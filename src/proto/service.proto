@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package oceandoc.proto;
+
+import "src/proto/error.proto";
+
+message Config {
+  string name = 1;
+}
+
+message StatusReq {
+  string request_id = 1;
+}
+
+message StatusRes {
+  string msg = 1;
+}
+
+message IpInfoReq {
+  string request_id = 1;
+}
+
+message IpInfoRes {
+  string msg = 1;
+}
+
+enum Op {
+  Op_Unused = 0;
+  Op_Put = 1;
+  Op_Delete = 2;
+  Op_Chmod = 3;
+  Op_Chowner = 4;
+}
+
+message FileReq {
+  Op op = 1;
+  string file_name = 2;
+  string file_sha256 = 3;
+  string file_size = 4;
+  int64 file_start = 5;
+  int64 file_end = 6;
+}
+
+message FileRes {
+  ErrCode err_code = 1;
+  string err_msg = 2;
+}
+
+service OceanFile {
+  rpc Status(StatusReq) returns (StatusRes);
+  rpc IpInfo(IpInfoReq) returns (IpInfoRes);
+  rpc PutFile(stream FileReq) returns (stream FileRes);
+  rpc DelFile(FileReq) returns (FileRes);
+  rpc Chmod(FileReq) returns (FileRes);
+  rpc Chowner(FileReq) returns (FileRes);
+}
