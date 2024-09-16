@@ -148,6 +148,7 @@ class ScanManager {
         scan_status->set_dir_num(scan_status->file_num() + dir_num);
       }
 
+      // TODO(Xie) dump info
       if (dir_num <= 0) {
         return true;
       }
@@ -169,7 +170,6 @@ class ScanManager {
 
         auto cur_thread_next_dir = it->path().string();
         ++it;
-
         std::vector<std::future<bool>> rets;
         while (current_threads <= max_threads &&
                it != std::filesystem::directory_iterator()) {
@@ -183,7 +183,9 @@ class ScanManager {
           absl::base_internal::SpinLockHolder locker(&lock_);
           ++current_threads;
         }
-        ParallelScan(cur_thread_next_dir, scan_status);
+        if (!ParallelScan(cur_thread_next_dir, scan_status)) {
+          return false;
+        }
         for (auto& f : rets) {
           if (f.get() == false) {
             return false;
