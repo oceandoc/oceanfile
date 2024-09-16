@@ -90,6 +90,7 @@ cc_library(
     name = "thread_pool",
     hdrs = ["thread_pool.h"],
     deps = [
+        ":config_manager",
         "@boost//:asio",
         "@com_github_glog_glog//:glog",
     ],

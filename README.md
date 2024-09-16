@@ -1,7 +1,8 @@
 # TODO
 * kill syncthing
 * kill immich
-* kill everything 
+* kill everything
+* password manager
 * notes generation
 * a web system
 

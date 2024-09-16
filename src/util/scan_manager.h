@@ -12,7 +12,9 @@
 #include <memory>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
+#include "absl/base/internal/spinlock.h"
 #include "folly/Singleton.h"
 #include "glog/logging.h"
 #include "src/proto/data.pb.h"
@@ -76,16 +78,26 @@ class ScanManager {
     }
 
     try {
+      int symlink_num = 0;
+      int file_num = 0;
+      int dir_num = 0;
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
         if (entry.is_symlink()) {
-          scan_status->set_symlink_num(scan_status->symlink_num() + 1);
+          ++symlink_num;
         } else if (entry.is_regular_file()) {
-          scan_status->set_file_num(scan_status->file_num() + 1);
+          ++file_num;
         } else if (entry.is_directory()) {
-          continue;
+          ++dir_num;
         } else {
           LOG(ERROR) << "Unknow file type: " << entry.path();
         }
+      }
+
+      {
+        absl::base_internal::SpinLockHolder locker(&lock_);
+        scan_status->set_symlink_num(scan_status->symlink_num() + symlink_num);
+        scan_status->set_file_num(scan_status->file_num() + file_num);
+        scan_status->set_dir_num(scan_status->file_num() + dir_num);
       }
 
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
@@ -96,6 +108,7 @@ class ScanManager {
           }
         }
       }
+
       scanned_dirs_.insert(path);
     } catch (const std::filesystem::filesystem_error& e) {
       LOG(ERROR) << "Scan " << path << " error: " << e.what();
@@ -104,9 +117,7 @@ class ScanManager {
     return true;
   }
 
-  bool ParallelScan(const std::string& path, proto::ScanStatus* scan_status,
-                    const uint32_t max_threads = 3,
-                    uint32_t current_threads = 1) {
+  bool ParallelScan(const std::string& path, proto::ScanStatus* scan_status) {
     auto it = scanned_dirs_.find(path);
     if (it != scanned_dirs_.end()) {
       return true;
@@ -115,37 +126,70 @@ class ScanManager {
     auto s_path = std::filesystem::path(path);
 
     try {
+      int symlink_num = 0;
+      int file_num = 0;
+      int dir_num = 0;
       for (const auto& entry : std::filesystem::directory_iterator(s_path)) {
         if (entry.is_symlink()) {
-          scan_status->set_symlink_num(scan_status->symlink_num() + 1);
+          ++symlink_num;
         } else if (entry.is_regular_file()) {
-          scan_status->set_file_num(scan_status->file_num() + 1);
+          ++file_num;
         } else if (entry.is_directory()) {
-          continue;
+          ++dir_num;
         } else {
           LOG(ERROR) << "Unknow file type: " << entry.path();
         }
       }
 
-      int dir_num = 0;
-      for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        if (entry.is_directory()) {
-          ++dir_num;
-          scan_status->set_dir_num(scan_status->dir_num() + 1);
-          if (dir_num > 1 && current_threads <= max_threads) {
-            std::packaged_task<bool(const std::string&, proto::ScanStatus*)>
-                task(std::bind(static_cast<bool (ScanManager::*)(
-                                   const std::string&, proto::ScanStatus*)>(
-                                   &ScanManager::Scan),
-                               this, entry.path().string(), scan_status));
-            std::future<bool> result = task.get_future();
-            ThreadPool::Instance()->Post(task);
-            ++current_threads;
-            bool value = result.get();
+      {
+        absl::base_internal::SpinLockHolder locker(&lock_);
+        scan_status->set_symlink_num(scan_status->symlink_num() + symlink_num);
+        scan_status->set_file_num(scan_status->file_num() + file_num);
+        scan_status->set_dir_num(scan_status->file_num() + dir_num);
+      }
+
+      if (dir_num <= 0) {
+        return true;
+      }
+
+      if (dir_num == 1) {
+        for (const auto& entry : std::filesystem::directory_iterator(s_path)) {
+          if (!entry.is_directory()) {
+            continue;
           }
-          if (!Scan(entry.path().string(), scan_status)) {
+          ParallelScan(entry.path().string(), scan_status);
+        }
+      }
+
+      for (auto it = std::filesystem::directory_iterator(path);
+           it != std::filesystem::directory_iterator();) {
+        if (!it->is_directory()) {
+          continue;
+        }
+
+        auto cur_thread_next_dir = it->path().string();
+        ++it;
+
+        std::vector<std::future<bool>> rets;
+        while (current_threads <= max_threads &&
+               it != std::filesystem::directory_iterator()) {
+          std::packaged_task<bool()> task(std::bind(
+              static_cast<bool (ScanManager::*)(
+                  const std::string&, proto::ScanStatus*)>(&ScanManager::Scan),
+              this, it->path().string(), scan_status));
+          rets.emplace_back(task.get_future());
+          ThreadPool::Instance()->Post(task);
+          ++it;
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          ++current_threads;
+        }
+        ParallelScan(cur_thread_next_dir, scan_status);
+        for (auto& f : rets) {
+          if (f.get() == false) {
             return false;
           }
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          --current_threads;
         }
       }
 
@@ -171,6 +215,9 @@ class ScanManager {
   std::map<std::string, proto::ScanStatus> status_;
   std::unordered_set<std::string> scanned_dirs_;
   std::set<std::string> scanning_;
+  mutable absl::base_internal::SpinLock lock_;
+  int current_threads = 0;
+  int max_threads = 3;
 };
 
 }  // namespace util

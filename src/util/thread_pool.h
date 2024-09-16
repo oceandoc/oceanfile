@@ -44,8 +44,7 @@ class ThreadPool final {
     }
   }
 
-  bool Post(
-      std::packaged_task<bool(const std::string&, proto::ScanStatus*)>& task) {
+  bool Post(std::packaged_task<bool()>& task) {
     boost::asio::post(*pool_.get(), std::move(task));
     return true;
   }
