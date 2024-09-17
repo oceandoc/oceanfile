@@ -41,6 +41,7 @@ class Util final {
 
   static std::string TodayStr();
 
+  static std::string DetailTimeStr(const int64_t ts);
   static std::string DetailTimeStr();
 
   static int64_t Random(int64_t start, int64_t end);
@@ -90,8 +91,9 @@ class Util final {
 
   static bool Copy(const std::string &src_path, const std::string dst_path);
 
-  static bool WriteToFile(const std::string &dir, const std::string &file,
-                          const std::string &content);
+  static bool WriteToFile(std::filesystem::path path,
+                          const std::string &content,
+                          const bool append = false);
 
   static std::istream &GetLine(std::istream &is, std::string *line);
 
@@ -157,17 +159,12 @@ class Util final {
 
   static int64_t Hash64(const std::string &str);
 
-  static std::string Hash(const std::string &str);
-
   static void PrintProtoMessage(const google::protobuf::Message &msg);
 
   static void PrintProtoMessage(const google::protobuf::Message &msg,
                                 std::string *json);
   static bool JsonToMessage(const std::string &json,
                             google::protobuf::Message *msg);
-
-  static void Replace(const std::string &from, const std::string &to,
-                      std::string *str);
 
   template <class TypeName>
   static void AppendField(const std::string &key, const TypeName value,
@@ -234,6 +231,11 @@ class Util final {
     search_str->append("=");
     search_str->append(value);
   }
+
+  static int64_t ToTimestamp(std::filesystem::file_time_type ftime);
+  static int64_t CreateTime(std::string_view path);
+  static int64_t UpdateTime(std::string_view path);
+  static int64_t FileSize(std::string_view path);
 
  public:
   static const char *kPathDelimeter;

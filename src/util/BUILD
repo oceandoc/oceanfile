@@ -48,6 +48,32 @@ cc_library(
 )
 
 cc_library(
+    name = "double_buffer",
+    hdrs = ["double_buffer.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        "@com_github_glog_glog//:glog",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+cc_library(
+    name = "periodic_task",
+    srcs = ["periodic_task.cc"],
+    hdrs = ["periodic_task.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        ":scan_manager",
+        ":util",
+        "//src/proto:cc_config",
+        "//src/proto:cc_data",
+        "@folly",
+    ],
+)
+
+cc_library(
     name = "repo_manager",
     srcs = ["repo_manager.cc"],
     hdrs = ["repo_manager.h"],
@@ -68,6 +94,7 @@ cc_library(
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        ":double_buffer",
         ":thread_pool",
         ":util",
         "//src/proto:cc_data",
@@ -77,9 +104,7 @@ cc_library(
 
 cc_test(
     name = "scan_manager_test",
-    srcs = [
-        "scan_manager_test.cc",
-    ],
+    srcs = ["scan_manager_test.cc"],
     copts = COPTS,
     data = ["//conf:base_config.json"],
     local_defines = LOCAL_DEFINES,
@@ -88,12 +113,23 @@ cc_test(
 
 cc_library(
     name = "thread_pool",
+    srcs = ["thread_pool.cc"],
     hdrs = ["thread_pool.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
     deps = [
         ":config_manager",
         "@boost//:asio",
         "@com_github_glog_glog//:glog",
     ],
+)
+
+cc_test(
+    name = "thread_pool_test",
+    srcs = ["thread_pool_test.cc"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [":thread_pool"],
 )
 
 cc_library(

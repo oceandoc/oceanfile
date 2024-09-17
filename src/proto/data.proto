@@ -1,44 +1,38 @@
 syntax = "proto3";
 package oceandoc.proto;
 
-message FileItem {
-  string name = 1;
-  string path = 2;
-  string owner = 3;
-  // remote file permiss, 1bit: need auth, 2bit: group, 3bit: all
-  uint32 permission = 4;
-  string sha256 = 5;
-  string enc_sha256 = 6;
-  uint64 local_create_time = 7;    // local create time
-  uint64 local_update_time = 8;    // local update time
-  uint64 remote_upload_time = 9;   // remote upload time
-  uint64 remote_update_time = 10;  // remote update time
-  uint64 remote_access_time = 11;  // remote access time
+enum FileType {
+  Unused = 0;
+  Regular = 1;
+  Symlink = 2;
+  Dir = 3;
 }
 
-message DirItem {
-  string name = 1;
-  string path = 2;
-  string owner = 3;
+message FileItem {
+  string path = 1;
+  uint64 size = 2;
+  uint64 create_time = 3;  // local create time
+  uint64 update_time = 4;  // local update time
+  FileType file_type = 5;
+
+  string owner = 6;
+  uint64 remote_access_time = 7;  // remote access time
+  string sha256 = 8;
+  string enc_sha256 = 9;
   // remote file permiss, 1bit: need auth, 2bit: group, 3bit: all
-  uint32 permission = 4;
-  uint64 local_create_time = 5;   // local create time
-  uint64 local_update_time = 6;   // local update time
-  uint64 remote_upload_time = 7;  // remote upload time
-  uint64 remote_update_time = 8;  // remote update time
-  uint64 remote_access_time = 9;  // remote access time
-  repeated FileItem file_items = 10;
+  uint32 permission = 10;
 }
 
 message ScanStatus {
   string path = 1;
-  uint64 last_update_time = 2;
-  uint64 file_num = 3;
-  uint64 dir_num = 4;
-  uint64 symlink_num = 5;
-  map<string, bool> visited_dirs = 6;
-  map<string, FileItem> visited_files = 7;
-  uint64 complete_time = 8;
+  uint64 file_num = 2;
+  uint64 dir_num = 3;
+  uint64 symlink_num = 4;
+  repeated string scanned_dirs = 5;
+  repeated FileItem scanned_files = 6;
+  int64 create_time = 7;
+  int64 update_time = 8;
+  int64 complete_time = 9;
 }
 
 message RepoItem {

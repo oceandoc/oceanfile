@@ -3,12 +3,15 @@
  * All rights reserved.
  *******************************************************************************/
 
+#ifndef BAZEL_TEMPLATE_UTIL_THREAD_POOL_H
+#define BAZEL_TEMPLATE_UTIL_THREAD_POOL_H
+
+#include <functional>
 #include <future>
 #include <memory>
 
 #include "boost/asio/post.hpp"
 #include "boost/asio/thread_pool.hpp"
-#include "src/proto/data.pb.h"
 #include "src/util/config_manager.h"
 
 namespace oceandoc {
@@ -32,7 +35,8 @@ class ThreadPool final {
 
   bool Init() {
     auto thread_num = ConfigManager::Instance()->EventThreads();
-    pool_ = (std::make_shared<boost::asio::thread_pool>(thread_num));
+    LOG(INFO) << "thread pool size: " << thread_num;
+    pool_ = std::make_shared<boost::asio::thread_pool>(thread_num);
     return true;
   }
 
@@ -49,6 +53,16 @@ class ThreadPool final {
     return true;
   }
 
+  bool Post(std::function<void()> task) {
+    boost::asio::post(*pool_.get(), std::move(task));
+    return true;
+  }
+
+  bool Post(std::packaged_task<int()>& task) {
+    boost::asio::post(*pool_.get(), std::move(task));
+    return true;
+  }
+
  private:
   std::shared_ptr<boost::asio::thread_pool> pool_;
   std::atomic_bool terminated;
@@ -56,3 +70,5 @@ class ThreadPool final {
 
 }  // namespace util
 }  // namespace oceandoc
+
+#endif  // BAZEL_TEMPLATE_UTIL_THREAD_POOL_H

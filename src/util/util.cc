@@ -26,6 +26,12 @@
 #include "openssl/md5.h"
 #include "src/MurmurHash2.h"
 #include "src/MurmurHash3.h"
+
+#if defined(__linux__) || defined(__APPLE__)
+#include <sys/stat.h>
+#elif defined(_WIN32)
+#include <windows.h>
+#endif
 // #include "src/common/ip_address.h"
 
 using absl::FormatTime;
@@ -98,8 +104,16 @@ string Util::TodayStr() {
 
 string Util::DetailTimeStr() {
   absl::Time now = absl::Now();
-  absl::TimeZone loc = absl::LocalTimeZone();
-  return absl::FormatTime("%Y-%m-%d%ET%H:%M:%E3S%Ez", now, loc);
+  TimeZone time_zone;
+  LoadTimeZone("Asia/Shanghai", &time_zone);
+  return absl::FormatTime("%Y-%m-%d%ET%H:%M:%E3S%Ez", now, time_zone);
+}
+
+string Util::DetailTimeStr(const int64_t ts) {
+  TimeZone time_zone;
+  LoadTimeZone("Asia/Shanghai", &time_zone);
+  return absl::FormatTime("%Y-%m-%d%ET%H:%M:%E3S%Ez", FromUnixMillis(ts),
+                          time_zone);
 }
 
 int64_t Util::Random(int64_t start, int64_t end) {
@@ -353,33 +367,23 @@ bool Util::Copy(const string &src_path, const string dst_path) {
   return true;
 }
 
-bool Util::WriteToFile(const string &dir, const string &file,
-                       const string &content) {
-  std::filesystem::path path;
-  if (dir.empty()) {
-    path = file;
-  } else if (dir[dir.size() - 1] == '/') {
-    path = dir + file;
-  } else {
-    path = dir + "/" + file;
-  }
-
+bool Util::WriteToFile(std::filesystem::path path, const string &content,
+                       const bool append) {
   try {
-    if (!dir.empty() && !std::filesystem::exists(dir)) {
-      std::filesystem::create_directories(dir);
+    if (!std::filesystem::exists(path)) {
+      if (path.has_parent_path()) {
+        std::filesystem::create_directories(path.parent_path());
+      }
     }
 
-    if (std::filesystem::exists(path)) {
-      std::filesystem::remove(path);
-    }
-
-    std::ofstream ofs(path);
-    if (ofs.is_open()) {
+    std::ofstream ofs(path, append ? std::ios::app : std::ios::out);
+    if (ofs && ofs.is_open()) {
       ofs << content;
       ofs.close();
     }
   } catch (std::exception &e) {
-    LOG(ERROR) << path.string() << " " << e.what();
+    LOG(ERROR) << (append ? "Write to " : "Append to ") << path.string()
+               << ", error: " << e.what();
     return false;
   }
 
@@ -776,13 +780,6 @@ string Util::UInt64ToHexStr(const uint64_t in) {
   return "";
 }
 
-string Util::Hash(const string &str) {
-  int32_t res;
-  MurmurHash3_x86_32(str.c_str(), str.length(), 0, &res);
-  res = abs(res);
-  return std::to_string(res);
-}
-
 int64_t Util::Hash64(const string &str) {
   return MurmurHash64A(str.c_str(), str.length(), 42L);
 }
@@ -820,12 +817,74 @@ bool Util::JsonToMessage(const std::string &json,
   return true;
 }
 
-void Util::Replace(const string &from, const string &to, string *str) {
-  size_t start_pos = str->find(from);
-  if (start_pos == std::string::npos) {
-    return;
+int64_t Util::ToTimestamp(std::filesystem::file_time_type ftime) {
+  auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+      ftime - decltype(ftime)::clock::now() + std::chrono::system_clock::now());
+  auto duration = sctp.time_since_epoch();
+  return std::chrono::duration_cast<std::chrono::milliseconds>(duration)
+      .count();
+}
+
+int64_t Util::UpdateTime(string_view path) {
+#if defined(_WIN32)
+  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+    ULARGE_INTEGER ull;
+    ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+    ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+    return ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
   }
-  str->replace(start_pos, from.length(), to);
+#else
+  struct stat attr;
+  if (lstat(path.data(), &attr) == 0) {
+#ifdef __APPLE__
+    return attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
+#else
+    return attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
+#endif
+  }
+#endif
+  return 0;
+}
+
+int64_t Util::CreateTime(string_view path) {
+#if defined(_WIN32)
+  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+    ULARGE_INTEGER ull;
+    ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
+    ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
+    return (ull.QuadPart / 10000ULL) - 11644473600000ULL;
+  }
+#else
+  struct stat attr;
+  if (lstat(path.data(), &attr) == 0) {
+#ifdef __linux__
+    return attr.st_ctim.tv_sec * 1000 + attr.st_ctim.tv_nsec / 1000000;
+#elif __APPLE__
+    return attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
+#endif
+  }
+  return 0;
+#endif
+}
+
+int64_t Util::FileSize(string_view path) {
+#if defined(_WIN32)
+  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+    LARGE_INTEGER size;
+    size.LowPart = fileInfo.nFileSizeLow;
+    size.HighPart = fileInfo.nFileSizeHigh;
+    return size.QuadPart;
+  }
+#else
+  struct stat attr;
+  if (lstat(path.data(), &attr) == 0) {
+    return attr.st_size;
+  }
+#endif
+  return 0;
 }
 
 }  // namespace util
