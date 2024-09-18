@@ -1,4 +1,6 @@
 # TODO
+* complete SyncLocal
+# final TODO
 * kill syncthing
 * kill immich
 * kill everything
