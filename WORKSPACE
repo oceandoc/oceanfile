@@ -588,10 +588,30 @@ new_git_repository(
     tag = "pcre2-10.42",
 )
 
+new_git_repository(
+    name = "crc32c",
+    build_file = "//bazel:crc32c.BUILD",
+    commit = "1c51f87c9ad8157b4461e2216b9272f13fd0be3b",
+    remote = "git@github.com:google/crc32c.git",
+)
+
 git_repository(
     name = "hedron_compile_commands",
     commit = "e43e8eaeed3e252ac7c02983f4b1792bdff2e2f0",
     remote = "git@code.xiamu.com:xiedeacc/bazel-compile-commands-extractor.git",
+)
+
+#new_git_repository(
+#name = "libudev",
+#build_file = "//bazel:libudev.BUILD",
+#remote = "git@github.com:systemd/systemd.git",
+#tag = "v256.6",
+#)
+
+new_local_repository(
+    name = "libudev",
+    build_file = "//bazel:libudev.BUILD",
+    path = "../systemd",
 )
 
 gen_local_config_git(name = "local_config_git")

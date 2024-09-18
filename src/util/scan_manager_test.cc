@@ -38,18 +38,21 @@ TEST(ScanManager, SymlinkCharacter) {
   LOG(INFO) << path << " size: " << Util::FileSize(path.string());
 }
 
-// TEST(ScanManager, Scan) {
-// std::string path = "/usr";
-// ScanManager::Instance()->Scan(path);
-// ScanManager::Instance()->Print();
-//}
+TEST(ScanManager, Scan) {
+  ScanManager::Instance()->Clear();
+  // std::string path = "/usr";
+  std::string path = "/usr/local/llvm";
+  ScanManager::Instance()->Scan(path);
+  ScanManager::Instance()->Print();
+}
 
 TEST(ScanManager, ParallelScan) {
   ConfigManager::Instance()->Init("./conf/base_config.json");
   ThreadPool::Instance()->Init();
 
   ScanManager::Instance()->Clear();
-  std::string path = "/usr";
+  // std::string path = "/usr";
+  std::string path = "/usr/local/llvm";
   ScanManager::Instance()->ParallelScan(path);
   ScanManager::Instance()->Print();
 }

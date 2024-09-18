@@ -69,9 +69,9 @@ bool PBCodeGenerator::Generate() const {
   string print_proto_message_name_final;
   Util::LoadSmallFile(GetFullPath("print_proto_message_name.cc"),
                       &print_proto_message_name_final);
-  Util::Replace(string("/** print_proto_message_name_content **/"),
-                print_proto_message_name_content,
-                &print_proto_message_name_final);
+  Util::ReplaceAll(&print_proto_message_name_final,
+                   string("/** print_proto_message_name_content **/"),
+                   print_proto_message_name_content);
   Print(out_path_, print_proto_message_name_final);
 
   LOG(INFO) << print_proto_message_name_final;

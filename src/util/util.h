@@ -70,20 +70,7 @@ class Util final {
 
   static bool Exist(const std::string &path);
 
-  static std::string TruncatePath(const std::string &src,
-                                  const std::string &path);
   static std::string RealPath(const std::string &path);
-
-  static bool ListFile(const std::string &path, std::vector<std::string> *files,
-                       const bool recursive = false);
-  static bool ListDir(const std::string &path, std::vector<std::string> *files,
-                      const bool recursive = false);
-
-  static bool ListFile(const std::string &path,
-                       std::vector<std::filesystem::path> *files,
-                       const std::string &name_pattern = "",
-                       const std::string &ignore_ext = "",
-                       const bool recursive = false);
 
   static bool CopyFile(const std::string &src_file_path,
                        const std::string dst_file_path,
@@ -91,7 +78,9 @@ class Util final {
 
   static bool Copy(const std::string &src_path, const std::string dst_path);
 
-  static bool WriteToFile(std::filesystem::path path,
+  static bool TruncateFile(const std::filesystem::path &path);
+
+  static bool WriteToFile(const std::filesystem::path &path,
                           const std::string &content,
                           const bool append = false);
 
@@ -155,7 +144,8 @@ class Util final {
 
   static uint64_t HexStrToUInt64(const std::string &in);
 
-  static std::string UInt64ToHexStr(const uint64_t in);
+  static std::string ToHexStr(const uint64_t in);
+  static void ToHexStr(std::string_view in, std::string *out);
 
   static int64_t Hash64(const std::string &str);
 
@@ -236,6 +226,19 @@ class Util final {
   static int64_t CreateTime(std::string_view path);
   static int64_t UpdateTime(std::string_view path);
   static int64_t FileSize(std::string_view path);
+  static void FileInfo(std::string_view path, int64_t *create_time,
+                       int64_t *update_time, int64_t *size);
+  static std::string PartitionUUID(std::string_view path);
+  static std::string Partition(std::string_view path);
+  static bool SetFileInvisible(std::string_view path);
+
+  static std::string UUID();
+
+  static uint32_t CRC32(std::string_view content);
+
+  static bool SHA256(std::string_view content, std::string *out);
+
+  static bool SHA256_libsodium(std::string_view content, std::string *out);
 
  public:
   static const char *kPathDelimeter;

@@ -3,12 +3,11 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_UTIL_REPO_MANAGER_H
-#define BAZEL_TEMPLATE_UTIL_REPO_MANAGER_H
+#ifndef BAZEL_TEMPLATE_UTIL_SCAN_MANAGER_H
+#define BAZEL_TEMPLATE_UTIL_SCAN_MANAGER_H
 
 #include <filesystem>
 #include <future>
-#include <map>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -32,63 +31,76 @@ class ScanManager {
  public:
   static std::shared_ptr<ScanManager> Instance();
 
-  bool Init() {
-    std::filesystem::path path = std::filesystem::current_path();
-    path += (std::filesystem::path::preferred_separator);
-    path += "conf";
-    path += std::filesystem::path::preferred_separator;
-    path += "repos.json";
+  bool Init() { return true; }
 
-    std::string content;
-    auto ret = Util::LoadSmallFile(path.string(), &content);
-    return true;
+  std::string GenFileDir(const std::string& path) {
+    return path + "/.Dr.Q.config";
   }
 
-  bool Clean() {}
-
-  bool Sort() {}
-
   std::string GenFileName(const std::string& path) {
-    std::filesystem::path s_path(path);
-    return s_path.filename().string() + "." +
-           Util::UInt64ToHexStr(Util::Hash64(path));
+    return GenFileDir(path) + "/" + Util::ToHexStr(Util::Hash64(path));
+  }
+
+  // TODO remark complete status here
+  void LoadCachedScanStatus(const std::string& path) {
+    scanned_dirs_.emplace(std::move(GenFileDir(path)));
+    const std::string cached_status_path = GenFileName(path);
+    if (!std::filesystem::exists(cached_status_path)) {
+      return;
+    }
+    std::string content;
+    if (Util::LoadSmallFile(cached_status_path, &content)) {
+      LOG(INFO) << "Load cached status: " << cached_status_path;
+      status_.ParseFromString(content);
+      Print();
+      for (const auto& scanned_dir : status_.scanned_dirs()) {
+        scanned_dirs_.emplace(scanned_dir);
+      }
+    }
   }
 
   bool Dump(const std::string& path) {
+    Util::TruncateFile(path);
     std::string content;
-    Util::PrintProtoMessage(status_, &content);
+    status_.SerializeToString(&content);
     return Util::WriteToFile(path, content, true);
   }
 
-  bool Scan(const std::string& path) {
+  proto::ScanStatus Scan(const std::string& path,
+                         bool disable_scan_cache = false) {
     if (!std::filesystem::exists(path)) {
       LOG(ERROR) << path << " not exists";
-      return false;
+      return proto::ScanStatus();
     }
 
     if (!std::filesystem::is_directory(path)) {
       LOG(ERROR) << path << " not directory";
-      return false;
+      return proto::ScanStatus();
     }
 
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
       if (scanning_) {
         LOG(ERROR) << "Another scan is running ...";
-        return false;
+        return proto::ScanStatus();
       }
       scanning_ = true;
     }
 
     Clear();
+    if (!disable_scan_cache) {
+      LoadCachedScanStatus(path);
+    }
 
     auto ret = Scan(path, &status_);
-
+    MarkDirStatus();
     if (ret) {
       ret = Dump(GenFileName(path));
+      status_.set_complete_time(Util::Now());
     }
+    absl::base_internal::SpinLockHolder locker(&lock_);
     scanning_ = false;
-    return ret;
+    return status_;
   }
 
   bool Scan(const std::string& path, proto::ScanStatus* scan_status) {
@@ -105,16 +117,18 @@ class ScanManager {
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
         auto file_item = scan_status->mutable_scanned_files()->Add();
         file_item->set_path(entry.path().string());
-        file_item->set_create_time(Util::CreateTime(file_item->path()));
-        file_item->set_update_time(Util::UpdateTime(file_item->path()));
+        int64_t create_time = 0, update_time = 0, size = 0;
+        Util::FileInfo(entry.path().string(), &create_time, &update_time,
+                       &size);
+        file_item->set_create_time(create_time);
+        file_item->set_update_time(update_time);
+        file_item->set_size(size);
 
         if (entry.is_symlink()) {
           ++symlink_num;
-          file_item->set_size(entry.file_size());
           file_item->set_file_type(proto::FileType::Symlink);
         } else if (entry.is_regular_file()) {
           ++file_num;
-          file_item->set_size(entry.file_size());
           file_item->set_file_type(proto::FileType::Regular);
         } else if (entry.is_directory()) {
           file_item->set_file_type(proto::FileType::Dir);
@@ -149,27 +163,38 @@ class ScanManager {
     return true;
   }
 
-  bool ParallelScan(const std::string& path) {
+  void MarkDirStatus() {
+    status_.mutable_scanned_dirs()->Reserve(scanned_dirs_.size());
+    for (const auto& d : scanned_dirs_) {
+      *status_.mutable_scanned_dirs()->Add() = d;
+    }
+  }
+
+  proto::ScanStatus ParallelScan(const std::string& path,
+                                 bool disable_scan_cache = false) {
     if (!std::filesystem::exists(path)) {
       LOG(ERROR) << path << " not exists";
-      return false;
+      return proto::ScanStatus();
     }
 
     if (!std::filesystem::is_directory(path)) {
       LOG(ERROR) << path << " not directory";
-      return false;
+      return proto::ScanStatus();
     }
 
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
       if (scanning_) {
         LOG(ERROR) << "Another scan is running ...";
-        return false;
+        return proto::ScanStatus();
       }
       scanning_ = true;
     }
 
     Clear();
+    if (!disable_scan_cache) {
+      LoadCachedScanStatus(path);
+    }
 
     std::packaged_task<bool()> task(
         std::bind(static_cast<bool (ScanManager::*)(const std::string&,
@@ -181,11 +206,14 @@ class ScanManager {
     ThreadPool::Instance()->Post(task);
 
     auto ret = task_future.get();
+    MarkDirStatus();
     if (ret) {
       ret = Dump(GenFileName(path));
+      status_.set_complete_time(Util::Now());
     }
+    absl::base_internal::SpinLockHolder locker(&lock_);
     scanning_ = false;
-    return ret;
+    return status_;
   }
 
   bool ParallelScan(const std::string& path, proto::ScanStatus* scan_status) {
@@ -200,19 +228,25 @@ class ScanManager {
 
     // LOG(INFO) << "Now scan " << path;
     try {
+      proto::FileItem* file_item = nullptr;
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        auto file_item = scan_status->mutable_scanned_files()->Add();
+        {
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          file_item = scan_status->mutable_scanned_files()->Add();
+        }
         file_item->set_path(entry.path().string());
-        file_item->set_create_time(Util::CreateTime(file_item->path()));
-        file_item->set_update_time(Util::UpdateTime(file_item->path()));
+        int64_t create_time = 0, update_time = 0, size = 0;
+        Util::FileInfo(entry.path().string(), &create_time, &update_time,
+                       &size);
+        file_item->set_create_time(create_time);
+        file_item->set_update_time(update_time);
+        file_item->set_size(size);
 
         if (entry.is_symlink()) {
           ++symlink_num;
-          file_item->set_size(Util::FileSize(file_item->path()));
           file_item->set_file_type(proto::FileType::Symlink);
         } else if (entry.is_regular_file()) {
           ++file_num;
-          file_item->set_size(Util::FileSize(file_item->path()));
           file_item->set_file_type(proto::FileType::Regular);
         } else if (entry.is_directory()) {
           file_item->set_file_type(proto::FileType::Dir);
@@ -285,14 +319,22 @@ class ScanManager {
     return complete;
   }
 
-  void Print() { Util::PrintProtoMessage(status_); }
+  void Print() {
+    LOG(INFO) << "file_num: " << status_.file_num()
+              << ", dir_num: " << status_.dir_num()
+              << ", symlink_num: " << status_.symlink_num();
+  }
 
   void Clear() {
     status_.Clear();
     scanned_dirs_.clear();
     scanning_ = false;
     current_threads = 0;
+    status_.mutable_scanned_files()->Reserve(10000000);
+    scanned_dirs_.reserve(10000000);
   }
+
+  proto::ScanStatus GetStatus() { return status_; }
 
  private:
   mutable absl::base_internal::SpinLock lock_;
@@ -306,4 +348,4 @@ class ScanManager {
 }  // namespace util
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_UTIL_REPO_MANAGER_H
+#endif  // BAZEL_TEMPLATE_UTIL_SCAN_MANAGER_H

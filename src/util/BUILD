@@ -80,6 +80,7 @@ cc_library(
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        ":scan_manager",
         ":util",
         "//src/proto:cc_config",
         "//src/proto:cc_data",
@@ -134,8 +135,18 @@ cc_test(
 
 cc_library(
     name = "util",
-    srcs = ["util.cc"],
-    hdrs = ["util.h"],
+    srcs = ["util.cc"] + select({
+        "@platforms//os:linux": ["util_linux.cc"],
+        "@platforms//os:osx": [],
+        "@platforms//os:windows": [],
+        "//conditions:default": [],
+    }),
+    hdrs = ["util.h"] + select({
+        "@platforms//os:linux": ["util_linux.h"],
+        "@platforms//os:osx": [],
+        "@platforms//os:windows": [],
+        "//conditions:default": [],
+    }),
     deps = [
         "@boost//:algorithm",
         "@boost//:beast",
@@ -145,6 +156,7 @@ cc_library(
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
         "@com_google_protobuf//:protobuf",
+        "@crc32c",
         "@fmt",
         "@folly",
         "@openssl",
@@ -160,6 +172,21 @@ cc_test(
     name = "util_test",
     timeout = "short",
     srcs = ["util_test.cc"],
+    deps = [
+        ":util",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "util_platform_test",
+    timeout = "short",
+    srcs = select({
+        "@platforms//os:linux": ["util_linux_test.cc"],
+        "@platforms//os:osx": [],
+        "@platforms//os:windows": [],
+        "//conditions:default": [],
+    }),
     deps = [
         ":util",
         "@com_google_googletest//:gtest_main",

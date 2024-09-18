@@ -21,6 +21,7 @@ message FileItem {
   string enc_sha256 = 9;
   // remote file permiss, 1bit: need auth, 2bit: group, 3bit: all
   uint32 permission = 10;
+  bool sync_finished = 11;
 }
 
 message ScanStatus {
@@ -38,7 +39,7 @@ message ScanStatus {
 message RepoItem {
   string repo_name = 1;
   string path = 2;
-  repeated FileItem items = 3;
+  string uuid = 3;
 }
 
 message OceanRepo {

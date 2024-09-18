@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
@@ -20,12 +21,25 @@
 #include "boost/algorithm/string/split.hpp"
 #include "boost/algorithm/string/trim_all.hpp"
 #include "boost/iostreams/device/mapped_file.hpp"
+#include "boost/uuid/random_generator.hpp"
+#include "boost/uuid/uuid_io.hpp"
+#include "crc32c/crc32c.h"
 #include "fmt/core.h"
 #include "glog/logging.h"
 #include "google/protobuf/util/json_util.h"
+#include "openssl/evp.h"
 #include "openssl/md5.h"
+#include "sodium/crypto_hash_sha256.h"
 #include "src/MurmurHash2.h"
 #include "src/MurmurHash3.h"
+
+#if defined(_WIN32)
+#include "src/util/util_windows.h"
+#elif defined(__linux__)
+#include "src/util/util_linux.h"
+#elif defined(__APPLE__)
+#include "src/util/util_osx.h"
+#endif
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <sys/stat.h>
@@ -68,17 +82,7 @@ int64_t Util::CurrentTimeMillis() {
 
 int64_t Util::NanoTime() { return GetCurrentTimeNanos(); }
 
-uint64_t Util::Now() {
-  auto duration_since_epoch =
-      std::chrono::system_clock::now().time_since_epoch();
-  auto microseconds_since_epoch =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          duration_since_epoch)
-          .count();
-  time_t seconds_since_epoch =
-      static_cast<time_t>(microseconds_since_epoch / 1000000);  // second
-  return seconds_since_epoch;
-}
+uint64_t Util::Now() { return absl::GetCurrentTimeNanos() / 1000000; }
 
 uint64_t Util::StrTimeToTimestamp(const string &time, int32_t offset) {
   absl::Time t;
@@ -217,131 +221,8 @@ bool Util::Mkdir(const string &dir) {
 
 bool Util::Exist(const string &path) { return std::filesystem::exists(path); }
 
-string Util::TruncatePath(const string &src, const string &path) {
-  string real_path = std::filesystem::canonical(src).string();
-  std::string::size_type n = real_path.find(path);
-  if (n != string::npos) {
-    return real_path.substr(0, n);
-  }
-  return "";
-}
-
 string Util::RealPath(const string &path) {
   return std::filesystem::canonical(path).string();
-}
-
-bool Util::ListDir(const string &path, std::vector<string> *files,
-                   const bool recursive) {
-  if (!files) {
-    return true;
-  }
-  try {
-    std::filesystem::path dir_path(path);
-    if (!std::filesystem::is_directory(dir_path)) {
-      return false;
-    }
-    if (recursive) {
-      std::filesystem::recursive_directory_iterator it(dir_path);
-      std::filesystem::recursive_directory_iterator end;
-      for (; it != end; ++it) {
-        files->emplace_back(it->path().string());
-      }
-    } else {
-      std::filesystem::directory_iterator it(dir_path);
-      std::filesystem::directory_iterator end;
-      for (; it != end; ++it) {
-        files->emplace_back(it->path().string());
-      }
-    }
-  } catch (const std::exception &e) {
-    LOG(ERROR) << e.what();
-    return false;
-  }
-  return true;
-}
-
-bool Util::ListFile(const string &path, std::vector<string> *files,
-                    const bool recursive) {
-  if (!files) {
-    return true;
-  }
-  try {
-    std::filesystem::path dir_path(path);
-    if (!std::filesystem::is_directory(dir_path)) {
-      return false;
-    }
-    if (recursive) {
-      std::filesystem::recursive_directory_iterator it(dir_path);
-      std::filesystem::recursive_directory_iterator end;
-      for (; it != end; ++it) {
-        if (std::filesystem::is_regular_file(it->status())) {
-          files->emplace_back(it->path().string());
-        }
-      }
-    } else {
-      std::filesystem::directory_iterator it(dir_path);
-      std::filesystem::directory_iterator end;
-      for (; it != end; ++it) {
-        if (std::filesystem::is_regular_file(it->status())) {
-          files->emplace_back(it->path().string());
-        }
-      }
-    }
-  } catch (const std::exception &e) {
-    LOG(ERROR) << e.what();
-    return false;
-  }
-  return true;
-}
-
-bool Util::ListFile(const string &path,
-                    std::vector<std::filesystem::path> *files,
-                    const std::string &name_pattern,
-                    const std::string &ignore_ext, const bool recursive) {
-  if (!files) {
-    return true;
-  }
-
-  try {
-    std::filesystem::path dir_path(path);
-    if (!std::filesystem::is_directory(dir_path)) {
-      LOG(ERROR) << path << " not directory";
-      return false;
-    }
-
-    if (recursive) {
-      std::filesystem::recursive_directory_iterator it(dir_path);
-      std::filesystem::recursive_directory_iterator end;
-      for (; it != end; ++it) {
-        if (std::filesystem::is_regular_file(it->status()) &&
-            it->path().extension().string() != ignore_ext) {
-          if (!name_pattern.empty() &&
-              it->path().string().find(name_pattern) == string::npos) {
-            continue;
-          }
-          files->emplace_back(it->path().string());
-        }
-      }
-    } else {
-      std::filesystem::directory_iterator it(dir_path);
-      std::filesystem::directory_iterator end;
-      for (; it != end; ++it) {
-        if (std::filesystem::is_regular_file(it->status()) &&
-            it->path().extension().string() != ignore_ext) {
-          if (!name_pattern.empty() &&
-              it->path().string().find(name_pattern) == string::npos) {
-            continue;
-          }
-          files->emplace_back(it->path());
-        }
-      }
-    }
-  } catch (const std::exception &e) {
-    LOG(ERROR) << e.what();
-    return false;
-  }
-
-  return true;
 }
 
 bool Util::CopyFile(const string &src_file_path, const string dst_file_path,
@@ -367,7 +248,19 @@ bool Util::Copy(const string &src_path, const string dst_path) {
   return true;
 }
 
-bool Util::WriteToFile(std::filesystem::path path, const string &content,
+bool Util::TruncateFile(const std::filesystem::path &path) {
+  try {
+    if (std::filesystem::exists(path)) {
+      std::filesystem::remove(path);
+    }
+  } catch (std::exception &e) {
+    LOG(ERROR) << path << ", error: " << e.what();
+    return false;
+  }
+  return true;
+}
+
+bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
                        const bool append) {
   try {
     if (!std::filesystem::exists(path)) {
@@ -771,13 +664,14 @@ uint64_t Util::HexStrToUInt64(const string &in) {
   return 0;
 }
 
-string Util::UInt64ToHexStr(const uint64_t in) {
-  try {
-    return fmt::format("{:016x}", in);
-  } catch (std::exception &e) {
-    LOG(ERROR) << "Parse error: " << in;
+string Util::ToHexStr(const uint64_t in) { return fmt::format("{:016x}", in); }
+
+void Util::ToHexStr(std::string_view in, std::string *out) {
+  out->clear();
+  out->reserve(in.size() * 2);
+  for (std::size_t i = 0; i < in.size(); ++i) {
+    out->append(fmt::format("{:02x}", (unsigned char)in[i]));
   }
-  return "";
 }
 
 int64_t Util::Hash64(const string &str) {
@@ -885,6 +779,114 @@ int64_t Util::FileSize(string_view path) {
   }
 #endif
   return 0;
+}
+
+void Util::FileInfo(std::string_view path, int64_t *create_time,
+                    int64_t *update_time, int64_t *size) {
+#if defined(_WIN32)
+  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+    ULARGE_INTEGER ull;
+    ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
+    ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
+    *create_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+
+    ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+    ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+    *upadte_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+
+    ull.LowPart = fileInfo.nFileSizeLow;
+    ull.HighPart = fileInfo.nFileSizeHigh;
+    *size = ull.QuadPart;
+  }
+#else
+  struct stat attr;
+  if (lstat(path.data(), &attr) == 0) {
+    *size = attr.st_size;
+#ifdef __linux__
+    *create_time = attr.st_ctim.tv_sec * 1000 + attr.st_ctim.tv_nsec / 1000000;
+    *update_time = attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
+#elif __APPLE__
+    *create_time =
+        attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
+    *update_time = attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
+#endif
+  }
+#endif
+}
+
+std::string Util::PartitionUUID(std::string_view path) {
+#if defined(_WIN32)
+  return UtilWindows::PartitionUUID(path);
+#elif defined(__linux__)
+  return UtilLinux::PartitionUUID(path);
+#elif defined(__APPLE__)
+  return UtilOsx::PartitionUUID(path);
+#endif
+}
+
+std::string Util::Partition(std::string_view path) {
+#if defined(_WIN32)
+  return UtilWindows::Partition(path);
+#elif defined(__linux__)
+  return UtilLinux::Partition(path);
+#elif defined(__APPLE__)
+  return UtilOsx::Partition(path);
+#endif
+}
+
+bool Util::SetFileInvisible(std::string_view path) {
+#if defined(_WIN32)
+  return UtilWindows::SetFileInvisible(path);
+#elif defined(__linux__)
+  return UtilLinux::SetFileInvisible(path);
+#elif defined(__APPLE__)
+  return UtilOsx::SetFileInvisible(path);
+#endif
+}
+
+std::string Util::UUID() {
+  boost::uuids::random_generator generator;
+  return boost::uuids::to_string(generator());
+}
+
+uint32_t Util::CRC32(std::string_view content) {
+  return crc32c::Crc32c(content);
+}
+
+bool Util::SHA256(std::string_view content, string *out) {
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned int length = 0;
+
+  EVP_MD_CTX *context = EVP_MD_CTX_new();
+  if (!context) {
+    return false;
+  }
+
+  if (EVP_DigestInit_ex(context, EVP_sha256(), nullptr) != 1 ||
+      EVP_DigestUpdate(context, content.data(), content.size()) != 1 ||
+      EVP_DigestFinal_ex(context, hash, &length) != 1) {
+    EVP_MD_CTX_free(context);
+    return false;
+  }
+
+  EVP_MD_CTX_free(context);
+
+  std::string_view sv(reinterpret_cast<const char *>(hash), length);
+  Util::ToHexStr(sv, out);
+  return true;
+}
+
+bool Util::SHA256_libsodium(std::string_view content, string *out) {
+  unsigned char hash[crypto_hash_sha256_BYTES];
+  crypto_hash_sha256(hash,
+                     reinterpret_cast<const unsigned char *>(content.data()),
+                     content.size());
+
+  std::string_view sv(reinterpret_cast<const char *>(hash),
+                      crypto_hash_sha256_BYTES);
+  Util::ToHexStr(sv, out);
+  return true;
 }
 
 }  // namespace util
