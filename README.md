@@ -1,5 +1,5 @@
 # TODO
-* complete SyncLocal
+* compress scan_status file
 # final TODO
 * kill syncthing
 * kill immich
@@ -9,6 +9,7 @@
 * a web system
 
 
+bazel run @hedron_compile_commands//:refresh_all
 
 # resource
 * https://github.com/awesome-selfhosted/awesome-selfhosted

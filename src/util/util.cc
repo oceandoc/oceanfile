@@ -20,6 +20,7 @@
 #include "boost/algorithm/string/predicate.hpp"
 #include "boost/algorithm/string/split.hpp"
 #include "boost/algorithm/string/trim_all.hpp"
+#include "boost/beast/core/detail/base64.hpp"
 #include "boost/iostreams/device/mapped_file.hpp"
 #include "boost/uuid/random_generator.hpp"
 #include "boost/uuid/uuid_io.hpp"
@@ -80,48 +81,40 @@ int64_t Util::CurrentTimeMillis() {
   return absl::GetCurrentTimeNanos() / 1000000;
 }
 
-int64_t Util::NanoTime() { return GetCurrentTimeNanos(); }
+int64_t Util::CurrentTimeNanos() { return GetCurrentTimeNanos(); }
 
-uint64_t Util::Now() { return absl::GetCurrentTimeNanos() / 1000000; }
+int64_t Util::StrToTimeStamp(string_view time) {
+  return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez");
+}
 
-uint64_t Util::StrTimeToTimestamp(const string &time, int32_t offset) {
+int64_t Util::StrToTimeStamp(string_view time, string_view format) {
   absl::Time t;
   string err;
-  if (!absl::ParseTime("%Y-%m-%d%ET%H:%M:%E3S%Ez", time, &t, &err)) {
+  if (!absl::ParseTime(format, time, &t, &err)) {
     LOG(ERROR) << "convert " << time << " " << err;
-    return 0;
+    return -1;
   }
-  return absl::ToUnixMillis(t) + offset;
+  return absl::ToUnixMillis(t);
 }
 
 string Util::ToTimeStr(const int64_t ts) {
-  TimeZone time_zone;
-  LoadTimeZone("Asia/Shanghai", &time_zone);
-  return FormatTime("%Y-%m-%d %H:%M:%S", FromUnixMillis(ts), time_zone);
+  return Util::ToTimeStr(ts, "Asia/Shanghai", "%Y-%m-%d%ET%H:%M:%E3S%Ez");
 }
 
-string Util::TodayStr() {
-  absl::Time now = absl::Now();
-  absl::TimeZone loc = absl::LocalTimeZone();
-  return absl::FormatTime("%Y-%m-%d", now, loc);
-}
-
-string Util::DetailTimeStr() {
-  absl::Time now = absl::Now();
+string Util::ToTimeStr(const int64_t ts, string_view format) {
   TimeZone time_zone;
   LoadTimeZone("Asia/Shanghai", &time_zone);
-  return absl::FormatTime("%Y-%m-%d%ET%H:%M:%E3S%Ez", now, time_zone);
+  return FormatTime(format, FromUnixMillis(ts), time_zone);
 }
 
-string Util::DetailTimeStr(const int64_t ts) {
+string Util::ToTimeStr(const int64_t ts, string_view format, string_view tz) {
   TimeZone time_zone;
-  LoadTimeZone("Asia/Shanghai", &time_zone);
-  return absl::FormatTime("%Y-%m-%d%ET%H:%M:%E3S%Ez", FromUnixMillis(ts),
-                          time_zone);
+  LoadTimeZone(tz, &time_zone);
+  return FormatTime(format, FromUnixMillis(ts), time_zone);
 }
 
 int64_t Util::Random(int64_t start, int64_t end) {
-  static thread_local std::mt19937 generator(NanoTime());
+  static thread_local std::mt19937 generator(CurrentTimeNanos());
   std::uniform_int_distribution<int64_t> distribution(start, end - 1);
   return distribution(generator);
 }
@@ -149,100 +142,58 @@ bool Util::SleepUntil(const Time &time, volatile bool *stop_signal) {
   return true;
 }
 
-bool Util::IsDir(const string &path) {
-  std::filesystem::path file_path(path);
-  return std::filesystem::is_directory(file_path);
-}
-
-bool Util::IsFile(const string &dir, const string &file) {
-  std::filesystem::path file_path(dir + "/" + file);
-  return std::filesystem::is_regular_file(file_path);
-}
-
-string Util::DirName(const string &path) {
-  std::filesystem::path file_path(path);
-  return file_path.parent_path().string();
-}
-
-string Util::BaseName(const string &path) {
-  std::filesystem::path file_path(path);
-  return file_path.filename().string();
-}
-
-std::string Util::FileExtention(const std::string &path) {
-  std::filesystem::path file_path(path);
-  return file_path.extension().string();
-}
-
-bool Util::Remove(const string &dir, const string &file) {
-  string path;
-  if (dir.empty()) {
-    path = file;
-  } else if (dir[dir.size() - 1] == '/') {
-    path = dir + file;
-  } else {
-    path = dir + "/" + file;
+void Util::UnifyDir(string *path) {
+  if (path->size() > 1 && path->back() == '/') {
+    path->resize(path->size() - 1);
   }
+}
 
+string Util::UnifyDir(string_view path) {
+  if (path.size() > 1 && path.back() == '/') {
+    return string(path.substr(0, path.size() - 1));
+  }
+  return string(path);
+}
+
+bool Util::Remove(string_view path) {
   try {
     if (std::filesystem::exists(path)) {
-      return std::filesystem::remove(path);
-    }
-  } catch (std::exception &e) {
-    LOG(ERROR) << e.what();
-    return false;
-  }
-
-  return true;
-}
-
-bool Util::Remove(const string &dir) {
-  try {
-    if (std::filesystem::exists(dir)) {
-      return std::filesystem::remove_all(dir);
+      return std::filesystem::remove_all(path);
     }
   } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << e.what();
+    LOG(ERROR) << "Remove error: " << path << ", " << e.what();
     return false;
   }
 
   return true;
 }
 
-bool Util::Mkdir(const string &dir) {
+bool Util::Mkdir(string_view path) {
   try {
-    std::filesystem::create_directories(dir);
-  } catch (const std::exception &e) {
-    LOG(ERROR) << "Mkdir " << dir << " error";
+    std::filesystem::create_directories(path);
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "Mkdir error: " << path << ", " << e.what();
     return false;
   }
   return true;
 }
 
-bool Util::Exist(const string &path) { return std::filesystem::exists(path); }
-
-string Util::RealPath(const string &path) {
-  return std::filesystem::canonical(path).string();
-}
-
-bool Util::CopyFile(const string &src_file_path, const string dst_file_path,
+bool Util::CopyFile(string_view src, string_view dst,
                     const std::filesystem::copy_options opt) {
   try {
-    return std::filesystem::copy_file(src_file_path, dst_file_path, opt);
-  } catch (std::exception &e) {
-    LOG(ERROR) << "copy " << src_file_path << " to " << dst_file_path
-               << " exception, " << e.what();
+    return std::filesystem::copy_file(src, dst, opt);
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "CopyFile error: " << src << " to " << dst << ", "
+               << e.what();
   }
   return false;
 }
 
-bool Util::Copy(const string &src_path, const string dst_path) {
+bool Util::Copy(string_view src, string_view dst) {
   try {
-    std::filesystem::copy(src_path, dst_path,
-                          std::filesystem::copy_options::recursive);
-  } catch (std::exception &e) {
-    LOG(ERROR) << "copy " << src_path << " to " << dst_path << " exception, "
-               << e.what();
+    std::filesystem::copy(src, dst, std::filesystem::copy_options::recursive);
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "Copy error: " << src << " to " << dst << ", " << e.what();
     return false;
   }
   return true;
@@ -253,8 +204,8 @@ bool Util::TruncateFile(const std::filesystem::path &path) {
     if (std::filesystem::exists(path)) {
       std::filesystem::remove(path);
     }
-  } catch (std::exception &e) {
-    LOG(ERROR) << path << ", error: " << e.what();
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "TruncateFile error: " << path << ", " << e.what();
     return false;
   }
   return true;
@@ -274,35 +225,13 @@ bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
       ofs << content;
       ofs.close();
     }
-  } catch (std::exception &e) {
-    LOG(ERROR) << (append ? "Write to " : "Append to ") << path.string()
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << (!append ? "Write to " : "Append to ") << path.string()
                << ", error: " << e.what();
     return false;
   }
 
   return true;
-}
-
-std::istream &Util::GetLine(std::istream &is, std::string *line) {
-  line->clear();
-  std::istream::sentry se(is, true);
-  std::streambuf *sb = is.rdbuf();
-
-  for (;;) {
-    int c = sb->sbumpc();
-    switch (c) {
-      case '\n':
-        return is;
-      case '\r':
-        if (sb->sgetc() == '\n') sb->sbumpc();
-        return is;
-      case std::streambuf::traits_type::eof():
-        if (line->empty()) is.setstate(std::ios::eofbit);
-        return is;
-      default:
-        line->push_back(static_cast<char>(c));
-    }
-  }
 }
 
 bool Util::LoadSmallFile(string_view file_name, string *content) {
@@ -317,39 +246,6 @@ bool Util::LoadSmallFile(string_view file_name, string *content) {
   in.close();
   *content = buffer.str();
   return true;
-}
-
-std::vector<string> Util::LoadLines(const string &file_name) {
-  std::ifstream in(file_name);
-  if (!in) {
-    LOG(ERROR) << "Fail to open " << file_name;
-    return std::vector<string>();
-  }
-  std::vector<string> ret;
-  string line;
-  while (getline(in, line)) {
-    Util::Trim(&line);
-    if (line.empty()) {
-      continue;
-    }
-    if (line[0] == '#') {
-      continue;
-    }
-    ret.emplace_back(std::move(line));
-  }
-  in.close();
-  return ret;
-}
-
-string Util::FileMd5(const string &file_path) {
-  unsigned char result[MD5_DIGEST_LENGTH];
-  boost::iostreams::mapped_file_source src(file_path);
-  MD5((unsigned char *)src.data(), src.size(), result);
-  std::ostringstream sout;
-  sout << std::hex << std::setfill('0');
-  for (auto c : result) sout << std::setw(2) << static_cast<int>(c);
-
-  return sout.str();
 }
 
 string Util::ToUpper(const string &str) {
@@ -398,14 +294,6 @@ bool Util::EndWith(const string &str, const string &postfix) {
   return boost::ends_with(str, postfix);
 }
 
-void Util::ReplaceAll(string *s, const string &from, const string &to) {
-  boost::algorithm::replace_all(*s, from, to);
-}
-
-void Util::ReplaceAll(string *s, const string &from, const char *const to) {
-  boost::algorithm::replace_all(*s, from, to);
-}
-
 void Util::Split(const string &str, const string &delim,
                  std::vector<string> *result, bool trim_empty) {
   result->clear();
@@ -420,262 +308,223 @@ void Util::Split(const string &str, const string &delim,
   boost::split(*result, str, boost::is_any_of(delim));
 }
 
-string Util::ToString(const std::set<uint64_t> &ids) {
-  string ret;
-  ret.resize(512);
-  bool first = true;
-  for (auto id : ids) {
-    if (first) {
-      first = false;
-      ret.append(std::to_string(id));
-      continue;
-    }
-    ret.append(",");
-    ret.append(std::to_string(id));
-  }
-  return ret;
+std::string Util::UUID() {
+  boost::uuids::random_generator generator;
+  return boost::uuids::to_string(generator());
 }
 
-std::string Util::ToString(const std::map<string, string> &vars) {
-  string ret;
-  ret.resize(512);
-  bool first = true;
-  for (auto &p : vars) {
-    if (first) {
-      first = false;
-      ret.append(p.first);
-      ret.append("=");
-      ret.append(p.second);
-      continue;
-    }
-    ret.append("&");
-    ret.append(p.first);
-    ret.append("=");
-    ret.append(p.second);
-  }
-  return ret;
-}
-
-string Util::StandardBase64Encode(const string &input) {
-  string output;
-  // try {
-  // output.resize(boost::beast::detail::base64::encoded_size(input.size()));
-  // auto const ret = boost::beast::detail::base64::encode(
-  // output.data(), input.data(), input.size());
-  // output.resize(ret);
-  //} catch (exception &e) {
-  // LOG(INFO) << "Base64 encode error";
-  //}
-  return output;
-}
-
-string Util::StandardBase64Decode(const string &input) {
-  string output;
-  // try {
-  // output.resize(boost::beast::detail::base64::decoded_size(input.size()));
-  // auto const ret = boost::beast::detail::base64::decode(
-  // output.data(), input.data(), input.size());
-  // output.resize(ret.first);
-  //} catch (exception &e) {
-  // LOG(INFO) << "Base64 decode error";
-  //}
-  return output;
-}
-
-static const char *base64_chars[2] = {
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "abcdefghijklmnopqrstuvwxyz"
-    "0123456789"
-    "+/",
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "abcdefghijklmnopqrstuvwxyz"
-    "0123456789"
-    "-_"};
-
-static unsigned int CharPos(const unsigned char chr) {
-  if (chr >= 'A' && chr <= 'Z')
-    return chr - 'A';
-  else if (chr >= 'a' && chr <= 'z')
-    return chr - 'a' + ('Z' - 'A') + 1;
-  else if (chr >= '0' && chr <= '9')
-    return chr - '0' + ('Z' - 'A') + ('z' - 'a') + 2;
-  else if (chr == '+' || chr == '-')
-    return 62;  // Be liberal with input and accept both url ('-') and non-url
-                // ('+') base 64 characters (
-  else if (chr == '/' || chr == '_')
-    return 63;  // Ditto for '/' and '_'
-  else
-    throw std::runtime_error("Input is not valid base64-encoded data.");
-}
-
-static std::string InsertLinebreaks(std::string str, size_t distance) {
-  if (!str.length()) {
-    return "";
-  }
-
-  size_t pos = distance;
-  while (pos < str.size()) {
-    str.insert(pos, "\n");
-    pos += distance + 1;
-  }
-  return str;
-}
-
-std::string Base64EncodeImpl(unsigned char const *bytes_to_encode,
-                             size_t in_len, bool url) {
-  size_t len_encoded = (in_len + 2) / 3 * 4;
-  unsigned char trailing_char = url ? '.' : '=';
-  const char *base64_chars_ = base64_chars[url];
-  std::string ret;
-  ret.reserve(len_encoded);
-
-  unsigned int pos = 0;
-  while (pos < in_len) {
-    ret.push_back(base64_chars_[(bytes_to_encode[pos + 0] & 0xfc) >> 2]);
-    if (pos + 1 < in_len) {
-      ret.push_back(base64_chars_[((bytes_to_encode[pos + 0] & 0x03) << 4) +
-                                  ((bytes_to_encode[pos + 1] & 0xf0) >> 4)]);
-
-      if (pos + 2 < in_len) {
-        ret.push_back(base64_chars_[((bytes_to_encode[pos + 1] & 0x0f) << 2) +
-                                    ((bytes_to_encode[pos + 2] & 0xc0) >> 6)]);
-        ret.push_back(base64_chars_[bytes_to_encode[pos + 2] & 0x3f]);
-      } else {
-        ret.push_back(base64_chars_[(bytes_to_encode[pos + 1] & 0x0f) << 2]);
-        ret.push_back(trailing_char);
-      }
-    } else {
-      ret.push_back(base64_chars_[(bytes_to_encode[pos + 0] & 0x03) << 4]);
-      ret.push_back(trailing_char);
-      ret.push_back(trailing_char);
-    }
-    pos += 3;
-  }
-  return ret;
-}
-
-template <typename String>
-static std::string Base64EncodeImpl(String s, bool url) {
-  return Base64EncodeImpl(reinterpret_cast<const unsigned char *>(s.data()),
-                          s.length(), url);
-}
-
-template <typename String, unsigned int line_length>
-static std::string EncodeWithLineBreaks(String s) {
-  return InsertLinebreaks(Base64EncodeImpl(s, false), line_length);
-}
-
-template <typename String>
-static std::string Base64EncodePemImpl(String s) {
-  return EncodeWithLineBreaks<String, 64>(s);
-}
-
-template <typename String>
-static std::string Base64EncodeMimeImpl(String s) {
-  return EncodeWithLineBreaks<String, 76>(s);
-}
-
-string Util::Base64Encode(std::string_view s, bool url) {
-  return Base64EncodeImpl(s, url);
-}
-
-string Util::Base64EncodePem(std::string_view s) {
-  return Base64EncodePemImpl(s);
-}
-
-string Util::Base64EncodeMime(std::string_view s) {
-  return Base64EncodeMimeImpl(s);
-}
-
-template <typename String>
-static std::string Base64DecodeImpl(String const &encoded_string,
-                                    bool remove_linebreaks) {
-  if (encoded_string.empty()) return std::string();
-  if (remove_linebreaks) {
-    std::string copy(encoded_string);
-    copy.erase(std::remove(copy.begin(), copy.end(), '\n'), copy.end());
-    return Base64DecodeImpl(copy, false);
-  }
-  size_t length_of_string = encoded_string.length();
-  size_t pos = 0;
-
-  size_t approx_length_of_decoded_string = length_of_string / 4 * 3;
-  std::string ret;
-  ret.reserve(approx_length_of_decoded_string);
-
-  while (pos < length_of_string) {
-    size_t CharPos_1 = CharPos(encoded_string.at(pos + 1));
-    ret.push_back(static_cast<std::string::value_type>(
-        ((CharPos(encoded_string.at(pos + 0))) << 2) +
-        ((CharPos_1 & 0x30) >> 4)));
-
-    if ((pos + 2 <
-         length_of_string) &&  // Check for data that is not padded with equal
-                               // signs (which is allowed by RFC 2045)
-        encoded_string.at(pos + 2) != '=' &&
-        encoded_string.at(pos + 2) !=
-            '.'  // accept URL-safe base 64 strings, too, so check for '.' also.
-    ) {
-      unsigned int CharPos_2 = CharPos(encoded_string.at(pos + 2));
-      ret.push_back(static_cast<std::string::value_type>(
-          ((CharPos_1 & 0x0f) << 4) + ((CharPos_2 & 0x3c) >> 2)));
-
-      if ((pos + 3 < length_of_string) && encoded_string.at(pos + 3) != '=' &&
-          encoded_string.at(pos + 3) != '.') {
-        ret.push_back(static_cast<std::string::value_type>(
-            ((CharPos_2 & 0x03) << 6) + CharPos(encoded_string.at(pos + 3))));
-      }
-    }
-    pos += 4;
-  }
-  return ret;
-}
-
-std::string Base64Decode(std::string const &s, bool remove_linebreaks) {
-  return Base64DecodeImpl(s, remove_linebreaks);
-}
-std::string Util::Base64Decode(std::string_view s, bool remove_linebreaks) {
-  return Base64DecodeImpl(s, remove_linebreaks);
-}
-
-string Util::Md5(const string &str, bool use_upper_case) {
-  unsigned char result[MD5_DIGEST_LENGTH];
-  MD5((unsigned char *)str.data(), str.size(), result);
-  string hex_str;
-  hex_str.reserve(512);
-
-  string format_para = "{:02x}";
+string Util::ToHexStr(const uint64_t in, bool use_upper_case) {
   if (use_upper_case) {
-    format_para = "{:02X}";
+    return fmt::format("{:016X}", in);
+  } else {
+    return fmt::format("{:016x}", in);
   }
-
-  for (auto c : result) {
-    hex_str.append(fmt::format(format_para, c));
-  }
-  return hex_str;
 }
 
-uint64_t Util::HexStrToUInt64(const string &in) {
-  try {
-    return std::stoull(in, nullptr, 16);
-  } catch (std::exception &e) {
-    LOG(ERROR) << "Parse error: " << in;
-  }
-  return 0;
-}
-
-string Util::ToHexStr(const uint64_t in) { return fmt::format("{:016x}", in); }
-
-void Util::ToHexStr(std::string_view in, std::string *out) {
+void Util::ToHexStr(string_view in, std::string *out, bool use_upper_case) {
   out->clear();
   out->reserve(in.size() * 2);
   for (std::size_t i = 0; i < in.size(); ++i) {
-    out->append(fmt::format("{:02x}", (unsigned char)in[i]));
+    if (use_upper_case) {
+      out->append(fmt::format("{:02X}", (unsigned char)in[i]));
+    } else {
+      out->append(fmt::format("{:02x}", (unsigned char)in[i]));
+    }
   }
 }
 
-int64_t Util::Hash64(const string &str) {
-  return MurmurHash64A(str.c_str(), str.length(), 42L);
+bool Util::HexStrToInt64(string_view in, int64_t *out) {
+  *out = 0;
+  auto result = std::from_chars(in.data(), in.data() + in.size(), *out, 16);
+  if (result.ec == std::errc()) {
+    return false;
+  }
+  return true;
+}
+
+uint32_t Util::CRC32(string_view content) { return crc32c::Crc32c(content); }
+
+string Util::Base64Encode(string_view input) {
+  string output;
+  output.resize(boost::beast::detail::base64::encoded_size(input.size()));
+  auto const ret = boost::beast::detail::base64::encode(
+      output.data(), input.data(), input.size());
+  output.resize(ret);
+  return output;
+}
+
+string Util::Base64Decode(string_view input) {
+  string output;
+  output.resize(boost::beast::detail::base64::decoded_size(input.size()));
+  auto const ret = boost::beast::detail::base64::decode(
+      output.data(), input.data(), input.size());
+  output.resize(ret.first);
+  return output;
+}
+
+int64_t Util::MurmurHash64A(string_view str) {
+  return ::MurmurHash64A(str.data(), str.size(), 42L);
+}
+
+bool Util::Hash(string_view str, const EVP_MD *type, string *out,
+                bool use_upper_case) {
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned int length;
+
+  EVP_MD_CTX *context = EVP_MD_CTX_new();
+  if (!context) {
+    return false;
+  }
+  if (EVP_DigestInit_ex(context, type, nullptr) != 1 ||
+      EVP_DigestUpdate(context, str.data(), str.size()) != 1 ||
+      EVP_DigestFinal_ex(context, hash, &length) != 1) {
+    EVP_MD_CTX_free(context);
+    return false;
+  }
+
+  EVP_MD_CTX_free(context);
+
+  string_view sv(reinterpret_cast<const char *>(hash), length);
+  Util::ToHexStr(sv, out, use_upper_case);
+  return true;
+}
+
+bool Util::ExtraFileHash(const std::string &path, const EVP_MD *type,
+                         std::string *out, bool use_upper_case) {
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned int length;
+  const size_t buffer_size = 64 * 1024 * 1024 * 8;  // 64MB buffer
+
+  std::ifstream file(path, std::ios::binary);
+  if (!file || !file.is_open()) {
+    return false;
+  }
+
+  EVP_MD_CTX *context = EVP_MD_CTX_new();
+  if (context == nullptr) {
+    return false;
+  }
+
+  if (EVP_DigestInit_ex(context, type, nullptr) != 1) {
+    EVP_MD_CTX_free(context);
+    return false;
+  }
+
+  char buffer[buffer_size];
+  while (file.read(buffer, sizeof(buffer)) || file.gcount()) {
+    if (EVP_DigestUpdate(context, buffer, file.gcount()) != 1) {
+      EVP_MD_CTX_free(context);
+      return false;
+    }
+  }
+
+  if (EVP_DigestFinal_ex(context, hash, &length) != 1) {
+    EVP_MD_CTX_free(context);
+    return false;
+  }
+
+  EVP_MD_CTX_free(context);
+
+  string_view sv(reinterpret_cast<const char *>(hash), length);
+  Util::ToHexStr(sv, out, use_upper_case);
+  return true;
+}
+
+bool Util::BigFileHash(const std::string &path, const EVP_MD *type,
+                       std::string *out, bool use_upper_case) {
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned int length;
+  const size_t buffer_size = 64 * 1024 * 1024 * 8;  // 64MB buffer
+
+  std::ifstream file(path, std::ios::binary);
+  if (!file || !file.is_open()) {
+    return false;
+  }
+
+  EVP_MD_CTX *context = EVP_MD_CTX_new();
+  if (context == nullptr) {
+    return false;
+  }
+
+  if (EVP_DigestInit_ex(context, type, nullptr) != 1) {
+    EVP_MD_CTX_free(context);
+    return false;
+  }
+
+  char buffer[buffer_size];
+  while (file.read(buffer, sizeof(buffer)) || file.gcount()) {
+    if (EVP_DigestUpdate(context, buffer, file.gcount()) != 1) {
+      EVP_MD_CTX_free(context);
+      return false;
+    }
+  }
+
+  if (EVP_DigestFinal_ex(context, hash, &length) != 1) {
+    EVP_MD_CTX_free(context);
+    return false;
+  }
+
+  EVP_MD_CTX_free(context);
+
+  string_view sv(reinterpret_cast<const char *>(hash), length);
+  Util::ToHexStr(sv, out, use_upper_case);
+  return true;
+}
+
+bool Util::SmallFileHash(const std::string &path, const EVP_MD *type,
+                         std::string *out, bool use_upper_case) {
+  string str;
+  if (!Util::LoadSmallFile(path, &str)) {
+    return false;
+  }
+  return Hash(str, type, out, use_upper_case);
+}
+
+bool Util::MD5(string_view str, string *out, bool use_upper_case) {
+  return Hash(str, EVP_md5(), out, use_upper_case);
+}
+
+bool Util::SmallFileMD5(const string &path, string *out, bool use_upper_case) {
+  return SmallFileHash(path, EVP_md5(), out, use_upper_case);
+}
+
+bool Util::BigFileMD5(const std::string &path, string *out,
+                      bool use_upper_case) {
+  return Util::BigFileHash(path, EVP_md5(), out, use_upper_case);
+}
+
+bool Util::ExtraFileMD5(const string &path, string *out, bool use_upper_case) {
+  return Util::ExtraFileHash(path, EVP_md5(), out, use_upper_case);
+}
+
+bool Util::SHA256(string_view str, string *out, bool use_upper_case) {
+  return Hash(str, EVP_sha256(), out, use_upper_case);
+}
+
+bool Util::SHA256_libsodium(string_view str, string *out, bool use_upper_case) {
+  unsigned char hash[crypto_hash_sha256_BYTES];
+  crypto_hash_sha256(hash, reinterpret_cast<const unsigned char *>(str.data()),
+                     str.size());
+
+  string_view sv(reinterpret_cast<const char *>(hash),
+                 crypto_hash_sha256_BYTES);
+  Util::ToHexStr(sv, out, use_upper_case);
+  return true;
+}
+
+bool Util::SmallFileSHA256(const string &path, string *out,
+                           bool use_upper_case) {
+  return SmallFileHash(path, EVP_sha256(), out, use_upper_case);
+}
+
+bool Util::BigFileSHA256(const std::string &path, string *out,
+                         bool use_upper_case) {
+  return BigFileHash(path, EVP_sha256(), out, use_upper_case);
+}
+
+bool Util::ExtraFileSHA256(const string &path, string *out,
+                           bool use_upper_case) {
+  return ExtraFileHash(path, EVP_sha256(), out, use_upper_case);
 }
 
 void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
@@ -709,14 +558,6 @@ bool Util::JsonToMessage(const std::string &json,
     return false;
   }
   return true;
-}
-
-int64_t Util::ToTimestamp(std::filesystem::file_time_type ftime) {
-  auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-      ftime - decltype(ftime)::clock::now() + std::chrono::system_clock::now());
-  auto duration = sctp.time_since_epoch();
-  return std::chrono::duration_cast<std::chrono::milliseconds>(duration)
-      .count();
 }
 
 int64_t Util::UpdateTime(string_view path) {
@@ -781,7 +622,7 @@ int64_t Util::FileSize(string_view path) {
   return 0;
 }
 
-void Util::FileInfo(std::string_view path, int64_t *create_time,
+void Util::FileInfo(string_view path, int64_t *create_time,
                     int64_t *update_time, int64_t *size) {
 #if defined(_WIN32)
   WIN32_FILE_ATTRIBUTE_DATA fileInfo;
@@ -815,7 +656,7 @@ void Util::FileInfo(std::string_view path, int64_t *create_time,
 #endif
 }
 
-std::string Util::PartitionUUID(std::string_view path) {
+std::string Util::PartitionUUID(string_view path) {
 #if defined(_WIN32)
   return UtilWindows::PartitionUUID(path);
 #elif defined(__linux__)
@@ -825,7 +666,7 @@ std::string Util::PartitionUUID(std::string_view path) {
 #endif
 }
 
-std::string Util::Partition(std::string_view path) {
+std::string Util::Partition(string_view path) {
 #if defined(_WIN32)
   return UtilWindows::Partition(path);
 #elif defined(__linux__)
@@ -835,7 +676,7 @@ std::string Util::Partition(std::string_view path) {
 #endif
 }
 
-bool Util::SetFileInvisible(std::string_view path) {
+bool Util::SetFileInvisible(string_view path) {
 #if defined(_WIN32)
   return UtilWindows::SetFileInvisible(path);
 #elif defined(__linux__)
@@ -845,47 +686,49 @@ bool Util::SetFileInvisible(std::string_view path) {
 #endif
 }
 
-std::string Util::UUID() {
-  boost::uuids::random_generator generator;
-  return boost::uuids::to_string(generator());
+bool Util::IsAbsolute(string_view src) {
+  std::filesystem::path s_src(src);
+  return s_src.is_absolute();
 }
 
-uint32_t Util::CRC32(std::string_view content) {
-  return crc32c::Crc32c(content);
-}
+bool Util::Relative(string_view path, string_view base, string *relative) {
+  relative->clear();
+  const string u_path = UnifyDir(path);
+  const string u_base = UnifyDir(base);
 
-bool Util::SHA256(std::string_view content, string *out) {
-  unsigned char hash[EVP_MAX_MD_SIZE];
-  unsigned int length = 0;
-
-  EVP_MD_CTX *context = EVP_MD_CTX_new();
-  if (!context) {
+  auto s_path = std::filesystem::path(u_path);
+  auto s_base = std::filesystem::path(u_base);
+  if (!s_path.is_absolute() || !s_base.is_absolute()) {
     return false;
   }
 
-  if (EVP_DigestInit_ex(context, EVP_sha256(), nullptr) != 1 ||
-      EVP_DigestUpdate(context, content.data(), content.size()) != 1 ||
-      EVP_DigestFinal_ex(context, hash, &length) != 1) {
-    EVP_MD_CTX_free(context);
-    return false;
+  if (boost::algorithm::starts_with(u_path, u_base) &&
+      u_path.size() > u_base.size()) {
+    *relative = u_path.substr(u_base.size() + 1);
   }
-
-  EVP_MD_CTX_free(context);
-
-  std::string_view sv(reinterpret_cast<const char *>(hash), length);
-  Util::ToHexStr(sv, out);
   return true;
 }
 
-bool Util::SHA256_libsodium(std::string_view content, string *out) {
-  unsigned char hash[crypto_hash_sha256_BYTES];
-  crypto_hash_sha256(hash,
-                     reinterpret_cast<const unsigned char *>(content.data()),
-                     content.size());
+bool Util::SyncSymlink(const std::string &src, const std::string &dst,
+                       const std::string &src_symlink) {
+  auto target = std::filesystem::read_symlink(src_symlink);
+  std::string target_relative_path;
+  Util::Relative(target.string(), src, &target_relative_path);
+  std::string symlink_relative_path;
+  Util::Relative(src_symlink, src, &symlink_relative_path);
+  auto dst_symlink = dst + "/" + symlink_relative_path;
 
-  std::string_view sv(reinterpret_cast<const char *>(hash),
-                      crypto_hash_sha256_BYTES);
-  Util::ToHexStr(sv, out);
+  Util::Remove(dst_symlink);
+  if (target.is_absolute()) {
+    if (Util::StartWith(target, src)) {
+      std::filesystem::create_symlink(dst + "/" + target_relative_path,
+                                      dst_symlink);
+    } else {
+      std::filesystem::create_symlink(target, dst_symlink);
+    }
+  } else {
+    std::filesystem::create_symlink(target, dst_symlink);
+  }
   return true;
 }
 

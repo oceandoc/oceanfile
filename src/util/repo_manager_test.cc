@@ -3,17 +3,19 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/util/scan_manager.h"
+#include "src/util/repo_manager.h"
+
+#include "gtest/gtest.h"
 
 namespace oceandoc {
 namespace util {
 
-static folly::Singleton<ScanManager> scan_manager;
-
-const std::string ScanManager::mark_dir_name = ".Dr.Q.config";
-
-std::shared_ptr<ScanManager> ScanManager::Instance() {
-  return scan_manager.try_get();
+TEST(RepoManager, SyncLocal) {
+  ConfigManager::Instance()->Init("./conf/base_config.json");
+  ThreadPool::Instance()->Init();
+  std::string src("/usr/local/llvm");
+  std::string dst("/usr/local/test");
+  RepoManager::Instance()->SyncLocal(src, dst);
 }
 
 }  // namespace util

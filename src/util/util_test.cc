@@ -12,9 +12,8 @@ namespace oceandoc {
 namespace util {
 
 TEST(Util, DetailTimeStr) {
-  EXPECT_EQ(Util::DetailTimeStr(1646397312000),
-            "2022-03-04T20:35:12.000+08:00");
-  LOG(INFO) << Util::DetailTimeStr(1646397312000);
+  EXPECT_EQ(Util::ToTimeStr(1646397312000), "2022-03-04T20:35:12.000+08:00");
+  LOG(INFO) << Util::ToTimeStr(1646397312000);
 }
 
 TEST(Util, UpdateTime) {
@@ -58,10 +57,11 @@ TEST(Util, CRC32) {
   Util::LoadSmallFile(
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus",
       &content);
-  auto start = Util::Now();
+  auto start = Util::CurrentTimeMillis();
   auto crc = Util::CRC32(content);
   LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, crc32:" << crc << ", cost: " << Util::Now() - start;
+            << "M, crc32:" << crc
+            << ", cost: " << Util::CurrentTimeMillis() - start;
   content =
       "A cyclic redundancy check (CRC) is an error-detecting code used to "
       "detect data corruption. When sending data, short checksum is generated "
@@ -80,15 +80,17 @@ TEST(Util, SHA256) {
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus",
       &content);
   std::string out;
-  auto start = Util::Now();
+  auto start = Util::CurrentTimeMillis();
   Util::SHA256(content, &out);
   LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, sha256:" << out << ", cost: " << Util::Now() - start;
+            << "M, sha256:" << out
+            << ", cost: " << Util::CurrentTimeMillis() - start;
 
-  start = Util::Now();
+  start = Util::CurrentTimeMillis();
   Util::SHA256_libsodium(content, &out);
   LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, sha256:" << out << ", cost: " << Util::Now() - start;
+            << "M, sha256:" << out
+            << ", cost: " << Util::CurrentTimeMillis() - start;
   content =
       "A cyclic redundancy check (CRC) is an error-detecting code used to "
       "detect data corruption. When sending data, short checksum is generated "
@@ -103,5 +105,52 @@ TEST(Util, SHA256) {
             "3f5d419c0386a26df1c75d0d1c488506fb641b33cebaa2a4917127ae33030b31");
 }
 
+TEST(Util, Relative) {
+  std::string path = "/usr/local/llvm/18/bin/llvm-dlltool";
+  std::string base = "/usr/local/llvm";
+  std::string relative;
+  EXPECT_EQ(Util::Relative(path, base, &relative), true);
+  EXPECT_EQ(relative, "18/bin/llvm-dlltool");
+
+  path = "/usr/local/llvm/18/bin/llvm-dlltool";
+  base = "/usr/local/llvm/";
+  EXPECT_EQ(Util::Relative(path, base, &relative), true);
+  EXPECT_EQ(relative, "18/bin/llvm-dlltool");
+
+  path = "/usr/local/llvm/18/bin/llvm-dlltool/";
+  base = "/usr/local/llvm";
+  EXPECT_EQ(Util::Relative(path, base, &relative), true);
+  EXPECT_EQ(relative, "18/bin/llvm-dlltool");
+
+  path = "/usr/local/llvm/18/bin/llvm-dlltool/";
+  base = "/usr/local/llvm/";
+  EXPECT_EQ(Util::Relative(path, base, &relative), true);
+  EXPECT_EQ(relative, "18/bin/llvm-dlltool");
+
+  path = "/usr/local/llvm/";
+  base = "/usr/local/llvm/";
+  EXPECT_EQ(Util::Relative(path, base, &relative), true);
+  EXPECT_EQ(relative, "");
+
+  path = "/usr/local/llvm";
+  base = "/usr/local/llvm/";
+  EXPECT_EQ(Util::Relative(path, base, &relative), true);
+  EXPECT_EQ(relative, "");
+
+  path = "/usr/local/llvm/";
+  base = "/usr/local/llvm";
+  EXPECT_EQ(Util::Relative(path, base, &relative), true);
+  EXPECT_EQ(relative, "");
+
+  path = "/";
+  base = "/";
+  EXPECT_EQ(Util::Relative(path, base, &relative), true);
+  EXPECT_EQ(relative, "");
+}
+
+TEST(Util, SyncSymlink) {
+  Util::SyncSymlink("/usr/local/llvm", "/usr/local/test",
+                    "/usr/local/llvm/18/bin/llvm-dlltool");
+}
 }  // namespace util
 }  // namespace oceandoc

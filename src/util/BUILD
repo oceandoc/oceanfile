@@ -8,11 +8,13 @@ COPTS = GLOBAL_COPTS + select({
     "@oceandoc//bazel:not_cross_compiling_on_windows": [
         "/Iexternal/double-conversion",
         "/Iexternal/folly",
+        "/Iexternal/libsodium/src/libsodium/include",
         "/I$(GENDIR)/external/folly",
     ],
     "//conditions:default": [
         "-isystem external/double-conversion",
         "-isystem external/folly",
+        "-isystem external/libsodium/src/libsodium/include",
         "-isystem $(GENDIR)/external/folly",
     ],
 }) + select({
@@ -88,6 +90,15 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "repo_manager_test",
+    srcs = ["repo_manager_test.cc"],
+    copts = COPTS,
+    data = ["//conf:base_config.json"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":repo_manager"],
+)
+
 cc_library(
     name = "scan_manager",
     srcs = ["scan_manager.cc"],
@@ -147,10 +158,13 @@ cc_library(
         "@platforms//os:windows": [],
         "//conditions:default": [],
     }),
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
     deps = [
         "@boost//:algorithm",
         "@boost//:beast",
         "@boost//:iostreams",
+        "@boost//:uuid",
         "@com_github_glog_glog//:glog",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",

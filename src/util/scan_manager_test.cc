@@ -12,6 +12,11 @@
 namespace oceandoc {
 namespace util {
 
+// TODO
+// 1. millions dir set performance
+// 2. billions file vector performance
+// 3. dump billions file name to disk performance
+
 TEST(ScanManager, SymlinkCharacter) {
   std::filesystem::path path("/usr/lib/llvm-14/build/Debug+Asserts");
   if (std::filesystem::is_symlink(path)) {
@@ -42,8 +47,12 @@ TEST(ScanManager, Scan) {
   ScanManager::Instance()->Clear();
   // std::string path = "/usr";
   std::string path = "/usr/local/llvm";
-  ScanManager::Instance()->Scan(path);
-  ScanManager::Instance()->Print();
+  proto::ScanStatus scan_status;
+  std::unordered_set<std::string> scanned_dirs;
+  scan_status.mutable_ignored_dirs()->insert(
+      {ScanManager::mark_dir_name, true});
+  ScanManager::Instance()->Scan(path, &scan_status, &scanned_dirs, false);
+  ScanManager::Instance()->Print(scan_status);
 }
 
 TEST(ScanManager, ParallelScan) {
@@ -53,14 +62,22 @@ TEST(ScanManager, ParallelScan) {
   ScanManager::Instance()->Clear();
   // std::string path = "/usr";
   std::string path = "/usr/local/llvm";
-  ScanManager::Instance()->ParallelScan(path);
-  ScanManager::Instance()->Print();
+  proto::ScanStatus scan_status;
+  std::unordered_set<std::string> scanned_dirs;
+  scan_status.mutable_ignored_dirs()->insert(
+      {ScanManager::mark_dir_name, true});
+  ScanManager::Instance()->ParallelScan(path, &scan_status, &scanned_dirs,
+                                        false);
+  ScanManager::Instance()->Print(scan_status);
 }
 
-// TODO
-// 1. millions dir set performance
-// 2. billions file vector performance
-// 3. dump billions file name to disk performance
+TEST(ScanManager, ValidateCachedStatusFile) {
+  ScanManager::Instance()->Clear();
+  std::string path = "/usr/local/llvm";
+  proto::ScanStatus scan_status;
+  std::unordered_set<std::string> scanned_dirs;
+  ScanManager::Instance()->ValidateCachedStatusFile(path);
+}
 
 }  // namespace util
 }  // namespace oceandoc
