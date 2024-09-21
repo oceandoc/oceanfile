@@ -36,7 +36,7 @@ class ServerContext : public async_grpc::ExecutionContext {
   std::string ToString() {
     std::string info;
     info.reserve(1024);
-    info.append(fmt::format("uptime: {}\n", util::Util::DetailTimeStr()));
+    info.append(fmt::format("uptime: {}\n", util::Util::ToTimeStr()));
     info.append(fmt::format("git commit: {}\n", git_commit_));
     return info;
   }

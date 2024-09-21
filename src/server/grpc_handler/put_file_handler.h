@@ -9,6 +9,7 @@
 #include "src/async_grpc/rpc_handler.h"
 #include "src/proto/service.pb.h"
 #include "src/server/grpc_handler/meta.h"
+#include "src/util/repo_manager.h"
 
 namespace oceandoc {
 namespace server {
@@ -16,10 +17,16 @@ namespace grpc_handler {
 
 class PutFileHandler : public async_grpc::RpcHandler<PutFileMethod> {
  public:
-  void OnRequest(const proto::FileReq& request) override {
-    // Respond twice to demonstrate bidirectional streaming.
-    auto response = std::make_unique<proto::FileRes>();
-    Send(std::move(response));
+  void OnRequest(const proto::FileReq& req) override {
+    auto res = std::make_unique<proto::FileRes>();
+
+    if (req.partition_num() == 0) {
+    }
+
+    auto ret = util::RepoManager::Instance()->WriteToFile(
+        req.repo_uuid(), req.sha256(), req.content(), true);
+
+    Send(std::move(res));
   }
 
   void OnReadsDone() override { Finish(grpc::Status::OK); }

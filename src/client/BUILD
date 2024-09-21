@@ -69,6 +69,7 @@ cc_binary(
     deps = [
         "//src/async_grpc",
         "//src/proto:cc_grpc_service",
+        "//src/util",
         "@openssl//:ssl",
     ],
 )

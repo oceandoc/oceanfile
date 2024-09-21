@@ -31,7 +31,7 @@ class GrpcServer final {
     server_builder
         .RegisterHandler<oceandoc::server::grpc_handler::PutFileHandler>();
     server_ = server_builder.Build();
-    server_->SetExecutionContext(std::make_unique<ServerContext>());
+    server_->SetExecutionContext(std::make_shared<ServerContext>());
     server_->Start();
 
     server_->GetContext<ServerContext>()->MarkedServerInitedDone();
@@ -40,9 +40,10 @@ class GrpcServer final {
  public:
   void WaitForShutdown() { server_->WaitForShutdown(); }
 
+  std::shared_ptr<async_grpc::Server> GetGrpcServer() { return server_; }
+
  private:
-  std::unique_ptr<async_grpc::Server> server_;
-  std::atomic<int64_t> next_log_info_time_;
+  std::shared_ptr<async_grpc::Server> server_;
 
  public:
   std::atomic_bool terminated;

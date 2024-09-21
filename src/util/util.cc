@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <charconv>
-#include <exception>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -28,8 +28,8 @@
 #include "fmt/core.h"
 #include "glog/logging.h"
 #include "google/protobuf/util/json_util.h"
+#include "lzma.h"
 #include "openssl/evp.h"
-#include "openssl/md5.h"
 #include "sodium/crypto_hash_sha256.h"
 #include "src/MurmurHash2.h"
 #include "src/MurmurHash3.h"
@@ -37,8 +37,14 @@
 #if defined(_WIN32)
 #include "src/util/util_windows.h"
 #elif defined(__linux__)
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "src/util/util_linux.h"
 #elif defined(__APPLE__)
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "src/util/util_osx.h"
 #endif
 
@@ -97,8 +103,13 @@ int64_t Util::StrToTimeStamp(string_view time, string_view format) {
   return absl::ToUnixMillis(t);
 }
 
+string Util::ToTimeStr() {
+  return Util::ToTimeStr(Util::CurrentTimeMillis(), "%Y-%m-%d%ET%H:%M:%E3S%Ez",
+                         "Asia/Shanghai");
+}
+
 string Util::ToTimeStr(const int64_t ts) {
-  return Util::ToTimeStr(ts, "Asia/Shanghai", "%Y-%m-%d%ET%H:%M:%E3S%Ez");
+  return Util::ToTimeStr(ts, "%Y-%m-%d%ET%H:%M:%E3S%Ez", "Asia/Shanghai");
 }
 
 string Util::ToTimeStr(const int64_t ts, string_view format) {
@@ -157,7 +168,7 @@ string Util::UnifyDir(string_view path) {
 
 bool Util::Remove(string_view path) {
   try {
-    if (std::filesystem::exists(path)) {
+    if (std::filesystem::exists(std::filesystem::symlink_status(path))) {
       return std::filesystem::remove_all(path);
     }
   } catch (const std::filesystem::filesystem_error &e) {
@@ -170,9 +181,26 @@ bool Util::Remove(string_view path) {
 
 bool Util::Mkdir(string_view path) {
   try {
-    std::filesystem::create_directories(path);
+    if (std::filesystem::exists(std::filesystem::status(path))) {
+      std::filesystem::create_directories(path);
+    }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << "Mkdir error: " << path << ", " << e.what();
+    return false;
+  }
+  return true;
+}
+
+bool Util::MkParentDir(const std::filesystem::path &path) {
+  try {
+    if (std::filesystem::exists(path)) {
+      return true;
+    }
+    if (path.has_parent_path()) {
+      std::filesystem::create_directories(path.parent_path());
+    }
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "Error: " << path.string() << ", e: " << e.what();
     return false;
   }
   return true;
@@ -389,55 +417,15 @@ bool Util::Hash(string_view str, const EVP_MD *type, string *out,
   return true;
 }
 
-bool Util::ExtraFileHash(const std::string &path, const EVP_MD *type,
-                         std::string *out, bool use_upper_case) {
+bool Util::FileHash(const std::string &path, const EVP_MD *type,
+                    std::string *out, bool use_upper_case) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int length;
   const size_t buffer_size = 64 * 1024 * 1024 * 8;  // 64MB buffer
 
   std::ifstream file(path, std::ios::binary);
   if (!file || !file.is_open()) {
-    return false;
-  }
-
-  EVP_MD_CTX *context = EVP_MD_CTX_new();
-  if (context == nullptr) {
-    return false;
-  }
-
-  if (EVP_DigestInit_ex(context, type, nullptr) != 1) {
-    EVP_MD_CTX_free(context);
-    return false;
-  }
-
-  char buffer[buffer_size];
-  while (file.read(buffer, sizeof(buffer)) || file.gcount()) {
-    if (EVP_DigestUpdate(context, buffer, file.gcount()) != 1) {
-      EVP_MD_CTX_free(context);
-      return false;
-    }
-  }
-
-  if (EVP_DigestFinal_ex(context, hash, &length) != 1) {
-    EVP_MD_CTX_free(context);
-    return false;
-  }
-
-  EVP_MD_CTX_free(context);
-
-  string_view sv(reinterpret_cast<const char *>(hash), length);
-  Util::ToHexStr(sv, out, use_upper_case);
-  return true;
-}
-
-bool Util::BigFileHash(const std::string &path, const EVP_MD *type,
-                       std::string *out, bool use_upper_case) {
-  unsigned char hash[EVP_MAX_MD_SIZE];
-  unsigned int length;
-  const size_t buffer_size = 64 * 1024 * 1024 * 8;  // 64MB buffer
-
-  std::ifstream file(path, std::ios::binary);
-  if (!file || !file.is_open()) {
+    LOG(ERROR) << "Check file exists or file permissions";
     return false;
   }
 
@@ -488,13 +476,8 @@ bool Util::SmallFileMD5(const string &path, string *out, bool use_upper_case) {
   return SmallFileHash(path, EVP_md5(), out, use_upper_case);
 }
 
-bool Util::BigFileMD5(const std::string &path, string *out,
-                      bool use_upper_case) {
-  return Util::BigFileHash(path, EVP_md5(), out, use_upper_case);
-}
-
-bool Util::ExtraFileMD5(const string &path, string *out, bool use_upper_case) {
-  return Util::ExtraFileHash(path, EVP_md5(), out, use_upper_case);
+bool Util::FileMD5(const std::string &path, string *out, bool use_upper_case) {
+  return Util::FileHash(path, EVP_md5(), out, use_upper_case);
 }
 
 bool Util::SHA256(string_view str, string *out, bool use_upper_case) {
@@ -517,14 +500,9 @@ bool Util::SmallFileSHA256(const string &path, string *out,
   return SmallFileHash(path, EVP_sha256(), out, use_upper_case);
 }
 
-bool Util::BigFileSHA256(const std::string &path, string *out,
-                         bool use_upper_case) {
-  return BigFileHash(path, EVP_sha256(), out, use_upper_case);
-}
-
-bool Util::ExtraFileSHA256(const string &path, string *out,
-                           bool use_upper_case) {
-  return ExtraFileHash(path, EVP_sha256(), out, use_upper_case);
+bool Util::FileSHA256(const std::string &path, string *out,
+                      bool use_upper_case) {
+  return FileHash(path, EVP_sha256(), out, use_upper_case);
 }
 
 void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
@@ -619,7 +597,7 @@ int64_t Util::FileSize(string_view path) {
     return attr.st_size;
   }
 #endif
-  return 0;
+  return -1;
 }
 
 void Util::FileInfo(string_view path, int64_t *create_time,
@@ -711,25 +689,185 @@ bool Util::Relative(string_view path, string_view base, string *relative) {
 
 bool Util::SyncSymlink(const std::string &src, const std::string &dst,
                        const std::string &src_symlink) {
-  auto target = std::filesystem::read_symlink(src_symlink);
-  std::string target_relative_path;
-  Util::Relative(target.string(), src, &target_relative_path);
-  std::string symlink_relative_path;
-  Util::Relative(src_symlink, src, &symlink_relative_path);
-  auto dst_symlink = dst + "/" + symlink_relative_path;
+  try {
+    auto target = std::filesystem::read_symlink(src_symlink);
+    std::string target_relative_path;
+    Util::Relative(target.string(), src, &target_relative_path);
+    std::string symlink_relative_path;
+    Util::Relative(src_symlink, src, &symlink_relative_path);
+    auto dst_symlink = dst + "/" + symlink_relative_path;
 
-  Util::Remove(dst_symlink);
-  if (target.is_absolute()) {
-    if (Util::StartWith(target, src)) {
-      std::filesystem::create_symlink(dst + "/" + target_relative_path,
-                                      dst_symlink);
+    Util::MkParentDir(dst_symlink);
+    Util::Remove(dst_symlink);
+    if (target.is_absolute()) {
+      if (Util::StartWith(target, src)) {
+        std::filesystem::create_symlink(dst + "/" + target_relative_path,
+                                        dst_symlink);
+      } else {
+        std::filesystem::create_symlink(target, dst_symlink);
+      }
     } else {
       std::filesystem::create_symlink(target, dst_symlink);
     }
-  } else {
-    std::filesystem::create_symlink(target, dst_symlink);
+    return true;
+  } catch (std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << e.what();
   }
   return true;
+}
+
+bool Util::LZMACompress(string_view data, string *out) {
+  lzma_stream strm = LZMA_STREAM_INIT;
+  lzma_ret ret =
+      lzma_easy_encoder(&strm, LZMA_PRESET_DEFAULT, LZMA_CHECK_CRC64);
+
+  if (ret != LZMA_OK) {
+    return false;
+  }
+
+  out->clear();
+  out->resize(data.size() + data.size() / 3 + 128);
+
+  strm.next_in = reinterpret_cast<const uint8_t *>(data.data());
+  strm.avail_in = data.size();
+  strm.next_out = reinterpret_cast<uint8_t *>(out->data());
+  strm.avail_out = out->size();
+
+  ret = lzma_code(&strm, LZMA_FINISH);
+
+  if (ret != LZMA_STREAM_END) {
+    lzma_end(&strm);
+    return false;
+  }
+
+  out->resize(out->size() - strm.avail_out);
+  lzma_end(&strm);
+  return true;
+}
+
+bool Util::LZMADecompress(string_view data, string *out) {
+  lzma_stream strm = LZMA_STREAM_INIT;
+  lzma_ret ret = lzma_stream_decoder(&strm, UINT64_MAX, LZMA_CONCATENATED);
+
+  if (ret != LZMA_OK) {
+    return false;
+  }
+
+  const size_t buffer_size = 64 * 1024 * 1024;  // 64MB
+  std::vector<uint8_t> decompressed_data(buffer_size);
+
+  strm.next_in = reinterpret_cast<const uint8_t *>(data.data());
+  strm.avail_in = data.size();
+  strm.next_out = decompressed_data.data();
+  strm.avail_out = decompressed_data.size();
+
+  do {
+    ret = lzma_code(&strm, LZMA_FINISH);
+    if (strm.avail_out == 0 || ret == LZMA_STREAM_END) {
+      out->append(reinterpret_cast<const char *>(decompressed_data.data()),
+                  buffer_size - strm.avail_out);
+      strm.next_out = decompressed_data.data();
+      strm.avail_out = buffer_size;
+    }
+
+    if (ret != LZMA_OK) {
+      break;
+    }
+  } while (true);
+
+  if (ret != LZMA_STREAM_END) {
+    lzma_end(&strm);
+    return false;
+  }
+
+  lzma_end(&strm);
+  return true;
+}
+
+int32_t Util::FilePartitionNum(std::string &path) {
+  auto ret = FileSize(path);
+  if (ret == -1) {
+    return -1;
+  }
+  return FilePartitionNum(ret);
+}
+
+int32_t Util::FilePartitionNum(const int64_t size) {
+  if (size <= 0) {
+    return 0;
+  }
+  return size / FilePartitionSize + ((size % FilePartitionSize) > 0 ? 0 : 1);
+}
+
+bool Util::PrepareFile(const string &path, FileAttr *attr) {
+  if (!FileSHA256(path, &attr->sha256)) {
+    LOG(ERROR) << "Calc " << path << " sha256 error";
+    return false;
+  }
+
+  attr->size = FileSize(path);
+  if (attr->size == -1) {
+    LOG(ERROR) << "Get " << path << " size error";
+    return false;
+  }
+
+  attr->partition_num = FilePartitionNum(attr->size);
+  return true;
+}
+
+std::string Util::RepoFilePath(const std::string &repo_path,
+                               const std::string &sha256) {
+  std::string repo_file_path(UnifyDir(repo_path));
+  repo_file_path.append("/");
+  repo_file_path.append(sha256.substr(0, 2));
+  repo_file_path.append("/");
+  repo_file_path.append(sha256.substr(2, 2));
+  repo_file_path.append("/");
+  repo_file_path.append(sha256);
+  return repo_file_path;
+}
+
+bool CreateFileWithSize(std::string &path, const std::size_t size) {
+#if defined(_WIN32)
+  HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
+                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+
+  if (hFile == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+
+  LARGE_INTEGER liSize;
+  liSize.QuadPart = size;
+
+  if (!SetFilePointerEx(hFile, liSize, nullptr, FILE_BEGIN) ||
+      !SetEndOfFile(hFile)) {
+    CloseHandle(hFile);
+    return false;
+  }
+
+  CloseHandle(hFile);
+#else
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  if (fd == -1) {
+    return false;
+  }
+
+  if (ftruncate(fd, size) == -1) {
+    close(fd);
+    return false;
+  }
+  close(fd);
+#endif
+  return true;
+}
+
+void Util::CalcPartitionStart(const int64_t size, const int32_t partition,
+                              int64_t *start, int64_t *end) {
+  *start = partition * FilePartitionSize;
+  if (size - start >= FilePartitionSize) {
+    *end = *start + FilePartitionSize - 1;
+  }
+  *end = size;
 }
 
 }  // namespace util

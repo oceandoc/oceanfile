@@ -4,12 +4,20 @@ package oceandoc.proto;
 
 import "src/proto/error.proto";
 
+message Context {
+  string private_ipv4 = 1;
+  string private_ipv6 = 2;
+  string public_ipv4 = 3;
+  repeated string public_ipv6 = 4;
+}
+
 message Config {
   string name = 1;
 }
 
 message StatusReq {
   string request_id = 1;
+  Context context = 2;
 }
 
 message StatusRes {
@@ -34,16 +42,17 @@ enum Op {
 
 message FileReq {
   Op op = 1;
-  string file_name = 2;
-  string file_sha256 = 3;
-  string file_size = 4;
-  int64 file_start = 5;
-  int64 file_end = 6;
+  string path = 2;
+  string sha256 = 3;
+  int64 size = 4;
+  string content = 5;
+  int32 partition_num = 6;
+  string repo_uuid = 7;
 }
 
 message FileRes {
   ErrCode err_code = 1;
-  string err_msg = 2;
+  int32 partition_num = 2;
 }
 
 service OceanFile {

@@ -169,7 +169,7 @@ class Server {
   void Shutdown();
 
   // Sets the server-wide context object shared between RPC handlers.
-  void SetExecutionContext(std::unique_ptr<ExecutionContext> execution_context);
+  void SetExecutionContext(std::shared_ptr<ExecutionContext> execution_context);
 
   template <typename T>
   ExecutionContext::Synchronized<T> GetContext() {
@@ -215,7 +215,7 @@ class Server {
 
   // A context object that is shared between all implementations of
   // 'RpcHandler'.
-  std::unique_ptr<ExecutionContext> execution_context_;
+  std::shared_ptr<ExecutionContext> execution_context_;
 };
 
 }  // namespace async_grpc

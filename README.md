@@ -1,5 +1,7 @@
 # TODO
-* compress scan_status file
+* handle interrupt signal
+* uuid
+
 # final TODO
 * kill syncthing
 * kill immich

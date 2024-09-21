@@ -86,10 +86,11 @@ class ScanManager {
     if (!std::filesystem::exists(cached_statuspath)) {
       return;
     }
-    std::string content;
+    std::string content, decompressed_content;
     if (Util::LoadSmallFile(cached_statuspath, &content)) {
       LOG(INFO) << "Load cached scan_status: " << cached_statuspath;
-      scan_status->ParseFromString(content);
+      Util::LZMADecompress(content, &decompressed_content);
+      scan_status->ParseFromString(decompressed_content);
       Print(*scan_status);
 
       for (const auto& dir : scan_status->scanned_dirs()) {
@@ -100,9 +101,10 @@ class ScanManager {
 
   bool Dump(const std::string& path, const proto::ScanStatus& scan_status) {
     Util::TruncateFile(path);
-    std::string content;
+    std::string content, compressed_content;
     scan_status.SerializeToString(&content);
-    return Util::WriteToFile(path, content, true);
+    Util::LZMACompress(content, &compressed_content);
+    return Util::WriteToFile(path, compressed_content, true);
   }
 
   void MarkDirStatus(proto::ScanStatus* scan_status,

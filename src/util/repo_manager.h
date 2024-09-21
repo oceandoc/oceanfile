@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 #include "folly/Singleton.h"
 #include "glog/logging.h"
@@ -28,15 +29,51 @@ class RepoManager {
   static std::shared_ptr<RepoManager> Instance();
 
   bool Init() {
-    std::string path = "./data/repos/repos.json";
+    std::string path = "./data/repos.json";
     std::string content;
     auto ret = Util::LoadSmallFile(path, &content);
+    absl::base_internal::SpinLockHolder locker(&lock_);
     if (ret && !Util::JsonToMessage(content, &repos_)) {
       LOG(ERROR) << "Read repo config error, path: " << path
                  << ", content: " << content;
       return false;
     }
     return true;
+  }
+
+  bool CreateRepo(const std::string& path) {
+    std::string uuid = Util::UUID();
+    const std::string& repo_file_path =
+        path + "/" + ScanManager::mark_dir_name + "/" + uuid + ".repo";
+    proto::Repo repo;
+    repo.set_create_time(Util::CurrentTimeMillis());
+    repo.set_uuid(uuid);
+
+    {
+      absl::base_internal::SpinLockHolder locker(&lock_);
+      repos_.mutable_repos()->insert({uuid, repo});
+    }
+
+    std::string content, compressed_content;
+    repo.SerializeToString(&content);
+    Util::LZMACompress(content, &compressed_content);
+    return Util::WriteToFile(repo_file_path, compressed_content, false);
+  }
+
+  std::string RepoPath(const std::string& uuid) {
+    auto it = repos_.repos().find(uuid);
+    if (it != repos_.repos().end()) {
+      return it->second.path();
+    }
+    return "";
+  }
+
+  bool WriteToFile(const std::string& repo_uuid, const std::string& sha256,
+                   const std::string& content, const int64_t start,
+                   const int64_t end) {
+    const auto& rep_path = RepoPath(repo_uuid);
+    const auto& repo_file_path = Util::RepoFilePath(rep_path, sha256);
+    return Util::WriteToFile(repo_file_path, content, append);
   }
 
   bool SyncLocal(const std::string& src, const std::string& dst,
@@ -50,8 +87,10 @@ class RepoManager {
     std::string canonical_dst(dst);
     Util::UnifyDir(&canonical_src);
     Util::UnifyDir(&canonical_dst);
+    Util::Mkdir(canonical_dst);
 
     proto::ScanStatus scan_status;
+    std::unordered_set<std::string> copy_failed_files;
     std::unordered_set<std::string> scanned_dirs;
     scan_status.mutable_ignored_dirs()->insert(
         {ScanManager::mark_dir_name, true});
@@ -70,55 +109,29 @@ class RepoManager {
     bool success = true;
     std::vector<std::future<bool>> rets;
     for (int i = 0; i < max_thread; ++i) {
-      std::packaged_task<bool()> task(std::bind(&RepoManager::SyncWorker, this,
-                                                i, &scan_status, canonical_src,
-                                                canonical_dst));
+      std::packaged_task<bool()> task(
+          std::bind(&RepoManager::SyncWorker, this, i, &scan_status,
+                    canonical_src, canonical_dst, &copy_failed_files));
       rets.emplace_back(task.get_future());
       ThreadPool::Instance()->Post(task);
     }
     for (auto& f : rets) {
       if (f.get() == false) {
         success = false;
+        LOG(INFO) << "Exists error";
       }
     }
-    const auto& scan_status_file =
-        ScanManager::Instance()->GenFileName(canonical_src);
-    ScanManager::Instance()->Dump(scan_status_file, scan_status);
-    return success;
-  }
-
-  bool MkAllDir(const proto::ScanStatus& status) {
-    bool success = true;
-    for (const auto& dir : status.scanned_dirs()) {
-      if (std::filesystem::exists(dir)) {
-        continue;
-      }
-      if (!Util::Mkdir(dir)) {
-        LOG(ERROR) << "Mkdir " << dir << " error";
-        success = false;
-      }
+    ScanManager::Instance()->Print(scan_status);
+    for (const auto& file : copy_failed_files) {
+      LOG(ERROR) << file << " sync failed";
     }
     return success;
-  }
-
-  bool MkParentDir(const std::filesystem::path& path) {
-    try {
-      if (std::filesystem::exists(path)) {
-        return true;
-      }
-      if (path.has_parent_path()) {
-        std::filesystem::create_directories(path.parent_path());
-      }
-    } catch (const std::filesystem::filesystem_error& e) {
-      LOG(ERROR) << "Error: " << path.string() << ", e: " << e.what();
-      return false;
-    }
-    return true;
   }
 
  private:
   bool SyncWorker(const int no, proto::ScanStatus* status,
-                  const std::string& src, const std::string& dst) {
+                  const std::string& src, const std::string& dst,
+                  std::unordered_set<std::string>* copy_failed_files) {
     bool success = true;
     for (int i = no; i < status->scanned_files().size(); i += max_thread) {
       if (status->scanned_files(i).sync_finished()) {
@@ -128,7 +141,7 @@ class RepoManager {
       std::string relative_path;
       Util::Relative(status->scanned_files(i).path(), src, &relative_path);
       auto dst_path = std::filesystem::path(dst + "/" + relative_path);
-      MkParentDir(dst_path);
+      Util::MkParentDir(dst_path);
       bool ret = true;
       if (status->scanned_files(i).file_type() == proto::Symlink) {
         ret = Util::SyncSymlink(src, dst, status->scanned_files(i).path());
@@ -138,7 +151,8 @@ class RepoManager {
       }
       if (!ret) {
         LOG(ERROR) << "Sync error: " << status->scanned_files(i).path();
-        copy_failed_files_.insert(status->scanned_files(i).path());
+        absl::base_internal::SpinLockHolder locker(&lock_);
+        copy_failed_files->insert(status->scanned_files(i).path());
         success = false;
       }
       status->mutable_scanned_files(i)->set_sync_finished(true);
@@ -168,16 +182,15 @@ class RepoManager {
         continue;
       }
 
-      LOG(INFO) << dst_path;
       std::filesystem::create_directories(dst_path);
     }
     return success;
   }
 
  private:
-  proto::OceanRepo repos_;
+  proto::Repos repos_;
   const int max_thread = 5;
-  std::set<std::string> copy_failed_files_;
+  mutable absl::base_internal::SpinLock lock_;
 };
 
 }  // namespace util

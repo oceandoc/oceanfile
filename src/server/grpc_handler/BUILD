@@ -72,5 +72,6 @@ cc_library(
         "//src/async_grpc",
         "//src/proto:cc_grpc_service",
         "//src/util",
+        "//src/util:repo_manager",
     ],
 )

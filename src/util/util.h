@@ -19,6 +19,15 @@
 namespace oceandoc {
 namespace util {
 
+const int64_t FilePartitionSize = 64 * 1024 * 1024 * 8;  // 64MB
+
+struct FileAttr {
+  std::string sha256;
+  std::string enc_sha256;
+  int64_t size;
+  int32_t partition_num;
+};
+
 class Util final {
  private:
   Util() {}
@@ -35,6 +44,7 @@ class Util final {
 
   static int64_t StrToTimeStamp(std::string_view time, std::string_view format);
 
+  static std::string ToTimeStr();
   static std::string ToTimeStr(const int64_t ts);
   static std::string ToTimeStr(const int64_t ts, std::string_view format);
   static std::string ToTimeStr(const int64_t ts, std::string_view format,
@@ -54,6 +64,7 @@ class Util final {
   static bool Remove(std::string_view path);
 
   static bool Mkdir(std::string_view path);
+  static bool MkParentDir(const std::filesystem::path &path);
 
   static bool CopyFile(std::string_view src, std::string_view dst,
                        const std::filesystem::copy_options opt);
@@ -103,6 +114,11 @@ class Util final {
     boost::algorithm::replace_all(*s, from, to);
   }
 
+  static void ReplaceAll(std::string *s, const std::string &from,
+                         const std::string &to) {
+    boost::algorithm::replace_all(*s, from, to);
+  }
+
   template <class TypeName>
   static void ReplaceAll(std::string *s, std::string_view from,
                          const TypeName to) {
@@ -121,11 +137,8 @@ class Util final {
   static bool Hash(std::string_view str, const EVP_MD *type, std::string *out,
                    bool use_upper_case = false);
 
-  static bool ExtraFileHash(const std::string &path, const EVP_MD *type,
-                            std::string *out, bool use_upper_case = false);
-
-  static bool BigFileHash(const std::string &path, const EVP_MD *type,
-                          std::string *out, bool use_upper_case = false);
+  static bool FileHash(const std::string &path, const EVP_MD *type,
+                       std::string *out, bool use_upper_case = false);
 
   static bool SmallFileHash(const std::string &path, const EVP_MD *type,
                             std::string *out, bool use_upper_case = false);
@@ -139,12 +152,8 @@ class Util final {
   static bool SmallFileSHA256(const std::string &path, std::string *out,
                               bool use_upper_case = false);
 
-  static bool BigFileSHA256(const std::string &path, std::string *out,
-                            bool use_upper_case = false);
-
-  // file size >= 1/4 memory
-  static bool ExtraFileSHA256(const std::string &path, std::string *out,
-                              bool use_upper_case = false);
+  static bool FileSHA256(const std::string &path, std::string *out,
+                         bool use_upper_case = false);
 
   static bool MD5(std::string_view str, std::string *out,
                   bool use_upper_case = false);
@@ -152,12 +161,8 @@ class Util final {
   static bool SmallFileMD5(const std::string &path, std::string *out,
                            bool use_upper_case = false);
 
-  static bool BigFileMD5(const std::string &path, std::string *out,
-                         bool use_upper_case = false);
-
-  // file size >= 1/4 memory
-  static bool ExtraFileMD5(const std::string &path, std::string *out,
-                           bool use_upper_case = false);
+  static bool FileMD5(const std::string &path, std::string *out,
+                      bool use_upper_case = false);
 
   static bool HexStrToInt64(std::string_view in, int64_t *out);
 
@@ -175,74 +180,26 @@ class Util final {
   static bool JsonToMessage(const std::string &json,
                             google::protobuf::Message *msg);
 
-  template <class TypeName>
-  static void AppendField(const std::string &key, const TypeName value,
-                          std::string *track_str, std::string *search_str,
-                          const bool first = false) {
-    if (!first) {
-      track_str->append("&");
-      search_str->append("\t");
-    }
-    track_str->append(key);
-    search_str->append(key);
-
-    track_str->append("=");
-    search_str->append("=");
-
-    track_str->append(std::to_string(value));
-    search_str->append(std::to_string(value));
-  }
-
-  static void AppendField(const std::string &key, const std::string &value,
-                          std::string *track_str, std::string *search_str,
-                          const bool first = false) {
-    if (!first) {
-      track_str->append("&");
-      search_str->append("\t");
-    }
-    track_str->append(key);
-    search_str->append(key);
-
-    track_str->append("=");
-    search_str->append("=");
-
-    track_str->append(value);
-    search_str->append(value);
-  }
-
-  template <class TypeName>
-  static void AppendField(const std::string &key, const TypeName value,
-                          std::string *search_str, const bool first = false) {
-    if (!first) {
-      search_str->append("\t");
-    }
-    search_str->append(key);
-    search_str->append("=");
-    search_str->append(std::to_string(value));
-  }
-
-  static void AppendField(const std::string &key, const char *const &value,
-                          std::string *search_str, const bool first = false) {
-    if (!first) {
-      search_str->append("\t");
-    }
-    search_str->append(key);
-    search_str->append("=");
-    search_str->append(value);
-  }
-
-  static void AppendField(const std::string &key, const std::string &value,
-                          std::string *search_str, const bool first = false) {
-    if (!first) {
-      search_str->append("\t");
-    }
-    search_str->append(key);
-    search_str->append("=");
-    search_str->append(value);
-  }
-
   static bool SyncSymlink(const std::string &src, const std::string &dst,
                           const std::string &src_symlink);
+
+  static bool LZMACompress(std::string_view data, std::string *out);
+  static bool LZMADecompress(std::string_view data, std::string *out);
+
+  static int32_t FilePartitionNum(std::string &path);
+
+  static int32_t FilePartitionNum(const int64_t size);
+
+  static bool PrepareFile(const std::string &path, FileAttr *attr);
+
+  static std::string RepoFilePath(const std::string &repo_path,
+                                  const std::string &sha256);
+
+  static bool CreateFileWithSize(const std::string &path,
+                                 const std::size_t size);
+
+  static void CalcPartitionStart(const int64_t size, const int32_t partition,
+                                 int64_t *start, int64_t *end);
 
  public:
   static const char *kPathDelimeter;

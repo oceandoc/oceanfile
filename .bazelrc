@@ -95,7 +95,7 @@ build:ubsan --action_env=UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1:suppre
 build --announce_rc
 
 build --strip='never'
-build --output_filter="^//"
+build --output_filter='^//(?!external)'
 build -c opt
 build --define cross_compiling=false
 build --features=-module_maps

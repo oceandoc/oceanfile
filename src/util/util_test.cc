@@ -5,11 +5,15 @@
 
 #include "src/util/util.h"
 
+#include <fstream>
+
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 
 namespace oceandoc {
 namespace util {
+
+using namespace std;
 
 TEST(Util, DetailTimeStr) {
   EXPECT_EQ(Util::ToTimeStr(1646397312000), "2022-03-04T20:35:12.000+08:00");
@@ -17,29 +21,29 @@ TEST(Util, DetailTimeStr) {
 }
 
 TEST(Util, UpdateTime) {
-  const auto& path = "/usr/include/x86_64-linux-gnu/openmpi";
+  const auto& path = "test_data/util_test/txt_symlink";
   if (std::filesystem::is_symlink(path)) {
     LOG(INFO) << "is symlink";
   }
-  EXPECT_EQ(Util::UpdateTime(path), 1646397312000);
+  EXPECT_EQ(Util::UpdateTime(path), 1726798844930);
   LOG(INFO) << Util::UpdateTime(path);
 }
 
 TEST(Util, CreateTime) {
-  auto path = "/usr/include/x86_64-linux-gnu/openmpi";
+  const auto& path = "test_data/util_test/txt_symlink";
   if (std::filesystem::is_symlink(path)) {
     LOG(INFO) << "is symlink";
   }
-  EXPECT_EQ(Util::CreateTime(path), 1720900552965);
+  EXPECT_EQ(Util::CreateTime(path), 1726798844930);
   LOG(INFO) << Util::CreateTime(path);
 }
 
 TEST(Util, FileSize) {
-  auto path = "/usr/include/x86_64-linux-gnu/openmpi";
+  string path = "test_data/util_test/txt_symlink";
   if (std::filesystem::is_symlink(path)) {
     LOG(INFO) << "is symlink";
   }
-  EXPECT_EQ(Util::FileSize(path), 42);
+  EXPECT_EQ(Util::FileSize(path), 3);
   LOG(INFO) << Util::FileSize(path);
 
   path = "/root/src/Dr.Q/oceanfile";
@@ -148,9 +152,44 @@ TEST(Util, Relative) {
   EXPECT_EQ(relative, "");
 }
 
+TEST(Util, Remove) {
+  std::string path = "test_data/util_test/test_remove";
+  std::ofstream ofs(path);
+  ofs.close();
+  EXPECT_EQ(Util::Remove("test_data/util_test/test_remove"), true);
+  ofstream ofs1(path);
+  ofs1.close();
+}
+
 TEST(Util, SyncSymlink) {
   Util::SyncSymlink("/usr/local/llvm", "/usr/local/test",
                     "/usr/local/llvm/18/bin/llvm-dlltool");
 }
+
+TEST(Util, LZMA) {
+  std::string data = "/usr/local/llvm";
+  std::string compressed_data;
+  std::string decompressed_data;
+
+  std::string compressed_data_hex;
+  std::string decompressed_data_hex;
+
+  if (!Util::LZMACompress(data, &compressed_data)) {
+    LOG(ERROR) << "compress error";
+  }
+  Util::ToHexStr(compressed_data, &compressed_data_hex);
+
+  EXPECT_EQ(compressed_data_hex,
+            "fd377a585a000004e6d6b4460200210116000000742fe5a301000e2f7573722f6c"
+            "6f63616c2f6c6c766d0000efb8e6d242765b590001270fdf1afc6a1fb6f37d0100"
+            "00000004595a");
+
+  if (!Util::LZMADecompress(compressed_data, &decompressed_data)) {
+    LOG(ERROR) << "decompress error";
+  }
+
+  EXPECT_EQ(decompressed_data, "/usr/local/llvm");
+}
+
 }  // namespace util
 }  // namespace oceandoc

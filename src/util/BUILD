@@ -175,6 +175,7 @@ cc_library(
         "@folly",
         "@openssl",
         "@smhasher",
+        "@xz//:lzma",
     ] + select({
         "@oceandoc//bazel:jemalloc": ["@jemalloc"],
         "@oceandoc//bazel:tcmalloc": ["@tcmalloc//tcmalloc"],
@@ -186,10 +187,13 @@ cc_test(
     name = "util_test",
     timeout = "short",
     srcs = ["util_test.cc"],
-    deps = [
-        ":util",
-        "@com_google_googletest//:gtest_main",
+    data = [
+        "//conf:base_config.json",
+        "//test_data/util_test:test_remove",
+        "//test_data/util_test:txt",
+        "//test_data/util_test:txt_symlink",
     ],
+    deps = [":util"],
 )
 
 cc_test(
@@ -201,10 +205,7 @@ cc_test(
         "@platforms//os:windows": [],
         "//conditions:default": [],
     }),
-    deps = [
-        ":util",
-        "@com_google_googletest//:gtest_main",
-    ],
+    deps = [":util"],
 )
 
 cc_test(
