@@ -252,14 +252,30 @@ bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
     if (ofs && ofs.is_open()) {
       ofs << content;
       ofs.close();
+      return true;
     }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << (!append ? "Write to " : "Append to ") << path.string()
                << ", error: " << e.what();
-    return false;
+  }
+  return false;
+}
+
+bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
+                       const int64_t start) {
+  try {
+    std::ofstream ofs(path);
+    if (ofs && ofs.is_open()) {
+      ofs.seekp(start);
+      ofs << content;
+      ofs.close();
+      return true;
+    }
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "Write to " << path << ", error: " << e.what();
   }
 
-  return true;
+  return false;
 }
 
 bool Util::LoadSmallFile(string_view file_name, string *content) {
@@ -392,6 +408,51 @@ string Util::Base64Decode(string_view input) {
 
 int64_t Util::MurmurHash64A(string_view str) {
   return ::MurmurHash64A(str.data(), str.size(), 42L);
+}
+
+EVP_MD_CTX *Util::HashInit(const EVP_MD *type) {
+  EVP_MD_CTX *context = EVP_MD_CTX_new();
+  if (!context) {
+    return nullptr;
+  }
+  if (EVP_DigestInit_ex(context, type, nullptr) != 1) {
+    EVP_MD_CTX_free(context);
+    return nullptr;
+  }
+  return context;
+}
+
+bool Util::HashUpdate(EVP_MD_CTX *context, string_view str) {
+  if (EVP_DigestUpdate(context, str.data(), str.size()) != 1) {
+    EVP_MD_CTX_free(context);
+    return false;
+  }
+  return true;
+}
+
+bool Util::HashFinal(EVP_MD_CTX *context, string *out, bool use_upper_case) {
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned int length;
+  if (EVP_DigestFinal_ex(context, hash, &length) != 1) {
+    EVP_MD_CTX_free(context);
+    return false;
+  }
+
+  EVP_MD_CTX_free(context);
+
+  string_view sv(reinterpret_cast<const char *>(hash), length);
+  Util::ToHexStr(sv, out, use_upper_case);
+  return true;
+}
+
+EVP_MD_CTX *Util::SHA256Init() { return HashInit(EVP_sha256()); }
+
+bool Util::SHA256Update(EVP_MD_CTX *context, string_view str) {
+  return HashUpdate(context, str);
+}
+
+bool Util::SHA256Final(EVP_MD_CTX *context, string *out, bool use_upper_case) {
+  return HashFinal(context, out, use_upper_case);
 }
 
 bool Util::Hash(string_view str, const EVP_MD *type, string *out,
@@ -557,7 +618,7 @@ int64_t Util::UpdateTime(string_view path) {
 #endif
   }
 #endif
-  return 0;
+  return -1;
 }
 
 int64_t Util::CreateTime(string_view path) {
@@ -578,7 +639,7 @@ int64_t Util::CreateTime(string_view path) {
     return attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
 #endif
   }
-  return 0;
+  return -1;
 #endif
 }
 
@@ -600,7 +661,7 @@ int64_t Util::FileSize(string_view path) {
   return -1;
 }
 
-void Util::FileInfo(string_view path, int64_t *create_time,
+bool Util::FileInfo(string_view path, int64_t *create_time,
                     int64_t *update_time, int64_t *size) {
 #if defined(_WIN32)
   WIN32_FILE_ATTRIBUTE_DATA fileInfo;
@@ -617,6 +678,7 @@ void Util::FileInfo(string_view path, int64_t *create_time,
     ull.LowPart = fileInfo.nFileSizeLow;
     ull.HighPart = fileInfo.nFileSizeHigh;
     *size = ull.QuadPart;
+    return true;
   }
 #else
   struct stat attr;
@@ -630,8 +692,10 @@ void Util::FileInfo(string_view path, int64_t *create_time,
         attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
     *update_time = attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
 #endif
+    return true;
   }
 #endif
+  return false;
 }
 
 std::string Util::PartitionUUID(string_view path) {
@@ -827,7 +891,10 @@ std::string Util::RepoFilePath(const std::string &repo_path,
   return repo_file_path;
 }
 
-bool CreateFileWithSize(std::string &path, const std::size_t size) {
+bool Util::CreateFileWithSize(const std::string &path, const int64_t size) {
+  if (std::filesystem::exists(path)) {
+    return true;
+  }
 #if defined(_WIN32)
   HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -847,7 +914,7 @@ bool CreateFileWithSize(std::string &path, const std::size_t size) {
 
   CloseHandle(hFile);
 #else
-  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
   if (fd == -1) {
     return false;
   }
@@ -864,7 +931,7 @@ bool CreateFileWithSize(std::string &path, const std::size_t size) {
 void Util::CalcPartitionStart(const int64_t size, const int32_t partition,
                               int64_t *start, int64_t *end) {
   *start = partition * FilePartitionSize;
-  if (size - start >= FilePartitionSize) {
+  if (size - *start >= FilePartitionSize) {
     *end = *start + FilePartitionSize - 1;
   }
   *end = size;

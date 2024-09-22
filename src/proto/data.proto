@@ -2,7 +2,7 @@ syntax = "proto3";
 package oceandoc.proto;
 
 enum FileType {
-  Unused = 0;
+  FT_Unused = 0;
   Regular = 1;
   Symlink = 2;
   Dir = 3;

@@ -14,7 +14,9 @@
 #include "src/async_grpc/execution_context.h"
 #include "src/server/version_info.h"
 #include "src/util/config_manager.h"
+#include "src/util/util.h"
 
+// TODO city, operator, code
 namespace oceandoc {
 namespace server {
 
@@ -22,7 +24,10 @@ using EchoResponder = std::function<bool()>;
 
 class ServerContext : public async_grpc::ExecutionContext {
  public:
-  ServerContext() : is_inited_(false), git_commit_(GIT_VERSION) {}
+  ServerContext()
+      : is_inited_(false),
+        git_commit_(GIT_VERSION),
+        uptime_(util::Util::CurrentTimeMillis()) {}
 
   void MarkedServerInitedDone() {
     is_inited_.store(true);
@@ -36,8 +41,10 @@ class ServerContext : public async_grpc::ExecutionContext {
   std::string ToString() {
     std::string info;
     info.reserve(1024);
-    info.append(fmt::format("uptime: {}\n", util::Util::ToTimeStr()));
+    info.append(fmt::format("uptime: {}\n", util::Util::ToTimeStr(uptime_)));
     info.append(fmt::format("git commit: {}\n", git_commit_));
+    info.append(
+        fmt::format("server current time: {}\n", util::Util::ToTimeStr()));
     return info;
   }
 
@@ -47,6 +54,7 @@ class ServerContext : public async_grpc::ExecutionContext {
  private:
   std::atomic_bool is_inited_;
   std::string git_commit_;
+  const int64_t uptime_;
 };
 
 }  // namespace server

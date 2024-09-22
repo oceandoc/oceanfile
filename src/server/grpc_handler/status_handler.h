@@ -17,14 +17,13 @@ namespace grpc_handler {
 
 class StatusHandler : public async_grpc::RpcHandler<StatusMethod> {
  public:
-  void OnRequest(const proto::StatusReq& request) override {
-    LOG(INFO) << request.request_id() << ", "
-              << request.context().private_ipv4();
-    auto response = std::make_unique<proto::StatusRes>();
-    response->set_msg(
+  void OnRequest(const proto::StatusReq& req) override {
+    LOG(INFO) << req.request_id();
+    auto res = std::make_unique<proto::StatusRes>();
+    res->set_status(
         static_cast<oceandoc::server::ServerContext*>(execution_context_)
             ->ToString());
-    Send(std::move(response));
+    Send(std::move(res));
   }
 };
 

@@ -41,17 +41,17 @@ class RepoManager {
     return true;
   }
 
-  bool CreateRepo(const std::string& path) {
-    std::string uuid = Util::UUID();
+  bool CreateRepo(const std::string& path, std::string* uuid) {
+    *uuid = Util::UUID();
     const std::string& repo_file_path =
-        path + "/" + ScanManager::mark_dir_name + "/" + uuid + ".repo";
+        path + "/" + ScanManager::mark_dir_name + "/" + *uuid + ".repo";
     proto::Repo repo;
     repo.set_create_time(Util::CurrentTimeMillis());
-    repo.set_uuid(uuid);
+    repo.set_uuid(*uuid);
 
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
-      repos_.mutable_repos()->insert({uuid, repo});
+      repos_.mutable_repos()->insert({*uuid, repo});
     }
 
     std::string content, compressed_content;
@@ -69,11 +69,33 @@ class RepoManager {
   }
 
   bool WriteToFile(const std::string& repo_uuid, const std::string& sha256,
-                   const std::string& content, const int64_t start,
-                   const int64_t end) {
-    const auto& rep_path = RepoPath(repo_uuid);
-    const auto& repo_file_path = Util::RepoFilePath(rep_path, sha256);
-    return Util::WriteToFile(repo_file_path, content, append);
+                   const std::string& content, const int64_t size,
+                   const int32_t partition_num) {
+    const auto& repo_path = RepoPath(repo_uuid);
+    if (repo_path.empty()) {
+      LOG(ERROR) << "Invalid repo path";
+      return false;
+    }
+    const auto& repo_file_path = Util::RepoFilePath(repo_path, sha256);
+    if (repo_file_path.empty()) {
+      LOG(ERROR) << "Invalid repo file path";
+      return false;
+    }
+    Util::CreateFileWithSize(repo_file_path, size);
+    int64_t start = 0, end = 0;
+    Util::CalcPartitionStart(size, partition_num, &start, &end);
+    if (end - start != static_cast<int64_t>(content.size())) {
+      LOG(ERROR) << "Calc size error";
+      return false;
+    }
+    return Util::WriteToFile(repo_file_path, content, start);
+  }
+
+  void SyncStatusDir(const std::string& canonical_src,
+                     const std::string& canonical_dst) {
+    const auto& src = ScanManager::Instance()->GenFileDir(canonical_src);
+    const auto& dst = canonical_dst + "/" + ScanManager::mark_dir_name;
+    Util::Copy(src, dst);
   }
 
   bool SyncLocal(const std::string& src, const std::string& dst,
@@ -94,6 +116,7 @@ class RepoManager {
     std::unordered_set<std::string> scanned_dirs;
     scan_status.mutable_ignored_dirs()->insert(
         {ScanManager::mark_dir_name, true});
+
     auto ret = ScanManager::Instance()->ParallelScan(
         canonical_src, &scan_status, &scanned_dirs, disable_scan_cache);
     if (!ret) {
@@ -101,10 +124,11 @@ class RepoManager {
       return false;
     }
 
-    if (scan_status.complete_time() == 0) {
-      LOG(ERROR) << "Scan error: " << src;
-      return false;
-    }
+    bool stop_dump_task = false;
+    auto dump_task =
+        std::bind(&ScanManager::DumpTask, ScanManager::Instance().get(),
+                  &stop_dump_task, canonical_src, &scan_status, &scanned_dirs);
+    ThreadPool::Instance()->Post(dump_task);
 
     bool success = true;
     std::vector<std::future<bool>> rets;
@@ -118,14 +142,23 @@ class RepoManager {
     for (auto& f : rets) {
       if (f.get() == false) {
         success = false;
-        LOG(INFO) << "Exists error";
       }
     }
+
+    stop_dump_task = true;
     ScanManager::Instance()->Print(scan_status);
+    ScanManager::Instance()->Dump(canonical_src, &scan_status, scanned_dirs);
+    SyncStatusDir(canonical_src, canonical_dst);
+
     for (const auto& file : copy_failed_files) {
       LOG(ERROR) << file << " sync failed";
     }
     return success;
+  }
+
+  void Stop() {
+    stop_.store(true);
+    ScanManager::Instance()->Stop();
   }
 
  private:
@@ -191,6 +224,7 @@ class RepoManager {
   proto::Repos repos_;
   const int max_thread = 5;
   mutable absl::base_internal::SpinLock lock_;
+  std::atomic<bool> stop_ = false;
 };
 
 }  // namespace util

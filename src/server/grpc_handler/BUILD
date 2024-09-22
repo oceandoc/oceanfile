@@ -63,8 +63,10 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_library(
     name = "grpc_handler",
     hdrs = [
+        "file_handler.h",
         "meta.h",
-        "put_file_handler.h",
+        "repo_handler.h",
+        "status_handler.h",
     ],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,

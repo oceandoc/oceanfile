@@ -1,6 +1,13 @@
 # TODO
-* handle interrupt signal
-* uuid
+* repo ctl interface
+* check scan status
+* increment sync
+* authentic
+* session cookie
+* operation log
+* check system time
+* public and private ip address, mac address
+
 
 # final TODO
 * kill syncthing
@@ -9,7 +16,6 @@
 * password manager
 * notes generation
 * a web system
-
 
 bazel run @hedron_compile_commands//:refresh_all
 

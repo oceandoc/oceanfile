@@ -12,11 +12,6 @@
 namespace oceandoc {
 namespace util {
 
-// TODO
-// 1. millions dir set performance
-// 2. billions file vector performance
-// 3. dump billions file name to disk performance
-
 TEST(ScanManager, SymlinkCharacter) {
   std::filesystem::path path("/usr/lib/llvm-14/build/Debug+Asserts");
   if (std::filesystem::is_symlink(path)) {
@@ -44,7 +39,6 @@ TEST(ScanManager, SymlinkCharacter) {
 }
 
 TEST(ScanManager, Scan) {
-  ScanManager::Instance()->Clear();
   // std::string path = "/usr";
   std::string path = "/usr/local/llvm";
   proto::ScanStatus scan_status;
@@ -58,8 +52,6 @@ TEST(ScanManager, Scan) {
 TEST(ScanManager, ParallelScan) {
   ConfigManager::Instance()->Init("./conf/base_config.json");
   ThreadPool::Instance()->Init();
-
-  ScanManager::Instance()->Clear();
   // std::string path = "/usr";
   std::string path = "/usr/local/llvm";
   proto::ScanStatus scan_status;
@@ -72,7 +64,6 @@ TEST(ScanManager, ParallelScan) {
 }
 
 TEST(ScanManager, ValidateCachedStatusFile) {
-  ScanManager::Instance()->Clear();
   std::string path = "/usr/local/llvm";
   proto::ScanStatus scan_status;
   std::unordered_set<std::string> scanned_dirs;

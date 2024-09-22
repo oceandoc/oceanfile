@@ -26,8 +26,8 @@ class FilePartitionBuffer {
   using FileBufferList = std::list<std::string>;
   static std::shared_ptr<FilePartitionBuffer> Instance();
 
-  bool Add(const std::string& sha256, int32_t partition_num,
-           const std::string& content) {
+  bool Insert(const std::string& sha256, int32_t partition_num,
+              const std::string& content) {
     return true;
   }
 

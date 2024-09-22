@@ -60,15 +60,19 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
     "//conditions:default": [],
 })
 
-cc_binary(
-    name = "grpc_client",
-    srcs = ["grpc_client.cc"],
+cc_library(
+    name = "grpc_clients",
+    hdrs = [
+        "grpc_file_client.h",
+        "grpc_repo_client.h",
+        "grpc_status_client.h",
+    ],
     copts = COPTS,
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
         "//src/async_grpc",
-        "//src/client/grpc_client:grpc_clients",
+        "//src/common:structs",
         "//src/proto:cc_grpc_service",
         "//src/util",
         "@openssl//:ssl",

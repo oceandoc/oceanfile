@@ -3,12 +3,17 @@
  * All rights reserved.
  *******************************************************************************/
 
+#ifndef BAZEL_TEMPLATE_SERVER_GRPC_SERVER_IMPL_H
+#define BAZEL_TEMPLATE_SERVER_GRPC_SERVER_IMPL_H
+
 #include <memory>
 #include <string>
 
 #include "absl/strings/str_cat.h"
 #include "src/async_grpc/server.h"
-#include "src/server/grpc_handler/put_file_handler.h"
+#include "src/server/grpc_handler/file_handler.h"
+#include "src/server/grpc_handler/repo_handler.h"
+#include "src/server/grpc_handler/status_handler.h"
 #include "src/server/server_context.h"
 #include "src/util/config_manager.h"
 
@@ -29,7 +34,7 @@ class GrpcServer final {
         util::ConfigManager::Instance()->EventThreads());
 
     server_builder
-        .RegisterHandler<oceandoc::server::grpc_handler::PutFileHandler>();
+        .RegisterHandler<oceandoc::server::grpc_handler::FileHandler>();
     server_ = server_builder.Build();
     server_->SetExecutionContext(std::make_shared<ServerContext>());
     server_->Start();
@@ -39,6 +44,11 @@ class GrpcServer final {
 
  public:
   void WaitForShutdown() { server_->WaitForShutdown(); }
+
+  void SignalHandler(int sig) {
+    LOG(INFO) << "Caught signal: " << sig;
+    server_->Shutdown();
+  }
 
   std::shared_ptr<async_grpc::Server> GetGrpcServer() { return server_; }
 
@@ -51,3 +61,5 @@ class GrpcServer final {
 
 }  // namespace server
 }  // namespace oceandoc
+
+#endif  // BAZEL_TEMPLATE_SERVER_GRPC_SERVER_IMPL_H

@@ -77,6 +77,9 @@ class Util final {
                           const std::string &content,
                           const bool append = false);
 
+  static bool WriteToFile(const std::filesystem::path &path,
+                          const std::string &content, const int64_t start);
+
   static bool LoadSmallFile(std::string_view path, std::string *content);
 
   static bool IsAbsolute(std::string_view src);
@@ -86,7 +89,7 @@ class Util final {
   static int64_t CreateTime(std::string_view path);
   static int64_t UpdateTime(std::string_view path);
   static int64_t FileSize(std::string_view path);
-  static void FileInfo(std::string_view path, int64_t *create_time,
+  static bool FileInfo(std::string_view path, int64_t *create_time,
                        int64_t *update_time, int64_t *size);
   static std::string PartitionUUID(std::string_view path);
   static std::string Partition(std::string_view path);
@@ -133,6 +136,16 @@ class Util final {
   static std::string Base64Decode(std::string_view input);
 
   static uint32_t CRC32(std::string_view content);
+
+  static EVP_MD_CTX *HashInit(const EVP_MD *type);
+  static bool HashUpdate(EVP_MD_CTX *context, std::string_view str);
+  static bool HashFinal(EVP_MD_CTX *context, std::string *out,
+                        bool use_upper_case = false);
+
+  static EVP_MD_CTX *SHA256Init();
+  static bool SHA256Update(EVP_MD_CTX *context, std::string_view str);
+  static bool SHA256Final(EVP_MD_CTX *context, std::string *out,
+                          bool use_upper_case = false);
 
   static bool Hash(std::string_view str, const EVP_MD *type, std::string *out,
                    bool use_upper_case = false);
@@ -195,8 +208,7 @@ class Util final {
   static std::string RepoFilePath(const std::string &repo_path,
                                   const std::string &sha256);
 
-  static bool CreateFileWithSize(const std::string &path,
-                                 const std::size_t size);
+  static bool CreateFileWithSize(const std::string &path, const int64_t size);
 
   static void CalcPartitionStart(const int64_t size, const int32_t partition,
                                  int64_t *start, int64_t *end);

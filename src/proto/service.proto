@@ -5,14 +5,11 @@ package oceandoc.proto;
 import "src/proto/error.proto";
 
 message Context {
-  string private_ipv4 = 1;
-  string private_ipv6 = 2;
-  string public_ipv4 = 3;
+  repeated string private_ipv4 = 1;
+  repeated string private_ipv6 = 2;
+  repeated string public_ipv4 = 3;
   repeated string public_ipv6 = 4;
-}
-
-message Config {
-  string name = 1;
+  repeated string mac = 5;
 }
 
 message StatusReq {
@@ -21,45 +18,54 @@ message StatusReq {
 }
 
 message StatusRes {
-  string msg = 1;
-}
-
-message IpInfoReq {
-  string request_id = 1;
-}
-
-message IpInfoRes {
-  string msg = 1;
+  ErrCode err_code = 1;
+  string status = 2;
 }
 
 enum Op {
   Op_Unused = 0;
-  Op_Put = 1;
-  Op_Delete = 2;
-  Op_Chmod = 3;
-  Op_Chowner = 4;
+  File_Put = 1;
+  File_Delete = 2;
+  File_Chmod = 3;
+  File_Chowner = 4;
+  Repo_Create = 5;
+  Repo_Delete = 6;
+  Repo_Chmod = 7;
+  Repo_Chowner = 8;
 }
 
 message FileReq {
-  Op op = 1;
-  string path = 2;
-  string sha256 = 3;
-  int64 size = 4;
-  string content = 5;
-  int32 partition_num = 6;
-  string repo_uuid = 7;
+  string request_id = 1;
+  Op op = 3;
+  string path = 4;
+  string sha256 = 5;
+  int64 size = 6;
+  string content = 7;
+  int32 partition_num = 8;
+  string repo_uuid = 9;
 }
 
 message FileRes {
   ErrCode err_code = 1;
-  int32 partition_num = 2;
+  string path = 2;
+  string sha256 = 3;
+  int32 partition_num = 4;
+}
+
+message RepoReq {
+  string request_id = 1;
+  Op op = 2;
+  string path = 3;
+  string repo_uuid = 4;
+}
+
+message RepoRes {
+  ErrCode err_code = 1;
+  string repo_uuid = 2;
 }
 
 service OceanFile {
   rpc Status(StatusReq) returns (StatusRes);
-  rpc IpInfo(IpInfoReq) returns (IpInfoRes);
-  rpc PutFile(stream FileReq) returns (stream FileRes);
-  rpc DelFile(FileReq) returns (FileRes);
-  rpc Chmod(FileReq) returns (FileRes);
-  rpc Chowner(FileReq) returns (FileRes);
+  rpc FileOp(stream FileReq) returns (stream FileRes);
+  rpc RepoOp(RepoReq) returns (RepoRes);
 }

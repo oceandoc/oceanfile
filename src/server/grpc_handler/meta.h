@@ -21,44 +21,20 @@ struct StatusMethod {
   using OutgoingType = oceandoc::proto::StatusRes;
 };
 
-struct IpInfoMethod {
+struct RepoOpMethod {
   static constexpr const char* MethodName() {
-    return "/oceandoc.proto.OceanFile/IpInfo";
+    return "/oceandoc.proto.OceanFile/RepoOp";
   }
-  using IncomingType = oceandoc::proto::IpInfoReq;
-  using OutgoingType = oceandoc::proto::IpInfoRes;
+  using IncomingType = oceandoc::proto::RepoReq;
+  using OutgoingType = oceandoc::proto::RepoRes;
 };
 
-struct PutFileMethod {
+struct FileOpMethod {
   static constexpr const char* MethodName() {
-    return "/oceandoc.proto.OceanFile/PutFile";
+    return "/oceandoc.proto.OceanFile/FileOp";
   }
   using IncomingType = async_grpc::Stream<oceandoc::proto::FileReq>;
   using OutgoingType = async_grpc::Stream<oceandoc::proto::FileRes>;
-};
-
-struct DelFileMethod {
-  static constexpr const char* MethodName() {
-    return "/oceandoc.proto.OceanFile/DelFile";
-  }
-  using IncomingType = oceandoc::proto::FileReq;
-  using OutgoingType = oceandoc::proto::FileRes;
-};
-
-struct ChmodMethod {
-  static constexpr const char* MethodName() {
-    return "/oceandoc.proto.OceanFile/Chmod";
-  }
-  using IncomingType = oceandoc::proto::FileReq;
-  using OutgoingType = oceandoc::proto::FileRes;
-};
-
-struct ChownFileMethod {
-  static constexpr const char* MethodName() {
-    return "/oceandoc.proto.OceanFile/Chowner";
-  }
-  using IncomingType = oceandoc::proto::FileReq;
-  using OutgoingType = oceandoc::proto::FileRes;
 };
 
 }  // namespace grpc_handler
