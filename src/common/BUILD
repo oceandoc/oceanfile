@@ -4,13 +4,12 @@ load("//bazel:cpplint.bzl", "cpplint")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "structs",
-    hdrs = ["structs.h"],
+    name = "defs",
+    hdrs = ["defs.h"],
 )
 
 cc_library(
     name = "blocking_list",
-    #    srcs = ["blocking_queue.cc"],
     hdrs = ["blocking_list.h"],
 )
 

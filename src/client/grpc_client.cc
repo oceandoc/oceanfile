@@ -23,9 +23,10 @@ int main(int argc, char** argv) {
   oceandoc::proto::StatusRes status_res;
   status_req.set_request_id(oceandoc::util::Util::UUID());
   if (status_client.Status(status_req, &status_res)) {
-    LOG(INFO) << "Server status: " << status_res.status();
+    LOG(INFO) << "Server status: \n" << status_res.status();
   } else {
     LOG(ERROR) << "Get server status error";
+    return -1;
   }
 
   oceandoc::client::RepoClient repo_client("localhost", "10001");
@@ -39,12 +40,13 @@ int main(int argc, char** argv) {
               << ", uuid: " << repo_res.repo_uuid();
   } else {
     LOG(ERROR) << "Create repo error";
+    return -1;
   }
 
   std::string path =
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus";
   oceandoc::client::FileClient file_client("localhost", "10001");
-  auto ret = file_client.Send(path);
+  auto ret = file_client.Send(repo_res.repo_uuid(), path);
   grpc::Status status = file_client.Await();
   if (!status.ok() || !ret) {
     LOG(ERROR) << "Store " << path << " failed.";

@@ -5,6 +5,7 @@
 
 #include "src/util/util.h"
 
+#include <filesystem>
 #include <fstream>
 
 #include "glog/logging.h"
@@ -15,9 +16,56 @@ namespace util {
 
 using namespace std;
 
-TEST(Util, DetailTimeStr) {
+TEST(Util, CurrentTimeMillis) {
+  LOG(INFO) << Util::CurrentTimeMillis();
+  EXPECT_GT(Util::CurrentTimeMillis(), 1704038400000);
+  EXPECT_LT(Util::CurrentTimeMillis(), 1904038400000);
+}
+
+TEST(Util, CurrentTimeNanos) {
+  LOG(INFO) << Util::CurrentTimeNanos();
+  EXPECT_GT(Util::CurrentTimeNanos(), 1727101022292387983);
+  EXPECT_LT(Util::CurrentTimeNanos(), 1927101022292387983);
+}
+
+TEST(Util, StrToTimeStamp) {
+  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44", "%Y-%m-%d HH:MM:SS"),
+            -1);
+
+  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44", "%Y-%m-%d %H:%M:%S"),
+            1727156204000);  // CST time
+
+  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 22:48:50", "%Y-%m-%d %H:%M:%S"),
+            1727189330000);  // CST time
+
+  EXPECT_EQ(
+      Util::StrToTimeStamp("2024-09-24 13:36:44.123", "%Y-%m-%d %H:%M:%E3S"),
+      1727156204123);
+
+  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44.123",
+                                 "%Y-%m-%d %H:%M:%E2S%E3f"),
+            1727156204123);
+
+  EXPECT_EQ(
+      Util::StrToTimeStamp("2024-09-24 13:36:44.123", "%Y-%m-%d %H:%M:%E3S"),
+      1727156204123);
+
+  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24T13:36:44.000+0000"),
+            1727185004000);
+  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24T13:36:44.000+0800"),
+            1727156204000);
+  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44.123+08:00",
+                                 "%Y-%m-%d %H:%M:%E3S%Ez"),
+            1727156204123);
+  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44.123+08:30:24",
+                                 "%Y-%m-%d %H:%M:%E3S%E*z"),
+            1727154380123);
+}
+
+TEST(Util, ToTimeStr) {
   EXPECT_EQ(Util::ToTimeStr(1646397312000), "2022-03-04T20:35:12.000+08:00");
-  LOG(INFO) << Util::ToTimeStr(1646397312000);
+  EXPECT_EQ(Util::ToTimeStr(1646397312000, "%Y-%m-%d %H:%M:%S"),
+            "2022-03-04 20:35:12");
 }
 
 TEST(Util, UpdateTime) {
@@ -54,19 +102,16 @@ TEST(Util, FileSize) {
   LOG(INFO) << Util::FileSize(path);
 }
 
-TEST(Util, UUID) { LOG(INFO) << Util::UUID(); }
+TEST(Util, UUID) {
+  // eg: 2b68792c-0580-41a2-a7b1-ab3a96a1a58e
+  LOG(INFO) << Util::UUID();
+}
 
 TEST(Util, CRC32) {
-  std::string content;
-  Util::LoadSmallFile(
-      "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus",
-      &content);
+  // https://crccalc.com/?crc=123456789&method=&datatype=0&outtype=0
+  // CRC-32/ISCSI
   auto start = Util::CurrentTimeMillis();
-  auto crc = Util::CRC32(content);
-  LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, crc32:" << crc
-            << ", cost: " << Util::CurrentTimeMillis() - start;
-  content =
+  std::string content =
       "A cyclic redundancy check (CRC) is an error-detecting code used to "
       "detect data corruption. When sending data, short checksum is generated "
       "based on data content and sent along with data. When receiving data, "
@@ -74,27 +119,15 @@ TEST(Util, CRC32) {
       "are equal, then there is no data corruption. The CRC-32 algorithm "
       "itself converts a variable-length string into an 8-character string.";
   LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, crc32:" << Util::CRC32(content);
+            << "M, crc32:" << Util::CRC32(content)
+            << ", cost: " << Util::CurrentTimeMillis() - start;
   EXPECT_EQ(Util::CRC32(content), 2331864810);
 }
 
 TEST(Util, SHA256) {
   std::string content;
-  Util::LoadSmallFile(
-      "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus",
-      &content);
   std::string out;
   auto start = Util::CurrentTimeMillis();
-  Util::SHA256(content, &out);
-  LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, sha256:" << out
-            << ", cost: " << Util::CurrentTimeMillis() - start;
-
-  start = Util::CurrentTimeMillis();
-  Util::SHA256_libsodium(content, &out);
-  LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, sha256:" << out
-            << ", cost: " << Util::CurrentTimeMillis() - start;
   content =
       "A cyclic redundancy check (CRC) is an error-detecting code used to "
       "detect data corruption. When sending data, short checksum is generated "
@@ -104,7 +137,8 @@ TEST(Util, SHA256) {
       "itself converts a variable-length string into an 8-character string.";
   Util::SHA256(content, &out);
   LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, sha256:" << out;
+            << "M, sha256:" << out
+            << ", cost: " << Util::CurrentTimeMillis() - start;
   EXPECT_EQ(out,
             "3f5d419c0386a26df1c75d0d1c488506fb641b33cebaa2a4917127ae33030b31");
 }
@@ -115,6 +149,10 @@ TEST(Util, Relative) {
   std::string relative;
   EXPECT_EQ(Util::Relative(path, base, &relative), true);
   EXPECT_EQ(relative, "18/bin/llvm-dlltool");
+
+  path = "usr/local/llvm/18/bin/llvm-dlltool";
+  base = "usr/local/llvm/";
+  EXPECT_EQ(Util::Relative(path, base, &relative), false);
 
   path = "/usr/local/llvm/18/bin/llvm-dlltool";
   base = "/usr/local/llvm/";
@@ -152,13 +190,47 @@ TEST(Util, Relative) {
   EXPECT_EQ(relative, "");
 }
 
+TEST(Util, Exists) {
+  std::string symlink_path = "test_data/util_test/txt_symlink";
+  std::string target_path = "test_data/util_test/txt";
+
+  if (!std::filesystem::exists(target_path)) {
+    ofstream ofs(target_path);
+    ofs.close();
+  }
+  EXPECT_EQ(std::filesystem::exists(target_path), true);
+  EXPECT_EQ(Util::Exists(symlink_path), true);
+
+  EXPECT_EQ(Util::Remove(target_path), true);
+  EXPECT_EQ(std::filesystem::exists(target_path), false);
+  EXPECT_EQ(Util::Exists(symlink_path), true);
+
+  if (!std::filesystem::exists(target_path)) {
+    ofstream ofs(target_path);
+    ofs.close();
+  }
+}
+
 TEST(Util, Remove) {
-  std::string path = "test_data/util_test/test_remove";
-  std::ofstream ofs(path);
-  ofs.close();
-  EXPECT_EQ(Util::Remove("test_data/util_test/test_remove"), true);
-  ofstream ofs1(path);
-  ofs1.close();
+  std::string symlink_path = "test_data/util_test/txt_symlink";
+  std::string target_path = "test_data/util_test/txt";
+
+  if (!std::filesystem::exists(target_path)) {
+    ofstream ofs(target_path);
+    ofs.close();
+  }
+
+  EXPECT_EQ(Util::Remove(symlink_path), true);
+  EXPECT_EQ(Util::Exists(target_path), true);
+  EXPECT_EQ(Util::Exists(symlink_path), false);
+
+  EXPECT_EQ(Util::Remove(target_path), true);
+  EXPECT_EQ(Util::Exists(target_path), false);
+
+  if (!std::filesystem::exists(target_path)) {
+    ofstream ofs(target_path);
+    ofs.close();
+  }
 }
 
 TEST(Util, SyncSymlink) {

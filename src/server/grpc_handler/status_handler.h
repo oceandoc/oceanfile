@@ -18,7 +18,7 @@ namespace grpc_handler {
 class StatusHandler : public async_grpc::RpcHandler<StatusMethod> {
  public:
   void OnRequest(const proto::StatusReq& req) override {
-    LOG(INFO) << req.request_id();
+    LOG(INFO) << "qid: " << req.request_id();
     auto res = std::make_unique<proto::StatusRes>();
     res->set_status(
         static_cast<oceandoc::server::ServerContext*>(execution_context_)

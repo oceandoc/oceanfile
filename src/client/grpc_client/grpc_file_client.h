@@ -16,7 +16,7 @@
 #include "grpcpp/client_context.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/support/client_callback.h"
-#include "src/common/structs.h"
+#include "src/common/defs.h"
 #include "src/proto/service.grpc.pb.h"
 #include "src/proto/service.pb.h"
 #include "src/util/util.h"
@@ -34,6 +34,7 @@ class FileClient
 
   void OnWriteDone(bool ok) override {
     if (!ok) {
+      LOG(ERROR) << "Write error";
       send_status_ = common::SendStatus::FATAL;
     }
     write_cv_.notify_all();
@@ -50,11 +51,13 @@ class FileClient
       }
       StartRead(&res_);
     } else {
+      LOG(ERROR) << "Read error";
       send_status_ = common::SendStatus::FATAL;
     }
   }
 
   void OnDone(const grpc::Status& s) override {
+    LOG(INFO) << "Finshed";
     std::unique_lock<std::mutex> l(mu_);
     status_ = s;
     done_ = true;
@@ -81,19 +84,25 @@ class FileClient
     return success ? common::SendStatus::SUCCESS : common::SendStatus::RETRING;
   }
 
-  bool Send(const std::string& path) {
+  bool Send(const std::string& repo_uuid, const std::string& path) {
+    if (repo_uuid.empty()) {
+      LOG(ERROR) << "Empty repo_uuid";
+      return false;
+    }
+
     send_status_ = common::SendStatus::SUCCESS;
     done_ = false;
     req_.Clear();
     mark_.clear();
 
+    req_.set_repo_uuid(repo_uuid);
     grpc::ClientContext context;
     stub_->async()->FileOp(&context, this);
 
     StartRead(&res_);
     StartCall();
 
-    util::FileAttr attr;
+    common::FileAttr attr;
     if (!util::Util::PrepareFile(path, &attr)) {
       LOG(ERROR) << "Prepare error: " << path;
       return false;
@@ -105,10 +114,11 @@ class FileClient
       return false;
     }
 
+    LOG(INFO) << attr.ToString();
     mark_.resize(attr.partition_num, 0);
 
-    char buffer[util::FilePartitionSize];
-    req_.mutable_content()->reserve(util::FilePartitionSize);
+    std::vector<char> buffer(common::BUFFER_SIZE_BYTES);
+    req_.mutable_content()->reserve(common::BUFFER_SIZE_BYTES);
     req_.set_op(proto::Op::File_Put);
     req_.set_path(path);
     req_.set_sha256(attr.sha256);
@@ -120,14 +130,16 @@ class FileClient
       req_.mutable_content()->resize(file.gcount());
       req_.set_partition_num(partition_num);
 
-      std::copy(buffer, buffer + file.gcount(),
+      std::copy(buffer.data(), buffer.data() + file.gcount(),
                 req_.mutable_content()->begin());
       StartWrite(&req_);
       std::unique_lock<std::mutex> l(write_mu_);
       write_cv_.wait(l);
     };
 
-    while (file.read(buffer, util::FilePartitionSize) || file.gcount()) {
+    while (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
+           file.gcount()) {
+      LOG(INFO) << "Now send part: " << partition_num;
       BatchSend(partition_num);
       if (send_status_ == common::SendStatus::FATAL) {
         StartWritesDone();
@@ -143,8 +155,9 @@ class FileClient
           return false;
         }
         if (mark_[i] == 1) {
-          file.seekg(i * util::FilePartitionSize);
-          if (file.read(buffer, util::FilePartitionSize) || file.gcount()) {
+          file.seekg(i * common::BUFFER_SIZE_BYTES);
+          if (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
+              file.gcount()) {
             BatchSend(i);
           }
         }

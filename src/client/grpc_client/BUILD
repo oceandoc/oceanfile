@@ -72,7 +72,7 @@ cc_library(
     local_defines = LOCAL_DEFINES,
     deps = [
         "//src/async_grpc",
-        "//src/common:structs",
+        "//src/common:defs",
         "//src/proto:cc_grpc_service",
         "//src/util",
         "@openssl//:ssl",

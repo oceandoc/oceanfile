@@ -109,6 +109,7 @@ cc_library(
         ":double_buffer",
         ":thread_pool",
         ":util",
+        "//src/common:defs",
         "//src/proto:cc_data",
         "@folly",
     ],
@@ -161,6 +162,7 @@ cc_library(
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        "//src/common:defs",
         "@boost//:algorithm",
         "@boost//:beast",
         "@boost//:iostreams",
@@ -192,6 +194,7 @@ cc_test(
         "//test_data/util_test:test_remove",
         "//test_data/util_test:txt",
         "//test_data/util_test:txt_symlink",
+        "//test_data/util_test/target_dir:test",
     ],
     deps = [":util"],
 )

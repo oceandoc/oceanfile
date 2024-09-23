@@ -18,6 +18,7 @@
 #include "absl/synchronization/mutex.h"
 #include "folly/Singleton.h"
 #include "glog/logging.h"
+#include "src/common/defs.h"
 #include "src/proto/data.pb.h"
 #include "src/util/thread_pool.h"
 #include "src/util/util.h"
@@ -36,7 +37,7 @@ class ScanManager {
   bool Init() { return true; }
 
   std::string GenFileDir(const std::string& path) {
-    return path + "/" + mark_dir_name;
+    return path + "/" + common::CONFIG_DIR;
   }
 
   std::string GenFileName(const std::string& path) {
@@ -482,8 +483,6 @@ class ScanManager {
   }
 
  public:
-  const static std::string mark_dir_name;
-
  private:
   mutable absl::base_internal::SpinLock lock_;
   std::atomic<bool> scanning_ = false;

@@ -10,8 +10,6 @@ namespace util {
 
 static folly::Singleton<ScanManager> scan_manager;
 
-const std::string ScanManager::mark_dir_name = ".Dr.Q.config";
-
 std::shared_ptr<ScanManager> ScanManager::Instance() {
   return scan_manager.try_get();
 }

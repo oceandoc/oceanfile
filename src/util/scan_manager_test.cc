@@ -8,6 +8,7 @@
 #include <filesystem>
 
 #include "gtest/gtest.h"
+#include "src/common/defs.h"
 
 namespace oceandoc {
 namespace util {
@@ -43,8 +44,7 @@ TEST(ScanManager, Scan) {
   std::string path = "/usr/local/llvm";
   proto::ScanStatus scan_status;
   std::unordered_set<std::string> scanned_dirs;
-  scan_status.mutable_ignored_dirs()->insert(
-      {ScanManager::mark_dir_name, true});
+  scan_status.mutable_ignored_dirs()->insert({common::CONFIG_DIR, true});
   ScanManager::Instance()->Scan(path, &scan_status, &scanned_dirs, false);
   ScanManager::Instance()->Print(scan_status);
 }
@@ -56,8 +56,7 @@ TEST(ScanManager, ParallelScan) {
   std::string path = "/usr/local/llvm";
   proto::ScanStatus scan_status;
   std::unordered_set<std::string> scanned_dirs;
-  scan_status.mutable_ignored_dirs()->insert(
-      {ScanManager::mark_dir_name, true});
+  scan_status.mutable_ignored_dirs()->insert({common::CONFIG_DIR, true});
   ScanManager::Instance()->ParallelScan(path, &scan_status, &scanned_dirs,
                                         false);
   ScanManager::Instance()->Print(scan_status);

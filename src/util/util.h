@@ -15,18 +15,10 @@
 #include "boost/algorithm/string/replace.hpp"
 #include "google/protobuf/message.h"
 #include "openssl/types.h"
+#include "src/common/defs.h"
 
 namespace oceandoc {
 namespace util {
-
-const int64_t FilePartitionSize = 64 * 1024 * 1024 * 8;  // 64MB
-
-struct FileAttr {
-  std::string sha256;
-  std::string enc_sha256;
-  int64_t size;
-  int32_t partition_num;
-};
 
 class Util final {
  private:
@@ -34,14 +26,9 @@ class Util final {
   ~Util() {}
 
  public:
-  static std::string GetServerIp();
-
   static int64_t CurrentTimeMillis();
-
   static int64_t CurrentTimeNanos();
-
   static int64_t StrToTimeStamp(std::string_view time);
-
   static int64_t StrToTimeStamp(std::string_view time, std::string_view format);
 
   static std::string ToTimeStr();
@@ -82,6 +69,10 @@ class Util final {
 
   static bool LoadSmallFile(std::string_view path, std::string *content);
 
+  static bool Create(std::string_view src);
+  static bool CreateSymlink(std::string_view src, std::string_view target);
+
+  static bool Exists(std::string_view src);
   static bool IsAbsolute(std::string_view src);
 
   static bool Relative(std::string_view path, std::string_view base,
@@ -188,7 +179,7 @@ class Util final {
 
   static void PrintProtoMessage(const google::protobuf::Message &msg);
 
-  static void PrintProtoMessage(const google::protobuf::Message &msg,
+  static bool PrintProtoMessage(const google::protobuf::Message &msg,
                                 std::string *json);
   static bool JsonToMessage(const std::string &json,
                             google::protobuf::Message *msg);
@@ -203,7 +194,7 @@ class Util final {
 
   static int32_t FilePartitionNum(const int64_t size);
 
-  static bool PrepareFile(const std::string &path, FileAttr *attr);
+  static bool PrepareFile(const std::string &path, common::FileAttr *attr);
 
   static std::string RepoFilePath(const std::string &repo_path,
                                   const std::string &sha256);
@@ -212,9 +203,6 @@ class Util final {
 
   static void CalcPartitionStart(const int64_t size, const int32_t partition,
                                  int64_t *start, int64_t *end);
-
- public:
-  static const char *kPathDelimeter;
 };
 
 }  // namespace util

@@ -45,11 +45,12 @@ message Repo {
   uint64 file_num = 4;
   uint64 dir_num = 5;
   uint64 symlink_num = 6;
-  int64 create_time = 7;
+  string create_time = 7;
   int64 update_time = 8;
   repeated FileItem files = 9;
 }
 
 message Repos {
   map<string, Repo> repos = 1;
+  map<string, Repo> uuid_repos = 2;
 }

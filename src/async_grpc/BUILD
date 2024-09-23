@@ -86,6 +86,7 @@ cc_library(
     local_defines = LOCAL_DEFINES,
     deps = [
         ":cc_protos",
+        "//src/common:defs",
         "@com_github_glog_glog//:glog",
         "@com_github_grpc_grpc//:grpc++",
     ],

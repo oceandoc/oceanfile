@@ -21,7 +21,6 @@
 #include "boost/algorithm/string/split.hpp"
 #include "boost/algorithm/string/trim_all.hpp"
 #include "boost/beast/core/detail/base64.hpp"
-#include "boost/iostreams/device/mapped_file.hpp"
 #include "boost/uuid/random_generator.hpp"
 #include "boost/uuid/uuid_io.hpp"
 #include "crc32c/crc32c.h"
@@ -32,7 +31,7 @@
 #include "openssl/evp.h"
 #include "sodium/crypto_hash_sha256.h"
 #include "src/MurmurHash2.h"
-#include "src/MurmurHash3.h"
+#include "src/common/defs.h"
 
 #if defined(_WIN32)
 #include "src/util/util_windows.h"
@@ -53,16 +52,7 @@
 #elif defined(_WIN32)
 #include <windows.h>
 #endif
-// #include "src/common/ip_address.h"
 
-using absl::FormatTime;
-using absl::FromUnixMillis;
-using absl::GetCurrentTimeNanos;
-using absl::LoadTimeZone;
-using absl::Milliseconds;
-using absl::SleepFor;
-using absl::Time;
-using absl::TimeZone;
 using google::protobuf::util::JsonParseOptions;
 using google::protobuf::util::JsonPrintOptions;
 using std::string;
@@ -71,33 +61,23 @@ using std::string_view;
 namespace oceandoc {
 namespace util {
 
-const char *Util::kPathDelimeter = "/";
-
-string Util::GetServerIp() {
-  // common::IPAddress ip_address;
-  // if (!common::IPAddress::GetFirstPrivateAddress(&ip_address)) {
-  // LOG(ERROR) << "Failed to get local ip address";
-  // return "";
-  //}
-  // return ip_address.ToString();
-  return "";
-}
-
 int64_t Util::CurrentTimeMillis() {
   return absl::GetCurrentTimeNanos() / 1000000;
 }
 
-int64_t Util::CurrentTimeNanos() { return GetCurrentTimeNanos(); }
+int64_t Util::CurrentTimeNanos() { return absl::GetCurrentTimeNanos(); }
 
 int64_t Util::StrToTimeStamp(string_view time) {
   return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez");
 }
 
 int64_t Util::StrToTimeStamp(string_view time, string_view format) {
+  absl::TimeZone tz;
+  absl::LoadTimeZone("localtime", &tz);
   absl::Time t;
   string err;
-  if (!absl::ParseTime(format, time, &t, &err)) {
-    LOG(ERROR) << "convert " << time << " " << err;
+  if (!absl::ParseTime(format, time, tz, &t, &err)) {
+    LOG(ERROR) << err << " " << time << ", format: " << format;
     return -1;
   }
   return absl::ToUnixMillis(t);
@@ -105,23 +85,23 @@ int64_t Util::StrToTimeStamp(string_view time, string_view format) {
 
 string Util::ToTimeStr() {
   return Util::ToTimeStr(Util::CurrentTimeMillis(), "%Y-%m-%d%ET%H:%M:%E3S%Ez",
-                         "Asia/Shanghai");
+                         "localtime");
 }
 
 string Util::ToTimeStr(const int64_t ts) {
-  return Util::ToTimeStr(ts, "%Y-%m-%d%ET%H:%M:%E3S%Ez", "Asia/Shanghai");
+  return Util::ToTimeStr(ts, "%Y-%m-%d%ET%H:%M:%E3S%Ez", "localtime");
 }
 
 string Util::ToTimeStr(const int64_t ts, string_view format) {
-  TimeZone time_zone;
-  LoadTimeZone("Asia/Shanghai", &time_zone);
-  return FormatTime(format, FromUnixMillis(ts), time_zone);
+  absl::TimeZone time_zone;
+  absl::LoadTimeZone("localtime", &time_zone);
+  return absl::FormatTime(format, absl::FromUnixMillis(ts), time_zone);
 }
 
 string Util::ToTimeStr(const int64_t ts, string_view format, string_view tz) {
-  TimeZone time_zone;
-  LoadTimeZone(tz, &time_zone);
-  return FormatTime(format, FromUnixMillis(ts), time_zone);
+  absl::TimeZone time_zone;
+  absl::LoadTimeZone(tz, &time_zone);
+  return absl::FormatTime(format, absl::FromUnixMillis(ts), time_zone);
 }
 
 int64_t Util::Random(int64_t start, int64_t end) {
@@ -134,12 +114,12 @@ void Util::Sleep(int64_t ms) {
   std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
-void Util::SleepUntil(const Time &time) {
+void Util::SleepUntil(const absl::Time &time) {
   volatile bool signal = false;
   SleepUntil(time, &signal);
 }
 
-bool Util::SleepUntil(const Time &time, volatile bool *stop_signal) {
+bool Util::SleepUntil(const absl::Time &time, volatile bool *stop_signal) {
   auto now = absl::Now();
   if (time <= now) {
     return true;
@@ -148,7 +128,7 @@ bool Util::SleepUntil(const Time &time, volatile bool *stop_signal) {
     if (*stop_signal) {
       return false;
     }
-    SleepFor(Milliseconds(100));
+    absl::SleepFor(absl::Milliseconds(100));
   }
   return true;
 }
@@ -196,6 +176,11 @@ bool Util::MkParentDir(const std::filesystem::path &path) {
     if (std::filesystem::exists(path)) {
       return true;
     }
+
+    if (std::filesystem::exists(path.parent_path())) {
+      return true;
+    }
+
     if (path.has_parent_path()) {
       std::filesystem::create_directories(path.parent_path());
     }
@@ -482,9 +467,8 @@ bool Util::FileHash(const std::string &path, const EVP_MD *type,
                     std::string *out, bool use_upper_case) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int length;
-  const size_t buffer_size = 64 * 1024 * 1024 * 8;  // 64MB buffer
 
-  std::ifstream file(path, std::ios::binary);
+  std::ifstream file(path);
   if (!file || !file.is_open()) {
     LOG(ERROR) << "Check file exists or file permissions";
     return false;
@@ -500,9 +484,10 @@ bool Util::FileHash(const std::string &path, const EVP_MD *type,
     return false;
   }
 
-  char buffer[buffer_size];
-  while (file.read(buffer, sizeof(buffer)) || file.gcount()) {
-    if (EVP_DigestUpdate(context, buffer, file.gcount()) != 1) {
+  std::vector<char> buffer(common::BUFFER_SIZE);
+
+  while (file.read(buffer.data(), common::BUFFER_SIZE) || file.gcount() > 0) {
+    if (EVP_DigestUpdate(context, buffer.data(), file.gcount()) != 1) {
       EVP_MD_CTX_free(context);
       return false;
     }
@@ -577,14 +562,15 @@ void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
   LOG(INFO) << "json_value: " << json_value;
 }
 
-void Util::PrintProtoMessage(const google::protobuf::Message &msg,
+bool Util::PrintProtoMessage(const google::protobuf::Message &msg,
                              string *json) {
   JsonPrintOptions option;
   option.add_whitespace = false;
   option.preserve_proto_field_names = true;
   if (!MessageToJsonString(msg, json, option).ok()) {
-    LOG(ERROR) << "to json string failed";
+    return false;
   }
+  return true;
 }
 
 bool Util::JsonToMessage(const std::string &json,
@@ -728,6 +714,11 @@ bool Util::SetFileInvisible(string_view path) {
 #endif
 }
 
+bool Util::Exists(string_view src) {
+  std::filesystem::path s_src(src);
+  return std::filesystem::is_symlink(s_src) || std::filesystem::exists(s_src);
+}
+
 bool Util::IsAbsolute(string_view src) {
   std::filesystem::path s_src(src);
   return s_src.is_absolute();
@@ -817,8 +808,7 @@ bool Util::LZMADecompress(string_view data, string *out) {
     return false;
   }
 
-  const size_t buffer_size = 64 * 1024 * 1024;  // 64MB
-  std::vector<uint8_t> decompressed_data(buffer_size);
+  std::vector<uint8_t> decompressed_data(common::BUFFER_SIZE / 8);
 
   strm.next_in = reinterpret_cast<const uint8_t *>(data.data());
   strm.avail_in = data.size();
@@ -829,9 +819,9 @@ bool Util::LZMADecompress(string_view data, string *out) {
     ret = lzma_code(&strm, LZMA_FINISH);
     if (strm.avail_out == 0 || ret == LZMA_STREAM_END) {
       out->append(reinterpret_cast<const char *>(decompressed_data.data()),
-                  buffer_size - strm.avail_out);
+                  common::BUFFER_SIZE - strm.avail_out);
       strm.next_out = decompressed_data.data();
-      strm.avail_out = buffer_size;
+      strm.avail_out = common::BUFFER_SIZE;
     }
 
     if (ret != LZMA_OK) {
@@ -860,10 +850,11 @@ int32_t Util::FilePartitionNum(const int64_t size) {
   if (size <= 0) {
     return 0;
   }
-  return size / FilePartitionSize + ((size % FilePartitionSize) > 0 ? 0 : 1);
+  // file size unit is byte
+  return std::ceil((double)size / (double)(common::BUFFER_SIZE / 8));  // NOLINT
 }
 
-bool Util::PrepareFile(const string &path, FileAttr *attr) {
+bool Util::PrepareFile(const string &path, common::FileAttr *attr) {
   if (!FileSHA256(path, &attr->sha256)) {
     LOG(ERROR) << "Calc " << path << " sha256 error";
     return false;
@@ -916,10 +907,12 @@ bool Util::CreateFileWithSize(const std::string &path, const int64_t size) {
 #else
   int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
   if (fd == -1) {
+    LOG(ERROR) << "Open file error: " << path.c_str();
     return false;
   }
 
   if (ftruncate(fd, size) == -1) {
+    LOG(ERROR) << "Truncate size error: " << path.c_str();
     close(fd);
     return false;
   }
@@ -930,9 +923,9 @@ bool Util::CreateFileWithSize(const std::string &path, const int64_t size) {
 
 void Util::CalcPartitionStart(const int64_t size, const int32_t partition,
                               int64_t *start, int64_t *end) {
-  *start = partition * FilePartitionSize;
-  if (size - *start >= FilePartitionSize) {
-    *end = *start + FilePartitionSize - 1;
+  *start = partition * common::BUFFER_SIZE_BYTES;
+  if (size - *start >= common::BUFFER_SIZE_BYTES) {
+    *end = *start + common::BUFFER_SIZE_BYTES - 1;
   }
   *end = size;
 }

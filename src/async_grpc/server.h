@@ -19,25 +19,15 @@
 
 #include <cstddef>
 #include <memory>
-#include <sstream>
 #include <string>
-#include <thread>
 
-#include "grpc++/grpc++.h"
 #include "src/async_grpc/completion_queue_thread.h"
 #include "src/async_grpc/event_queue_thread.h"
 #include "src/async_grpc/execution_context.h"
-#include "src/async_grpc/rpc_handler.h"
-#include "src/async_grpc/rpc_service_method_traits.h"
 #include "src/async_grpc/service.h"
+#include "src/common/defs.h"
 
 namespace async_grpc {
-namespace {
-
-constexpr int kDefaultMaxMessageSize = 10 * 1024 * 1024;    // 10 MB
-constexpr double kDefaultTracingSamplerProbability = 0.01;  // 1 Percent
-
-}  // namespace
 
 class Server {
  protected:
@@ -53,10 +43,11 @@ class Server {
     size_t num_grpc_threads;
     size_t num_event_threads;
     std::string server_address;
-    int max_receive_message_size = kDefaultMaxMessageSize;
-    int max_send_message_size = kDefaultMaxMessageSize;
+    int max_receive_message_size = oceandoc::common::MAX_GRPC_MSG_SIZE;
+    int max_send_message_size = oceandoc::common::MAX_GRPC_MSG_SIZE;
     bool enable_tracing = false;
-    double tracing_sampler_probability = kDefaultTracingSamplerProbability;
+    double tracing_sampler_probability =
+        oceandoc::common::TRACING_SAMPLER_PROBALITITY;
     std::string tracing_task_name;
     std::string tracing_gcp_project_id;
   };
