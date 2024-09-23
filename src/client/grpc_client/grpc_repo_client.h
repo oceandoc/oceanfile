@@ -6,55 +6,55 @@
 #ifndef BAZEL_TEMPLATE_CLIENT_GRPC_REPO_CLIENT_H
 #define BAZEL_TEMPLATE_CLIENT_GRPC_REPO_CLIENT_H
 
-#include <algorithm>
 #include <condition_variable>
-#include <fstream>
 #include <mutex>
-#include <vector>
 
-#include "glog/logging.h"
 #include "grpcpp/client_context.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/support/client_callback.h"
-#include "src/common/structs.h"
 #include "src/proto/service.grpc.pb.h"
 #include "src/proto/service.pb.h"
-#include "src/util/util.h"
-
-using grpc::ClientContext;
-using grpc::Status;
 
 namespace oceandoc {
 namespace client {
 
 class RepoClient {
  public:
-  explicit RepoClient(proto::OceanFile::Stub* stub) {
-    // stub->async()->RepoOp(&context_, this);
+  explicit RepoClient(const std::string& addr, const std::string& port)
+      : channel_(grpc::CreateChannel(addr + ":" + port,
+                                     grpc::InsecureChannelCredentials())),
+        stub_(oceandoc::proto::OceanFile::NewStub(channel_)) {}
+
+  bool CreateRepo(const proto::RepoReq& req, proto::RepoRes* res) {
+    grpc::ClientContext context;
+    bool result;
+    std::mutex mu;
+    std::condition_variable cv;
+    bool done = false;
+    stub_->async()->RepoOp(
+        &context, &req, res,
+        [&result, &mu, &cv, &done, res](grpc::Status status) {
+          bool ret;
+          if (!status.ok()) {
+            ret = false;
+          } else if (res->err_code() == proto::SUCCESS) {
+            ret = true;
+          } else {
+            ret = false;
+          }
+          std::lock_guard<std::mutex> lock(mu);
+          result = ret;
+          done = true;
+          cv.notify_one();
+        });
+    std::unique_lock<std::mutex> lock(mu);
+    cv.wait(lock, [&done] { return done; });
+    return result;
   }
-
-  void Reset() { done_ = false; }
-
-  grpc::Status Await() {
-    std::unique_lock<std::mutex> l(mu_);
-    cv_.wait(l, [this] { return done_; });
-    return std::move(status_);
-  }
-
-  bool Send() { return true; }
 
  private:
-  ClientContext context_;
-  std::mutex mu_;
-  std::condition_variable cv_;
-  std::mutex write_mu_;
-  std::condition_variable write_cv_;
-  Status status_;
-  bool done_ = false;
-  proto::RepoReq req_;
-  proto::RepoRes res_;
-  mutable absl::base_internal::SpinLock lock_;
-  std::vector<int32_t> mark_;
+  std::shared_ptr<grpc::Channel> channel_;
+  std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
 };
 
 }  // namespace client

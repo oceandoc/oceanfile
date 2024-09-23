@@ -6,7 +6,7 @@
 * session cookie
 * operation log
 * check system time
-* public and private ip address, mac address
+* public and private ip address, mac address, system info
 
 
 # final TODO

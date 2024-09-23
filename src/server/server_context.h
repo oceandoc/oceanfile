@@ -31,7 +31,7 @@ class ServerContext : public async_grpc::ExecutionContext {
 
   void MarkedServerInitedDone() {
     is_inited_.store(true);
-    LOG(INFO) << "grpc server started on: "
+    LOG(INFO) << "Grpc server started on: "
               << util::ConfigManager::Instance()->ServerAddr() << ", port: "
               << util::ConfigManager::Instance()->GrpcServerPort();
   }

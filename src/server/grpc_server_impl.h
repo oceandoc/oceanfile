@@ -33,9 +33,12 @@ class GrpcServer final {
     server_builder.SetNumEventThreads(
         util::ConfigManager::Instance()->EventThreads());
 
-    server_builder
-        .RegisterHandler<oceandoc::server::grpc_handler::FileHandler>();
+    server_builder.RegisterHandler<grpc_handler::StatusHandler>();
+    server_builder.RegisterHandler<grpc_handler::RepoHandler>();
+    server_builder.RegisterHandler<grpc_handler::FileHandler>();
+
     server_ = server_builder.Build();
+
     server_->SetExecutionContext(std::make_shared<ServerContext>());
     server_->Start();
 

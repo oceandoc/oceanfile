@@ -13,6 +13,8 @@ enum SendStatus {
   SUCCESS,
   RETRING,
   TOO_MANY_RETRY,
+  FATAL,
+  FAIL,
 };
 
 }  // namespace common

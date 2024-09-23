@@ -20,7 +20,14 @@ class RepoHandler : public async_grpc::RpcHandler<RepoOpMethod> {
   void OnRequest(const proto::RepoReq& req) override {
     auto res = std::make_unique<proto::RepoRes>();
     std::string uuid;
-    auto ret = util::RepoManager::Instance()->CreateRepo(req.path(), &uuid);
+    bool ret = true;
+    switch (req.op()) {
+      case proto::Op::Repo_Create:
+        ret = util::RepoManager::Instance()->CreateRepo(req.path(), &uuid);
+        break;
+      default:
+        LOG(ERROR) << "Unsupported operation";
+    }
 
     if (!ret) {
       res->set_err_code(proto::ErrCode::FAIL);

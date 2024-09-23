@@ -21,27 +21,22 @@
 #include "src/proto/service.pb.h"
 #include "src/util/util.h"
 
-using grpc::ClientContext;
-using grpc::Status;
-
 namespace oceandoc {
 namespace client {
 
 class FileClient
     : public grpc::ClientBidiReactor<proto::FileReq, proto::FileRes> {
  public:
-  explicit FileClient(proto::OceanFile::Stub* stub) {
-    stub->async()->FileOp(&context_, this);
-    StartRead(&res_);
-    StartCall();
-  }
-
-  void Reset() { done_ = false; }
+  explicit FileClient(const std::string& addr, const std::string& port)
+      : channel_(grpc::CreateChannel(addr + ":" + port,
+                                     grpc::InsecureChannelCredentials())),
+        stub_(oceandoc::proto::OceanFile::NewStub(channel_)) {}
 
   void OnWriteDone(bool ok) override {
-    if (ok) {
-      write_cv_.notify_all();
+    if (!ok) {
+      send_status_ = common::SendStatus::FATAL;
     }
+    write_cv_.notify_all();
   }
 
   void OnReadDone(bool ok) override {
@@ -54,6 +49,8 @@ class FileClient
         mark_[res_.partition_num()] = -1;
       }
       StartRead(&res_);
+    } else {
+      send_status_ = common::SendStatus::FATAL;
     }
   }
 
@@ -71,8 +68,8 @@ class FileClient
   }
 
   common::SendStatus GetStatus() {
-    absl::base_internal::SpinLockHolder locker(&lock_);
     bool success = true;
+    absl::base_internal::SpinLockHolder locker(&lock_);
     for (auto m : mark_) {
       if (m > 1) {
         return common::SendStatus::TOO_MANY_RETRY;
@@ -81,20 +78,30 @@ class FileClient
         success = false;
       }
     }
-
     return success ? common::SendStatus::SUCCESS : common::SendStatus::RETRING;
   }
 
   bool Send(const std::string& path) {
+    send_status_ = common::SendStatus::SUCCESS;
+    done_ = false;
+    req_.Clear();
+    mark_.clear();
+
+    grpc::ClientContext context;
+    stub_->async()->FileOp(&context, this);
+
+    StartRead(&res_);
+    StartCall();
+
     util::FileAttr attr;
     if (!util::Util::PrepareFile(path, &attr)) {
-      LOG(ERROR) << "Prepare error";
-      return 0;
+      LOG(ERROR) << "Prepare error: " << path;
+      return false;
     }
 
     std::ifstream file(path, std::ios::binary);
     if (!file || !file.is_open()) {
-      LOG(ERROR) << "Check file exists or file permissions";
+      LOG(ERROR) << "Check file exists or file permissions: " << path;
       return false;
     }
 
@@ -108,35 +115,41 @@ class FileClient
     req_.set_size(attr.size);
 
     int32_t partition_num = 0;
-    while (file.read(buffer, util::FilePartitionSize) || file.gcount()) {
+
+    auto BatchSend = [this, buffer, &file](const int32_t partition_num) {
       req_.mutable_content()->resize(file.gcount());
       req_.set_partition_num(partition_num);
-      ++partition_num;
 
       std::copy(buffer, buffer + file.gcount(),
                 req_.mutable_content()->begin());
       StartWrite(&req_);
       std::unique_lock<std::mutex> l(write_mu_);
       write_cv_.wait(l);
+    };
+
+    while (file.read(buffer, util::FilePartitionSize) || file.gcount()) {
+      BatchSend(partition_num);
+      if (send_status_ == common::SendStatus::FATAL) {
+        StartWritesDone();
+        return false;
+      }
+      ++partition_num;
     }
 
     while (GetStatus() == common::SendStatus::RETRING) {
       for (size_t i = 0; i < mark_.size(); ++i) {
+        if (send_status_ == common::SendStatus::FATAL) {
+          StartWritesDone();
+          return false;
+        }
         if (mark_[i] == 1) {
           file.seekg(i * util::FilePartitionSize);
           if (file.read(buffer, util::FilePartitionSize) || file.gcount()) {
-            req_.mutable_content()->resize(file.gcount());
-            req_.set_partition_num(partition_num);
-            ++partition_num;
-
-            std::copy(buffer, buffer + file.gcount(),
-                      req_.mutable_content()->begin());
-            StartWrite(&req_);
-            std::unique_lock<std::mutex> l(write_mu_);
-            write_cv_.wait(l);
+            BatchSend(i);
           }
         }
       }
+      util::Util::Sleep(10);
     }
 
     StartWritesDone();
@@ -144,12 +157,18 @@ class FileClient
   }
 
  private:
-  ClientContext context_;
+  std::shared_ptr<grpc::Channel> channel_;
+  std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
+
+  grpc::Status status_;
+
+  std::atomic<common::SendStatus> send_status_ = common::SendStatus::SUCCESS;
+
   std::mutex mu_;
   std::condition_variable cv_;
+
   std::mutex write_mu_;
   std::condition_variable write_cv_;
-  Status status_;
   bool done_ = false;
   proto::FileReq req_;
   proto::FileRes res_;

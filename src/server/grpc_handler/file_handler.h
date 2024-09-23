@@ -19,9 +19,16 @@ class FileHandler : public async_grpc::RpcHandler<FileOpMethod> {
  public:
   void OnRequest(const proto::FileReq& req) override {
     auto res = std::make_unique<proto::FileRes>();
-    auto ret = util::RepoManager::Instance()->WriteToFile(
-        req.repo_uuid(), req.sha256(), req.content(), req.size(),
-        req.partition_num());
+    bool ret = true;
+    switch (req.op()) {
+      case proto::Op::File_Put:
+        ret = util::RepoManager::Instance()->WriteToFile(
+            req.repo_uuid(), req.sha256(), req.content(), req.size(),
+            req.partition_num());
+        break;
+      default:
+        LOG(ERROR) << "Unsupported operation";
+    }
 
     if (!ret) {
       res->set_err_code(proto::ErrCode::FAIL);
