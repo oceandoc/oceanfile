@@ -81,7 +81,7 @@ class RepoManager {
 
   bool ExistsRepo(const std::string& path, std::string* uuid = nullptr) {
     std::string repo_config_dir = path + "/" + common::CONFIG_DIR;
-    if (!std::filesystem::exists(repo_config_dir) ||
+    if (!Util::Exists(repo_config_dir) ||
         !std::filesystem::is_directory(repo_config_dir)) {
       return false;
     }
@@ -268,6 +268,12 @@ class RepoManager {
     std::string canonical_dst(dst);
     Util::UnifyDir(&canonical_src);
     Util::UnifyDir(&canonical_dst);
+
+    if (Util::StartWith(canonical_dst, canonical_src)) {
+      LOG(ERROR) << "Cannot sync " << canonical_src << " to " << canonical_dst
+                 << ", for cannot sync to subdir";
+      return false;
+    }
     Util::Mkdir(canonical_dst);
 
     proto::ScanStatus scan_status;
@@ -369,7 +375,7 @@ class RepoManager {
         LOG(ERROR) << dir.string() << " symlink";
       }
 
-      if (std::filesystem::exists(dst_path)) {
+      if (Util::Exists(dst_path.string())) {
         continue;
       }
       std::filesystem::create_directories(dst_path);

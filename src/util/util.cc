@@ -13,6 +13,7 @@
 #include <random>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <utility>
 
@@ -114,55 +115,131 @@ void Util::Sleep(int64_t ms) {
   std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
-void Util::SleepUntil(const absl::Time &time) {
-  volatile bool signal = false;
-  SleepUntil(time, &signal);
-}
-
-bool Util::SleepUntil(const absl::Time &time, volatile bool *stop_signal) {
-  auto now = absl::Now();
-  if (time <= now) {
-    return true;
-  }
-  while (absl::Now() < time) {
-    if (*stop_signal) {
-      return false;
-    }
-    absl::SleepFor(absl::Milliseconds(100));
-  }
-  return true;
-}
-
 void Util::UnifyDir(string *path) {
   if (path->size() > 1 && path->back() == '/') {
     path->resize(path->size() - 1);
   }
+  ReplaceAll(path, string("//"), string("/"));
 }
 
 string Util::UnifyDir(string_view path) {
-  if (path.size() > 1 && path.back() == '/') {
-    return string(path.substr(0, path.size() - 1));
-  }
-  return string(path);
+  string ret(path);
+  UnifyDir(&ret);
+  return ret;
 }
 
-bool Util::Remove(string_view path) {
-  try {
-    if (std::filesystem::exists(std::filesystem::symlink_status(path))) {
-      return std::filesystem::remove_all(path);
-    }
-  } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << "Remove error: " << path << ", " << e.what();
-    return false;
-  }
+bool Util::IsAbsolute(string_view src) {
+  std::filesystem::path s_src(src);
+  return s_src.is_absolute();
+}
 
-  return true;
+int64_t Util::CreateTime(const std::string &path) {
+#if defined(_WIN32)
+  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+    ULARGE_INTEGER ull;
+    ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
+    ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
+    return (ull.QuadPart / 10000ULL) - 11644473600000ULL;
+  }
+#else
+  struct stat attr;
+  if (lstat(path.c_str(), &attr) == 0) {
+#ifdef __linux__
+    return attr.st_ctim.tv_sec * 1000 + attr.st_ctim.tv_nsec / 1000000;
+#elif __APPLE__
+    return attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
+#endif
+  }
+  return -1;
+#endif
+}
+
+int64_t Util::UpdateTime(const std::string &path) {
+#if defined(_WIN32)
+  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+    ULARGE_INTEGER ull;
+    ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+    ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+    return ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+  }
+#else
+  struct stat attr;
+  if (lstat(path.c_str(), &attr) == 0) {
+#ifdef __APPLE__
+    return attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
+#else
+    return attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
+#endif
+  }
+#endif
+  return -1;
+}
+
+int64_t Util::FileSize(const std::string &path) {
+#if defined(_WIN32)
+  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+    LARGE_INTEGER size;
+    size.LowPart = fileInfo.nFileSizeLow;
+    size.HighPart = fileInfo.nFileSizeHigh;
+    return size.QuadPart;
+  }
+#else
+  struct stat attr;
+  if (lstat(path.c_str(), &attr) == 0) {
+    return attr.st_size;
+  }
+#endif
+  return -1;
+}
+
+bool Util::FileInfo(const std::string &path, int64_t *create_time,
+                    int64_t *update_time, int64_t *size) {
+#if defined(_WIN32)
+  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+    ULARGE_INTEGER ull;
+    ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
+    ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
+    *create_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+
+    ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+    ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+    *upadte_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+
+    ull.LowPart = fileInfo.nFileSizeLow;
+    ull.HighPart = fileInfo.nFileSizeHigh;
+    *size = ull.QuadPart;
+    return true;
+  }
+#else
+  struct stat attr;
+  if (lstat(path.c_str(), &attr) == 0) {
+    *size = attr.st_size;
+#ifdef __linux__
+    *create_time = attr.st_ctim.tv_sec * 1000 + attr.st_ctim.tv_nsec / 1000000;
+    *update_time = attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
+#elif __APPLE__
+    *create_time =
+        attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
+    *update_time = attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
+#endif
+    return true;
+  }
+#endif
+  return false;
+}
+
+bool Util::Exists(string_view path) {
+  return std::filesystem::exists(std::filesystem::symlink_status(path));
 }
 
 bool Util::Mkdir(string_view path) {
   try {
-    if (std::filesystem::exists(std::filesystem::status(path))) {
-      std::filesystem::create_directories(path);
+    if (!Exists(path)) {
+      return std::filesystem::create_directories(path);
     }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << "Mkdir error: " << path << ", " << e.what();
@@ -173,21 +250,169 @@ bool Util::Mkdir(string_view path) {
 
 bool Util::MkParentDir(const std::filesystem::path &path) {
   try {
-    if (std::filesystem::exists(path)) {
-      return true;
-    }
-
-    if (std::filesystem::exists(path.parent_path())) {
+    if (path.has_parent_path() && Exists(path.parent_path().string())) {
       return true;
     }
 
     if (path.has_parent_path()) {
-      std::filesystem::create_directories(path.parent_path());
+      return Mkdir(path.parent_path().string());
     }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << "Error: " << path.string() << ", e: " << e.what();
     return false;
   }
+  return true;
+}
+
+bool Util::Remove(string_view path) {
+  try {
+    if (Exists(path)) {
+      return std::filesystem::remove_all(path);
+    }
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "Remove error: " << path << ", " << e.what();
+    return false;
+  }
+
+  return true;
+}
+
+bool Util::Create(const string &path) {
+  if (path.empty()) {
+    LOG(ERROR) << "Empty path";
+    return false;
+  }
+
+  if (path.size() > 1 && path.back() == '/') {
+    LOG(ERROR) << "Create only support file: " << path;
+    return false;
+  }
+
+  if (!Exists(path)) {
+    if (!MkParentDir(path)) {
+      LOG(ERROR) << "Mk parent dir error";
+      return false;
+    }
+  }
+
+  try {
+    if (Exists(path)) {
+      return true;
+    }
+
+#if defined(_WIN32)
+    HANDLE hFile = CreateFile(path.c_str(), GENERIC_WRITE, 0, nullptr,
+                              CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE) {
+      return false;
+    }
+    CloseHandle(hFile);
+#else
+    int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0640);
+    if (fd == -1) {
+      LOG(ERROR) << "Create file error: " << path;
+      return false;
+    }
+    close(fd);
+#endif
+    return true;
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "Mkdir error: " << path << ", " << e.what();
+    return false;
+  }
+  return true;
+}
+
+bool Util::CreateFileWithSize(const std::string &path, const int64_t size) {
+  if (std::filesystem::exists(std::filesystem::symlink_status(path))) {
+    return true;
+  }
+#if defined(_WIN32)
+  HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
+                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+
+  if (hFile == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+
+  LARGE_INTEGER liSize;
+  liSize.QuadPart = size;
+
+  if (!SetFilePointerEx(hFile, liSize, nullptr, FILE_BEGIN) ||
+      !SetEndOfFile(hFile)) {
+    CloseHandle(hFile);
+    return false;
+  }
+
+  CloseHandle(hFile);
+#else
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
+  if (fd == -1) {
+    LOG(ERROR) << "Open file error: " << path;
+    return false;
+  }
+
+  if (ftruncate(fd, size) == -1) {
+    LOG(ERROR) << "Truncate size error: " << path;
+    close(fd);
+    return false;
+  }
+  close(fd);
+#endif
+  return true;
+}
+
+bool Util::CreateSymlink(std::string_view src, std::string_view target) {
+  std::error_code ec;
+  std::filesystem::create_symlink(target, src, ec);
+  if (ec) {
+    LOG(ERROR) << "Create symlink to " << target << " error";
+    return false;
+  }
+  return true;
+}
+
+std::filesystem::path Util::FindCommonRoot(const std::filesystem::path &path,
+                                           const std::filesystem::path &base) {
+  std::filesystem::path t(base);
+  do {
+    if (Util::StartWith(path.string(), t.string())) {
+      return t;
+    }
+    if (t.string() == "/") {
+      return "";
+    } else if (t.has_parent_path()) {
+      t = t.parent_path();
+    } else {
+      return "";
+    }
+  } while (true);
+}
+
+bool Util::Relative(string_view path, string_view base, string *relative) {
+  relative->clear();
+  const string u_path = UnifyDir(path);
+  const string u_base = UnifyDir(base);
+
+  auto s_path = std::filesystem::path(u_path);
+  auto s_base = std::filesystem::path(u_base);
+
+  auto common_parent = FindCommonRoot(s_path, s_base);
+  if (common_parent.string().empty()) {
+    LOG(ERROR) << "cannot calc relative between " << path << " and " << base;
+    return false;
+  }
+
+  auto t = s_base;
+  while (common_parent.string() != t.string()) {
+    relative->append("../");
+    t = t.parent_path();
+  }
+
+  if (u_path.size() > common_parent.string().size()) {
+    relative->append(u_path.substr(common_parent.string().size() + 1));
+  }
+  UnifyDir(relative);
   return true;
 }
 
@@ -214,11 +439,17 @@ bool Util::Copy(string_view src, string_view dst) {
 
 bool Util::TruncateFile(const std::filesystem::path &path) {
   try {
-    if (std::filesystem::exists(path)) {
-      std::filesystem::remove(path);
+    if (!std::filesystem::exists(path)) {
+      return true;
+    }
+    std::ofstream ofs(path, std::ios::trunc);
+    if (!ofs) {
+      return false;
+    } else {
+      return true;
     }
   } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << "TruncateFile error: " << path << ", " << e.what();
+    LOG(ERROR) << "TruncateFile error: " << path.string() << ", " << e.what();
     return false;
   }
   return true;
@@ -263,10 +494,10 @@ bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
   return false;
 }
 
-bool Util::LoadSmallFile(string_view file_name, string *content) {
-  std::ifstream in(file_name.data());
+bool Util::LoadSmallFile(const std::string &path, string *content) {
+  std::ifstream in(path);
   if (!in || !in.is_open()) {
-    LOG(ERROR) << "Fail to open " << file_name
+    LOG(ERROR) << "Fail to open " << path
                << ", please check file exists and file permissions";
     return false;
   }
@@ -275,6 +506,142 @@ bool Util::LoadSmallFile(string_view file_name, string *content) {
   in.close();
   *content = buffer.str();
   return true;
+}
+
+std::string Util::PartitionUUID(string_view path) {
+#if defined(_WIN32)
+  return UtilWindows::PartitionUUID(path);
+#elif defined(__linux__)
+  return UtilLinux::PartitionUUID(path);
+#elif defined(__APPLE__)
+  return UtilOsx::PartitionUUID(path);
+#endif
+}
+
+std::string Util::Partition(string_view path) {
+#if defined(_WIN32)
+  return UtilWindows::Partition(path);
+#elif defined(__linux__)
+  return UtilLinux::Partition(path);
+#elif defined(__APPLE__)
+  return UtilOsx::Partition(path);
+#endif
+}
+
+bool Util::SetFileInvisible(string_view path) {
+#if defined(_WIN32)
+  return UtilWindows::SetFileInvisible(path);
+#elif defined(__linux__)
+  return UtilLinux::SetFileInvisible(path);
+#elif defined(__APPLE__)
+  return UtilOsx::SetFileInvisible(path);
+#endif
+}
+
+bool Util::SyncSymlink(const std::string &src, const std::string &dst,
+                       const std::string &src_symlink) {
+  try {
+    if (!Util::StartWith(src_symlink, src)) {
+      LOG(ERROR) << src_symlink << " must start with " << src;
+      return false;
+    }
+
+    std::filesystem::path s_src_symlink(src_symlink);
+    auto target = std::filesystem::read_symlink(src_symlink);
+    std::string symlink_relative_path;
+    Util::Relative(src_symlink, src, &symlink_relative_path);
+    auto dst_symlink = dst + "/" + symlink_relative_path +
+                       (symlink_relative_path.empty() ? "" : "/") +
+                       s_src_symlink.filename().string();
+    std::filesystem::create_symlink(target, dst_symlink);
+
+    // auto target = std::filesystem::read_symlink(src_symlink);
+    // std::string target_relative_path;
+    // Util::Relative(target.string(), src, &target_relative_path);
+
+    // auto dst_target = dst + "/" + target_relative_path +
+    //(target_relative_path.empty() ? "" : "/") +
+    // target.string();
+
+    // std::string symlink_relative_path;
+    // Util::Relative(src_symlink, src, &symlink_relative_path);
+    // auto dst_symlink = dst + "/" + symlink_relative_path +
+    //(symlink_relative_path.empty() ? "" : "/") +
+    // s_src_symlink.filename().string();
+
+    // Util::MkParentDir(dst_symlink);
+    // Util::Remove(dst_symlink);
+
+    // if (target.is_absolute()) {
+    // if (Util::StartWith(target, src)) {
+    // std::filesystem::create_symlink(dst + "/" + target_relative_path,
+    // dst_symlink);
+    //} else {
+    // std::filesystem::create_symlink(target, dst_symlink);
+    //}
+    //} else {
+    //// TODO handle ../../.. situation
+    // std::filesystem::create_symlink(target, dst_symlink);
+    //}
+    return true;
+  } catch (std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << e.what();
+  }
+  return true;
+}
+
+int32_t Util::FilePartitionNum(const std::string &path) {
+  auto ret = FileSize(path);
+  if (ret == -1) {
+    return -1;
+  }
+  return FilePartitionNum(ret);
+}
+
+int32_t Util::FilePartitionNum(const int64_t size) {
+  if (size <= 0) {
+    return 0;
+  }
+  // file size unit is Bytes
+  return std::ceil((double)size / (double)common::BUFFER_SIZE_BYTES);  // NOLINT
+}
+
+bool Util::PrepareFile(const string &path, common::FileAttr *attr) {
+  if (!FileSHA256(path, &attr->sha256)) {
+    LOG(ERROR) << "Calc " << path << " sha256 error";
+    return false;
+  }
+
+  attr->size = FileSize(path);
+  if (attr->size == -1) {
+    LOG(ERROR) << "Get " << path << " size error";
+    return false;
+  }
+
+  attr->partition_num = FilePartitionNum(attr->size);
+  return true;
+}
+
+std::string Util::RepoFilePath(const std::string &repo_path,
+                               const std::string &sha256) {
+  std::string repo_file_path(UnifyDir(repo_path));
+  repo_file_path.append("/");
+  repo_file_path.append(sha256.substr(0, 2));
+  repo_file_path.append("/");
+  repo_file_path.append(sha256.substr(2, 2));
+  repo_file_path.append("/");
+  repo_file_path.append(sha256);
+  return repo_file_path;
+}
+
+void Util::CalcPartitionStart(const int64_t size, const int32_t partition,
+                              int64_t *start, int64_t *end) {
+  *start = partition * common::BUFFER_SIZE_BYTES;
+  if (size - *start >= common::BUFFER_SIZE_BYTES) {
+    *end = *start + common::BUFFER_SIZE_BYTES - 1;
+    return;
+  }
+  *end = size - 1;
 }
 
 string Util::ToUpper(const string &str) {
@@ -484,9 +851,10 @@ bool Util::FileHash(const std::string &path, const EVP_MD *type,
     return false;
   }
 
-  std::vector<char> buffer(common::BUFFER_SIZE);
+  std::vector<char> buffer(common::BUFFER_SIZE_BYTES);
 
-  while (file.read(buffer.data(), common::BUFFER_SIZE) || file.gcount() > 0) {
+  while (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
+         file.gcount() > 0) {
     if (EVP_DigestUpdate(context, buffer.data(), file.gcount()) != 1) {
       EVP_MD_CTX_free(context);
       return false;
@@ -585,192 +953,6 @@ bool Util::JsonToMessage(const std::string &json,
   return true;
 }
 
-int64_t Util::UpdateTime(string_view path) {
-#if defined(_WIN32)
-  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
-    ULARGE_INTEGER ull;
-    ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
-    ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
-    return ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
-  }
-#else
-  struct stat attr;
-  if (lstat(path.data(), &attr) == 0) {
-#ifdef __APPLE__
-    return attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
-#else
-    return attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
-#endif
-  }
-#endif
-  return -1;
-}
-
-int64_t Util::CreateTime(string_view path) {
-#if defined(_WIN32)
-  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
-    ULARGE_INTEGER ull;
-    ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
-    ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
-    return (ull.QuadPart / 10000ULL) - 11644473600000ULL;
-  }
-#else
-  struct stat attr;
-  if (lstat(path.data(), &attr) == 0) {
-#ifdef __linux__
-    return attr.st_ctim.tv_sec * 1000 + attr.st_ctim.tv_nsec / 1000000;
-#elif __APPLE__
-    return attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
-#endif
-  }
-  return -1;
-#endif
-}
-
-int64_t Util::FileSize(string_view path) {
-#if defined(_WIN32)
-  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
-    LARGE_INTEGER size;
-    size.LowPart = fileInfo.nFileSizeLow;
-    size.HighPart = fileInfo.nFileSizeHigh;
-    return size.QuadPart;
-  }
-#else
-  struct stat attr;
-  if (lstat(path.data(), &attr) == 0) {
-    return attr.st_size;
-  }
-#endif
-  return -1;
-}
-
-bool Util::FileInfo(string_view path, int64_t *create_time,
-                    int64_t *update_time, int64_t *size) {
-#if defined(_WIN32)
-  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
-    ULARGE_INTEGER ull;
-    ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
-    ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
-    *create_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
-
-    ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
-    ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
-    *upadte_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
-
-    ull.LowPart = fileInfo.nFileSizeLow;
-    ull.HighPart = fileInfo.nFileSizeHigh;
-    *size = ull.QuadPart;
-    return true;
-  }
-#else
-  struct stat attr;
-  if (lstat(path.data(), &attr) == 0) {
-    *size = attr.st_size;
-#ifdef __linux__
-    *create_time = attr.st_ctim.tv_sec * 1000 + attr.st_ctim.tv_nsec / 1000000;
-    *update_time = attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
-#elif __APPLE__
-    *create_time =
-        attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
-    *update_time = attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
-#endif
-    return true;
-  }
-#endif
-  return false;
-}
-
-std::string Util::PartitionUUID(string_view path) {
-#if defined(_WIN32)
-  return UtilWindows::PartitionUUID(path);
-#elif defined(__linux__)
-  return UtilLinux::PartitionUUID(path);
-#elif defined(__APPLE__)
-  return UtilOsx::PartitionUUID(path);
-#endif
-}
-
-std::string Util::Partition(string_view path) {
-#if defined(_WIN32)
-  return UtilWindows::Partition(path);
-#elif defined(__linux__)
-  return UtilLinux::Partition(path);
-#elif defined(__APPLE__)
-  return UtilOsx::Partition(path);
-#endif
-}
-
-bool Util::SetFileInvisible(string_view path) {
-#if defined(_WIN32)
-  return UtilWindows::SetFileInvisible(path);
-#elif defined(__linux__)
-  return UtilLinux::SetFileInvisible(path);
-#elif defined(__APPLE__)
-  return UtilOsx::SetFileInvisible(path);
-#endif
-}
-
-bool Util::Exists(string_view src) {
-  std::filesystem::path s_src(src);
-  return std::filesystem::is_symlink(s_src) || std::filesystem::exists(s_src);
-}
-
-bool Util::IsAbsolute(string_view src) {
-  std::filesystem::path s_src(src);
-  return s_src.is_absolute();
-}
-
-bool Util::Relative(string_view path, string_view base, string *relative) {
-  relative->clear();
-  const string u_path = UnifyDir(path);
-  const string u_base = UnifyDir(base);
-
-  auto s_path = std::filesystem::path(u_path);
-  auto s_base = std::filesystem::path(u_base);
-  if (!s_path.is_absolute() || !s_base.is_absolute()) {
-    return false;
-  }
-
-  if (boost::algorithm::starts_with(u_path, u_base) &&
-      u_path.size() > u_base.size()) {
-    *relative = u_path.substr(u_base.size() + 1);
-  }
-  return true;
-}
-
-bool Util::SyncSymlink(const std::string &src, const std::string &dst,
-                       const std::string &src_symlink) {
-  try {
-    auto target = std::filesystem::read_symlink(src_symlink);
-    std::string target_relative_path;
-    Util::Relative(target.string(), src, &target_relative_path);
-    std::string symlink_relative_path;
-    Util::Relative(src_symlink, src, &symlink_relative_path);
-    auto dst_symlink = dst + "/" + symlink_relative_path;
-
-    Util::MkParentDir(dst_symlink);
-    Util::Remove(dst_symlink);
-    if (target.is_absolute()) {
-      if (Util::StartWith(target, src)) {
-        std::filesystem::create_symlink(dst + "/" + target_relative_path,
-                                        dst_symlink);
-      } else {
-        std::filesystem::create_symlink(target, dst_symlink);
-      }
-    } else {
-      std::filesystem::create_symlink(target, dst_symlink);
-    }
-    return true;
-  } catch (std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << e.what();
-  }
-  return true;
-}
-
 bool Util::LZMACompress(string_view data, string *out) {
   lzma_stream strm = LZMA_STREAM_INIT;
   lzma_ret ret =
@@ -808,7 +990,7 @@ bool Util::LZMADecompress(string_view data, string *out) {
     return false;
   }
 
-  std::vector<uint8_t> decompressed_data(common::BUFFER_SIZE / 8);
+  std::vector<uint8_t> decompressed_data(common::BUFFER_SIZE_BYTES);
 
   strm.next_in = reinterpret_cast<const uint8_t *>(data.data());
   strm.avail_in = data.size();
@@ -819,9 +1001,9 @@ bool Util::LZMADecompress(string_view data, string *out) {
     ret = lzma_code(&strm, LZMA_FINISH);
     if (strm.avail_out == 0 || ret == LZMA_STREAM_END) {
       out->append(reinterpret_cast<const char *>(decompressed_data.data()),
-                  common::BUFFER_SIZE - strm.avail_out);
+                  common::BUFFER_SIZE_BYTES - strm.avail_out);
       strm.next_out = decompressed_data.data();
-      strm.avail_out = common::BUFFER_SIZE;
+      strm.avail_out = common::BUFFER_SIZE_BYTES;
     }
 
     if (ret != LZMA_OK) {
@@ -836,98 +1018,6 @@ bool Util::LZMADecompress(string_view data, string *out) {
 
   lzma_end(&strm);
   return true;
-}
-
-int32_t Util::FilePartitionNum(std::string &path) {
-  auto ret = FileSize(path);
-  if (ret == -1) {
-    return -1;
-  }
-  return FilePartitionNum(ret);
-}
-
-int32_t Util::FilePartitionNum(const int64_t size) {
-  if (size <= 0) {
-    return 0;
-  }
-  // file size unit is byte
-  return std::ceil((double)size / (double)(common::BUFFER_SIZE / 8));  // NOLINT
-}
-
-bool Util::PrepareFile(const string &path, common::FileAttr *attr) {
-  if (!FileSHA256(path, &attr->sha256)) {
-    LOG(ERROR) << "Calc " << path << " sha256 error";
-    return false;
-  }
-
-  attr->size = FileSize(path);
-  if (attr->size == -1) {
-    LOG(ERROR) << "Get " << path << " size error";
-    return false;
-  }
-
-  attr->partition_num = FilePartitionNum(attr->size);
-  return true;
-}
-
-std::string Util::RepoFilePath(const std::string &repo_path,
-                               const std::string &sha256) {
-  std::string repo_file_path(UnifyDir(repo_path));
-  repo_file_path.append("/");
-  repo_file_path.append(sha256.substr(0, 2));
-  repo_file_path.append("/");
-  repo_file_path.append(sha256.substr(2, 2));
-  repo_file_path.append("/");
-  repo_file_path.append(sha256);
-  return repo_file_path;
-}
-
-bool Util::CreateFileWithSize(const std::string &path, const int64_t size) {
-  if (std::filesystem::exists(path)) {
-    return true;
-  }
-#if defined(_WIN32)
-  HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
-                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-
-  if (hFile == INVALID_HANDLE_VALUE) {
-    return false;
-  }
-
-  LARGE_INTEGER liSize;
-  liSize.QuadPart = size;
-
-  if (!SetFilePointerEx(hFile, liSize, nullptr, FILE_BEGIN) ||
-      !SetEndOfFile(hFile)) {
-    CloseHandle(hFile);
-    return false;
-  }
-
-  CloseHandle(hFile);
-#else
-  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
-  if (fd == -1) {
-    LOG(ERROR) << "Open file error: " << path.c_str();
-    return false;
-  }
-
-  if (ftruncate(fd, size) == -1) {
-    LOG(ERROR) << "Truncate size error: " << path.c_str();
-    close(fd);
-    return false;
-  }
-  close(fd);
-#endif
-  return true;
-}
-
-void Util::CalcPartitionStart(const int64_t size, const int32_t partition,
-                              int64_t *start, int64_t *end) {
-  *start = partition * common::BUFFER_SIZE_BYTES;
-  if (size - *start >= common::BUFFER_SIZE_BYTES) {
-    *end = *start + common::BUFFER_SIZE_BYTES - 1;
-  }
-  *end = size;
 }
 
 }  // namespace util

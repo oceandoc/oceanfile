@@ -46,7 +46,7 @@ class ScanManager {
 
   bool ValidateCachedStatusFile(const std::string& path) {
     const auto& file_path = GenFileName(path);
-    if (!std::filesystem::exists(file_path)) {
+    if (!Util::Exists(file_path)) {
       LOG(ERROR) << path << " not exists";
       return false;
     }
@@ -54,7 +54,7 @@ class ScanManager {
     std::unordered_set<std::string> scanned_dirs;
     LoadCachedScanStatus(path, &scan_status, &scanned_dirs);
     for (const auto& file : scan_status.scanned_files()) {
-      if (!std::filesystem::exists(file.path())) {
+      if (!Util::Exists(file.path())) {
         LOG(ERROR) << "file " << file.path() << " not exists";
         continue;
       }
@@ -67,7 +67,7 @@ class ScanManager {
     }
 
     for (const auto& dir : scan_status.scanned_dirs()) {
-      if (!std::filesystem::exists(dir)) {
+      if (!Util::Exists(dir)) {
         LOG(ERROR) << "dir " << dir << " not exists";
         continue;
       }
@@ -83,7 +83,7 @@ class ScanManager {
                             proto::ScanStatus* scan_status,
                             std::unordered_set<std::string>* scanned_dirs) {
     const std::string& cached_statuspath = GenFileName(path);
-    if (!std::filesystem::exists(cached_statuspath)) {
+    if (!Util::Exists(cached_statuspath)) {
       return;
     }
 
@@ -208,7 +208,7 @@ class ScanManager {
   bool Scan(const std::string& path, proto::ScanStatus* scan_status,
             std::unordered_set<std::string>* scanned_dirs,
             bool disable_scan_cache) {
-    if (!std::filesystem::exists(path)) {
+    if (!Util::Exists(path)) {
       LOG(ERROR) << path << " not exists";
       return false;
     }
@@ -319,7 +319,7 @@ class ScanManager {
   bool ParallelScan(const std::string& path, proto::ScanStatus* scan_status,
                     std::unordered_set<std::string>* scanned_dirs,
                     bool disable_scan_cache) {
-    if (!std::filesystem::exists(path)) {
+    if (!Util::Exists(path)) {
       LOG(ERROR) << path << " not exists";
       return false;
     }

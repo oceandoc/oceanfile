@@ -7,9 +7,12 @@
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <thread>
 
 #include "glog/logging.h"
 #include "gtest/gtest.h"
+#include "src/common/defs.h"
 
 namespace oceandoc {
 namespace util {
@@ -68,39 +71,392 @@ TEST(Util, ToTimeStr) {
             "2022-03-04 20:35:12");
 }
 
-TEST(Util, UpdateTime) {
-  const auto& path = "test_data/util_test/txt_symlink";
-  if (std::filesystem::is_symlink(path)) {
-    LOG(INFO) << "is symlink";
+TEST(Util, Random) {
+  auto generator = [](int thread_num) {
+    for (int i = 0; i < 10000; ++i) {
+      auto ret = Util::Random(0, 100);
+      // LOG(INFO) << "thread: " << thread_num << ", cnt: " << i
+      // << ", random num: " << ret;
+      EXPECT_GT(ret, -1);
+      EXPECT_LT(ret, 100);
+    }
+  };
+
+  std::thread threads[12];
+  for (int i = 0; i < 12; ++i) {
+    threads[i] = std::thread(std::bind(generator, i));
   }
-  EXPECT_EQ(Util::UpdateTime(path), 1726798844930);
-  LOG(INFO) << Util::UpdateTime(path);
+
+  for (int i = 0; i < 12; ++i) {
+    if (threads[i].joinable()) {
+      threads[i].join();
+    }
+  }
+}
+
+TEST(Util, UnifyDir) {
+  std::string path = "/";
+  Util::UnifyDir(&path);
+  EXPECT_EQ(path, "/");
+
+  path = "/data";
+  Util::UnifyDir(&path);
+  EXPECT_EQ(path, "/data");
+
+  path = "/data/";
+  Util::UnifyDir(&path);
+  EXPECT_EQ(path, "/data");
+
+  EXPECT_EQ(Util::UnifyDir("/"), "/");
+  EXPECT_EQ(Util::UnifyDir("/data"), "/data");
+  EXPECT_EQ(Util::UnifyDir("/data/"), "/data");
+  EXPECT_EQ(Util::UnifyDir("/data//test/"), "/data/test");
 }
 
 TEST(Util, CreateTime) {
-  const auto& path = "test_data/util_test/txt_symlink";
-  if (std::filesystem::is_symlink(path)) {
-    LOG(INFO) << "is symlink";
-  }
-  EXPECT_EQ(Util::CreateTime(path), 1726798844930);
-  LOG(INFO) << Util::CreateTime(path);
+  const auto& path = "test_data/util_test/never_modify";
+  EXPECT_EQ(Util::CreateTime(path), 1727156828142);
+}
+
+TEST(Util, UpdateTime) {
+  const auto& path = "test_data/util_test/never_modify";
+  EXPECT_EQ(Util::UpdateTime(path), 1727156828142);
 }
 
 TEST(Util, FileSize) {
+  // echo "test" > txt will add a \n to file automatic, vim has same behavior
+  EXPECT_EQ(Util::FileSize("test_data/util_test/txt_symlink"), 3);
+  EXPECT_EQ(Util::FileSize("test_data/util_test/txt"), 5);
+
   string path = "test_data/util_test/txt_symlink";
-  if (std::filesystem::is_symlink(path)) {
-    LOG(INFO) << "is symlink";
-  }
   EXPECT_EQ(Util::FileSize(path), 3);
-  LOG(INFO) << Util::FileSize(path);
 
   path = "/root/src/Dr.Q/oceanfile";
-  if (std::filesystem::is_symlink(path)) {
-    LOG(INFO) << "is dir";
-  }
   EXPECT_EQ(Util::FileSize(path), 4096);
-  LOG(INFO) << Util::FileSize(path);
 }
+
+TEST(Util, FileInfo) {
+  const auto& path = "test_data/util_test/never_modify";
+  int64_t create_time = -1, update_time = -1, size = -1;
+  EXPECT_EQ(Util::FileInfo(path, &create_time, &update_time, &size), true);
+  EXPECT_EQ(create_time, 1727156828142);
+  EXPECT_EQ(update_time, 1727156828142);
+  EXPECT_EQ(size, 5);
+}
+
+TEST(Util, Path) {
+  std::string path = "/usr/local/";
+  EXPECT_EQ(std::filesystem::path(path).string(), "/usr/local/");
+  EXPECT_EQ(Util::UnifyDir(path), "/usr/local");
+
+  path = "/usr/local";
+  EXPECT_EQ(std::filesystem::path(path).string(), "/usr/local");
+
+  std::filesystem::path s_symlink("test_data/util_test/txt_symlink");
+  std::filesystem::path s_target("test_data/util_test/txt");
+  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
+  EXPECT_EQ(s_symlink == s_target, false);
+
+  s_symlink = "test_data/util_test/symlink_dir";
+  s_target = "test_data/util_test/target_dir";
+  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
+  EXPECT_EQ(s_symlink == s_target, false);
+
+  s_symlink = "test_data/util_test/symlink_dir";
+  s_target = "test_data/util_test/target_dir/";
+  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
+
+  s_symlink = "test_data/util_test/symlink_dir";
+  s_target = "test_data/util_test/symlink_dir/";
+  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
+  EXPECT_EQ(s_symlink == s_target, false);
+
+  s_symlink = "test_data/util_test/target_dir";
+  s_target = "test_data/util_test/target_dir/";
+  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
+  EXPECT_EQ(s_symlink == s_target, false);
+
+  s_symlink = "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  EXPECT_EQ(s_symlink.parent_path().string(),
+            "test_data/util_test/symlink_test/test1/test2");
+}
+
+TEST(Util, Exists) {
+  EXPECT_EQ(Util::Exists("test_data/util_test/symlink_not_exists"), true);
+  EXPECT_EQ(std::filesystem::exists("test_data/util_test/symlink_not_exists"),
+            false);
+}
+
+TEST(Util, FileOperation) {
+  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1/test"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1/test_dir"),
+            true);
+
+  EXPECT_EQ(Util::Remove("test_data/util_test/test_remove"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove"), false);
+
+  EXPECT_EQ(Util::Mkdir("test_data/util_test/test_remove"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove"), true);
+
+  EXPECT_EQ(Util::Create("test_data/util_test/test_remove/test1/test"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1/test"), true);
+
+  EXPECT_EQ(Util::Mkdir("test_data/util_test/test_remove/test1/test_dir"),
+            true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1/test_dir"),
+            true);
+
+  EXPECT_EQ(Util::Exists("test_data/util_test/txt_symlink"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), true);
+  EXPECT_EQ(Util::Remove("test_data/util_test/txt_symlink"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/txt_symlink"), false);
+  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), true);
+  EXPECT_EQ(Util::CreateSymlink("test_data/util_test/txt_symlink", "txt"),
+            true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/txt_symlink"), true);
+  EXPECT_EQ(std::filesystem::is_symlink("test_data/util_test/txt_symlink"),
+            true);
+}
+
+TEST(Util, CreateFileWithSize) {
+  if (Util::Exists("test_data/util_test/create_with_size")) {
+    EXPECT_EQ(Util::Remove("test_data/util_test/create_with_size"), true);
+  }
+  EXPECT_EQ(Util::CreateFileWithSize("test_data/util_test/create_with_size", 5),
+            true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/create_with_size"), true);
+  EXPECT_EQ(Util::FileSize("test_data/util_test/create_with_size"), 5);
+}
+
+TEST(Util, FindCommonRoot) {
+  std::filesystem::path path =
+      "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  std::filesystem::path base =
+      "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  auto ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(),
+            "test_data/util_test/symlink_test/test1/test2/symlink_to_target");
+
+  path = "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  base = "test_data/util_test/symlink_test/test1/test2";
+  ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(), "test_data/util_test/symlink_test/test1/test2");
+
+  path = "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  base = "test1";
+  ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(), "");
+
+  path = "test1";
+  base = "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(), "");
+
+  path = "/";
+  base = "/";
+  ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(), "/");
+
+  path = "/";
+  base = "/base";
+  ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(), "/");
+
+  path = "/test";
+  base = "/base";
+  ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(), "/");
+
+  path = "/base/test";
+  base = "/base";
+  ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(), "/base");
+
+  path = "base/test";
+  base = "/base";
+  ret = Util::FindCommonRoot(path, base);
+  EXPECT_EQ(ret.string(), "");
+}
+
+TEST(Util, Relative) {
+  // std::filesystem::relative don't need file exists
+  EXPECT_EQ(std::filesystem::relative("base/test", "/base").string(), "");
+  EXPECT_EQ(std::filesystem::relative("/usr/xxxx/llvm", "/usr/xxxx").string(),
+            "llvm");
+  EXPECT_EQ(std::filesystem::relative("/usr/local/llvm", "/usr/local").string(),
+            "llvm");
+  EXPECT_EQ(std::filesystem::relative("/usr/local", "/usr/local").string(),
+            ".");
+
+  EXPECT_EQ(std::filesystem::relative("/usr/xxxx", "/usr/local").string(),
+            "../xxxx");
+  EXPECT_EQ(std::filesystem::relative("/usr/test1/test2/xxxx",
+                                      "/usr/xxxx1/xxxx2/local")
+                .string(),
+            "../../../test1/test2/xxxx");
+
+  // std::filesystem::relative will follow symlink
+  EXPECT_EQ(
+      std::filesystem::relative(
+          "test_data/util_test/symlink_test/test1/test2/symlink_to_target",
+          "test_data/util_test/symlink_test")
+          .string(),
+      "target");
+
+  ////////////////////////////////////////////////////////////////
+  std::string relative;
+  EXPECT_EQ(Util::Relative("base/test", "/base", &relative), false);
+  EXPECT_EQ(relative, "");
+
+  EXPECT_EQ(Util::Relative("/usr/xxxx/llvm", "/usr/xxxx", &relative), true);
+  EXPECT_EQ(relative, "llvm");
+
+  EXPECT_EQ(Util::Relative("/usr/local/", "/usr/local/llvm", &relative), true);
+  EXPECT_EQ(relative, "..");
+
+  EXPECT_EQ(Util::Relative("/usr/local/llvm", "/usr/local", &relative), true);
+  EXPECT_EQ(relative, "llvm");
+
+  EXPECT_EQ(Util::Relative("/usr/local", "/usr/local", &relative), true);
+  EXPECT_EQ(relative, "");
+
+  EXPECT_EQ(Util::Relative("/usr/xxxx", "/usr/local", &relative), true);
+  EXPECT_EQ(relative, "../xxxx");
+
+  EXPECT_EQ(Util::Relative("/usr/test1/test2/xxxx", "/usr/xxxx1/xxxx2/local",
+                           &relative),
+            true);
+  EXPECT_EQ(relative, "../../../test1/test2/xxxx");
+
+  // Util::Relative will follow symlink
+  EXPECT_EQ(
+      Util::Relative(
+          "test_data/util_test/symlink_test/test1/test2/symlink_to_target",
+          "test_data/util_test/symlink_test", &relative),
+      true);
+  EXPECT_EQ(relative, "test1/test2/symlink_to_target");
+}
+
+///////////////////////////////////////////////////
+TEST(Util, CopyFile) {
+  EXPECT_EQ(Util::Exists("test_data/util_test/copy_file_dst"), true);
+  EXPECT_EQ(Util::Remove("test_data/util_test/copy_file_dst"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/copy_file_dst"), false);
+  EXPECT_EQ(Util::CopyFile("test_data/util_test/copy_file_src",
+                           "test_data/util_test/copy_file_dst"),
+            true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/copy_file_dst"), true);
+
+  EXPECT_EQ(Util::Exists("test_data/util_test/copy_symlink_file_dst"), true);
+  EXPECT_EQ(Util::Remove("test_data/util_test/copy_symlink_file_dst"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/copy_symlink_file_dst"), false);
+  EXPECT_EQ(Util::CopyFile("test_data/util_test/copy_symlink_file_src",
+                           "test_data/util_test/copy_symlink_file_dst"),
+            true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/copy_symlink_file_dst"), true);
+}
+
+TEST(Util, TruncateFile) {
+  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), true);
+  EXPECT_EQ(Util::FileSize("test_data/util_test/txt"), 5);
+  EXPECT_EQ(Util::TruncateFile("test_data/util_test/txt"), true);
+  EXPECT_EQ(Util::WriteToFile("test_data/util_test/txt", "test\n"), true);
+  EXPECT_EQ(Util::FileSize("test_data/util_test/txt"), 5);
+}
+
+TEST(Util, WriteToFile) {
+  EXPECT_EQ(Util::Exists("test_data/util_test/write_to_file"), true);
+  EXPECT_EQ(Util::Remove("test_data/util_test/write_to_file"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/write_to_file"), false);
+  EXPECT_EQ(Util::CreateFileWithSize("test_data/util_test/write_to_file", 200),
+            true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/write_to_file"), true);
+  EXPECT_EQ(
+      Util::WriteToFile("test_data/util_test/write_to_file", "test", 100L),
+      true);
+  std::string sha256;
+  EXPECT_EQ(Util::SmallFileSHA256("test_data/util_test/write_to_file", &sha256),
+            true);
+  EXPECT_EQ(sha256,
+            "a35f8984bc0f1c415ae8edcc77bb841ac0ab9deb23b48966c56a7ba12cc20657");
+}
+///////////////////////////////////////////////////
+
+TEST(Util, LoadSmallFile) {
+  std::string content;
+  EXPECT_EQ(Util::LoadSmallFile("test_data/util_test/txt_symlink", &content),
+            true);
+  EXPECT_EQ(content, "test\n");
+}
+
+///////////////////////////////////////////////////
+// TODO finish
+// TEST(Util, PartitionUUID) {
+// const auto& path = "test_data/util_test/never_modify";
+// EXPECT_EQ(Util::CreateTime(path), 1727156828142);
+// }
+
+// TODO finish
+// TEST(Util, Partition) {
+// const auto& path = "test_data/util_test/never_modify";
+// EXPECT_EQ(Util::CreateTime(path), 1727156828142);
+// }
+
+// TODO finish
+// TEST(Util, SetFileInvisible) {
+// const auto& path = "test_data/util_test/never_modify";
+// EXPECT_EQ(Util::CreateTime(path), 1727156828142);
+// }
+
+TEST(Util, SyncSymlink) {
+  Util::SyncSymlink(
+      "test_data/util_test", "test_data/util_test/test",
+      "test_data/util_test/symlink_test/test1/test2/symlink_to_target");
+}
+
+TEST(Util, FilePartitionNum) {
+  EXPECT_EQ(Util::FilePartitionNum("/usr/local/gcc/14.1.0/libexec/gcc/"
+                                   "x86_64-pc-linux-gnu/14.1.0/cc1plus"),
+            6);
+}
+
+TEST(Util, PrepareFile) {
+  common::FileAttr attr;
+  Util::PrepareFile("test_data/util_test/txt", &attr);
+  EXPECT_EQ(attr.sha256,
+            "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2");
+  EXPECT_EQ(attr.partition_num, 1);
+  EXPECT_EQ(attr.size, 5);
+}
+
+TEST(Util, RepoFilePath) {
+  EXPECT_EQ(
+      Util::RepoFilePath(
+          "test_data/util_test",
+          "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2"),
+      "test_data/util_test/f2/ca/"
+      "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2");
+}
+
+TEST(Util, CalcPartitionStart) {
+  int64_t start = 0, end = 0;
+  Util::CalcPartitionStart(359621552, 0, &start, &end);
+  EXPECT_EQ(start, 0);
+  EXPECT_EQ(end, common::BUFFER_SIZE_BYTES - 1);
+
+  Util::CalcPartitionStart(359621552, 1, &start, &end);
+  EXPECT_EQ(start, common::BUFFER_SIZE_BYTES);
+  EXPECT_EQ(end, common::BUFFER_SIZE_BYTES * 2 - 1);
+
+  Util::CalcPartitionStart(359621552, 6, &start, &end);
+  EXPECT_EQ(start, common::BUFFER_SIZE_BYTES * 6);
+  EXPECT_EQ(end, 359621552 - 1);
+}
+
+///////////////////////////////////////////////////
 
 TEST(Util, UUID) {
   // eg: 2b68792c-0580-41a2-a7b1-ab3a96a1a58e
@@ -141,101 +497,6 @@ TEST(Util, SHA256) {
             << ", cost: " << Util::CurrentTimeMillis() - start;
   EXPECT_EQ(out,
             "3f5d419c0386a26df1c75d0d1c488506fb641b33cebaa2a4917127ae33030b31");
-}
-
-TEST(Util, Relative) {
-  std::string path = "/usr/local/llvm/18/bin/llvm-dlltool";
-  std::string base = "/usr/local/llvm";
-  std::string relative;
-  EXPECT_EQ(Util::Relative(path, base, &relative), true);
-  EXPECT_EQ(relative, "18/bin/llvm-dlltool");
-
-  path = "usr/local/llvm/18/bin/llvm-dlltool";
-  base = "usr/local/llvm/";
-  EXPECT_EQ(Util::Relative(path, base, &relative), false);
-
-  path = "/usr/local/llvm/18/bin/llvm-dlltool";
-  base = "/usr/local/llvm/";
-  EXPECT_EQ(Util::Relative(path, base, &relative), true);
-  EXPECT_EQ(relative, "18/bin/llvm-dlltool");
-
-  path = "/usr/local/llvm/18/bin/llvm-dlltool/";
-  base = "/usr/local/llvm";
-  EXPECT_EQ(Util::Relative(path, base, &relative), true);
-  EXPECT_EQ(relative, "18/bin/llvm-dlltool");
-
-  path = "/usr/local/llvm/18/bin/llvm-dlltool/";
-  base = "/usr/local/llvm/";
-  EXPECT_EQ(Util::Relative(path, base, &relative), true);
-  EXPECT_EQ(relative, "18/bin/llvm-dlltool");
-
-  path = "/usr/local/llvm/";
-  base = "/usr/local/llvm/";
-  EXPECT_EQ(Util::Relative(path, base, &relative), true);
-  EXPECT_EQ(relative, "");
-
-  path = "/usr/local/llvm";
-  base = "/usr/local/llvm/";
-  EXPECT_EQ(Util::Relative(path, base, &relative), true);
-  EXPECT_EQ(relative, "");
-
-  path = "/usr/local/llvm/";
-  base = "/usr/local/llvm";
-  EXPECT_EQ(Util::Relative(path, base, &relative), true);
-  EXPECT_EQ(relative, "");
-
-  path = "/";
-  base = "/";
-  EXPECT_EQ(Util::Relative(path, base, &relative), true);
-  EXPECT_EQ(relative, "");
-}
-
-TEST(Util, Exists) {
-  std::string symlink_path = "test_data/util_test/txt_symlink";
-  std::string target_path = "test_data/util_test/txt";
-
-  if (!std::filesystem::exists(target_path)) {
-    ofstream ofs(target_path);
-    ofs.close();
-  }
-  EXPECT_EQ(std::filesystem::exists(target_path), true);
-  EXPECT_EQ(Util::Exists(symlink_path), true);
-
-  EXPECT_EQ(Util::Remove(target_path), true);
-  EXPECT_EQ(std::filesystem::exists(target_path), false);
-  EXPECT_EQ(Util::Exists(symlink_path), true);
-
-  if (!std::filesystem::exists(target_path)) {
-    ofstream ofs(target_path);
-    ofs.close();
-  }
-}
-
-TEST(Util, Remove) {
-  std::string symlink_path = "test_data/util_test/txt_symlink";
-  std::string target_path = "test_data/util_test/txt";
-
-  if (!std::filesystem::exists(target_path)) {
-    ofstream ofs(target_path);
-    ofs.close();
-  }
-
-  EXPECT_EQ(Util::Remove(symlink_path), true);
-  EXPECT_EQ(Util::Exists(target_path), true);
-  EXPECT_EQ(Util::Exists(symlink_path), false);
-
-  EXPECT_EQ(Util::Remove(target_path), true);
-  EXPECT_EQ(Util::Exists(target_path), false);
-
-  if (!std::filesystem::exists(target_path)) {
-    ofstream ofs(target_path);
-    ofs.close();
-  }
-}
-
-TEST(Util, SyncSymlink) {
-  Util::SyncSymlink("/usr/local/llvm", "/usr/local/test",
-                    "/usr/local/llvm/18/bin/llvm-dlltool");
 }
 
 TEST(Util, LZMA) {

@@ -191,7 +191,6 @@ cc_test(
     srcs = ["util_test.cc"],
     data = [
         "//conf:base_config.json",
-        "//test_data/util_test:test_remove",
         "//test_data/util_test:txt",
         "//test_data/util_test:txt_symlink",
         "//test_data/util_test/target_dir:test",
