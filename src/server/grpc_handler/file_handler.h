@@ -18,8 +18,6 @@ namespace grpc_handler {
 class FileHandler : public async_grpc::RpcHandler<FileOpMethod> {
  public:
   void OnRequest(const proto::FileReq& req) override {
-    LOG(INFO) << "Now store file " << req.sha256()
-              << ", part: " << req.partition_num();
     auto res = std::make_unique<proto::FileRes>();
     bool ret = true;
     switch (req.op()) {
@@ -50,7 +48,10 @@ class FileHandler : public async_grpc::RpcHandler<FileOpMethod> {
     Send(std::move(res));
   }
 
-  void OnReadsDone() override { Finish(grpc::Status::OK); }
+  void OnReadsDone() override {
+    LOG(INFO) << "OnReadsDone";
+    Finish(grpc::Status::OK);
+  }
 
  private:
 };

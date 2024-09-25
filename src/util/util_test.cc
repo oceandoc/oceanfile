@@ -412,9 +412,20 @@ TEST(Util, LoadSmallFile) {
 // }
 
 TEST(Util, SyncSymlink) {
-  Util::SyncSymlink(
-      "test_data/util_test", "test_data/util_test/test",
-      "test_data/util_test/symlink_test/test1/test2/symlink_to_target");
+  std::string src = "test_data/util_test";
+  std::string dst = "test_data/util_test/test";
+  std::string src_symlink =
+      "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  std::string dst_symlink =
+      "test_data/util_test/test/symlink_test/test1/test2/symlink_to_target";
+  EXPECT_EQ(Util::Remove(dst_symlink), true);
+  EXPECT_EQ(Util::Exists(dst_symlink), false);
+  EXPECT_EQ(Util::SyncSymlink(src, dst, src_symlink), true);
+  EXPECT_EQ(Util::Exists(dst_symlink), true);
+
+  std::string src_target = std::filesystem::read_symlink(src_symlink).string();
+  std::string dst_target = std::filesystem::read_symlink(dst_symlink).string();
+  EXPECT_EQ(src_target, dst_target);
 }
 
 TEST(Util, FilePartitionNum) {
@@ -430,6 +441,36 @@ TEST(Util, PrepareFile) {
             "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2");
   EXPECT_EQ(attr.partition_num, 1);
   EXPECT_EQ(attr.size, 5);
+}
+
+TEST(Util, SimplifyPath) {
+  std::string result;
+  EXPECT_EQ(Util::SimplifyPath("/a/b/../c/./d/..", &result), true);
+  EXPECT_EQ(result, "/a/c");
+
+  result.clear();
+  EXPECT_EQ(Util::SimplifyPath("a/b/../c/./d/..", &result), true);
+  EXPECT_EQ(result, "a/c");
+
+  result.clear();
+  EXPECT_EQ(Util::SimplifyPath("a/b/../c/./d/../../../..", &result), false);
+  EXPECT_EQ(result, "");
+
+  result.clear();
+  EXPECT_EQ(Util::SimplifyPath("/a/../..", &result), false);
+  EXPECT_EQ(result, "");
+
+  result.clear();
+  EXPECT_EQ(Util::SimplifyPath("a/..", &result), true);
+  EXPECT_EQ(result, "");
+
+  result.clear();
+  EXPECT_EQ(Util::SimplifyPath("..", &result), false);
+  EXPECT_EQ(result, "");
+
+  result.clear();
+  EXPECT_EQ(Util::SimplifyPath("../..", &result), false);
+  EXPECT_EQ(result, "");
 }
 
 TEST(Util, RepoFilePath) {

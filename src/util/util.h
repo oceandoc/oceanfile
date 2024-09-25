@@ -88,6 +88,7 @@ class Util final {
 
   static bool PrepareFile(const std::string &path, common::FileAttr *attr);
 
+  static bool SimplifyPath(const std::string &path, std::string *out);
   static std::string RepoFilePath(const std::string &repo_path,
                                   const std::string &sha256);
 
@@ -177,6 +178,8 @@ class Util final {
 
   static void ToHexStr(std::string_view in, std::string *out,
                        bool use_upper_case = false);
+
+  static std::string ToHexStr(std::string_view in, bool use_upper_case = false);
 
   static int64_t MurmurHash64A(std::string_view str);
 

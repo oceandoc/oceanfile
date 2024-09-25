@@ -1,13 +1,13 @@
 # TODO
 * repo ctl interface
 * check scan status
-* increment sync
+* increment validation
+* log client failed part
 * authentic
 * session cookie
 * operation log
 * check system time
 * public and private ip address, mac address, system info
-
 
 # final TODO
 * kill syncthing

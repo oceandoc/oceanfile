@@ -40,7 +40,7 @@ message FileReq {
   string path = 4;
   string sha256 = 5;
   int64 size = 6;
-  string content = 7;
+  bytes content = 7;
   int32 partition_num = 8;
   string repo_uuid = 9;
 }

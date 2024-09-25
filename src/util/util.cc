@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <stack>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -480,17 +481,22 @@ bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
 bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
                        const int64_t start) {
   try {
-    std::ofstream ofs(path);
+    std::ofstream ofs(path, std::ios::binary | std::ios::out | std::ios::in);
     if (ofs && ofs.is_open()) {
       ofs.seekp(start);
-      ofs << content;
+      if (ofs.fail()) {
+        return false;
+      }
+      ofs.write(content.data(), content.size());
+      if (ofs.fail()) {
+        return false;
+      }
       ofs.close();
       return true;
     }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << "Write to " << path << ", error: " << e.what();
   }
-
   return false;
 }
 
@@ -498,7 +504,7 @@ bool Util::LoadSmallFile(const std::string &path, string *content) {
   std::ifstream in(path);
   if (!in || !in.is_open()) {
     LOG(ERROR) << "Fail to open " << path
-               << ", please check file exists and file permissions";
+               << ", please check file exists and file permission";
     return false;
   }
   std::stringstream buffer;
@@ -546,43 +552,43 @@ bool Util::SyncSymlink(const std::string &src, const std::string &dst,
       return false;
     }
 
-    std::filesystem::path s_src_symlink(src_symlink);
+    if (std::filesystem::is_symlink(src) || std::filesystem::is_symlink(dst)) {
+      LOG(ERROR) << "src and dst cannot be symlink";
+      return false;
+    }
+
+    if (!std::filesystem::is_symlink(src_symlink)) {
+      LOG(ERROR) << "src_symlink must be symlink";
+      return false;
+    }
+
     auto target = std::filesystem::read_symlink(src_symlink);
-    std::string symlink_relative_path;
-    Util::Relative(src_symlink, src, &symlink_relative_path);
-    auto dst_symlink = dst + "/" + symlink_relative_path +
-                       (symlink_relative_path.empty() ? "" : "/") +
-                       s_src_symlink.filename().string();
+
+    std::string src_symlink_relative_path;
+    Util::Relative(src_symlink, src, &src_symlink_relative_path);
+
+    auto dst_symlink = dst;
+    if (!src_symlink_relative_path.empty()) {
+      dst_symlink = dst + "/" + src_symlink_relative_path;
+    }
+
+    Util::MkParentDir(dst_symlink);
+    Util::Remove(dst_symlink);
     std::filesystem::create_symlink(target, dst_symlink);
 
-    // auto target = std::filesystem::read_symlink(src_symlink);
-    // std::string target_relative_path;
-    // Util::Relative(target.string(), src, &target_relative_path);
+    // std::string target_relative_path =
+    // std::filesystem::relative(src_symlink, src);
+    // if (!target_relative_path.empty()) {
+    // auto src_target_path = src + "/" + target_relative_path;
+    // auto dst_target_path = dst + "/" + target_relative_path;
+    // if (std::filesystem::is_regular_file(src_target_path)) {
+    // if (!Exists(dst_target_path)) {
+    // CopyFile(src_target_path, dst_target_path);
+    // }
+    // } else {
+    // }
+    // }
 
-    // auto dst_target = dst + "/" + target_relative_path +
-    //(target_relative_path.empty() ? "" : "/") +
-    // target.string();
-
-    // std::string symlink_relative_path;
-    // Util::Relative(src_symlink, src, &symlink_relative_path);
-    // auto dst_symlink = dst + "/" + symlink_relative_path +
-    //(symlink_relative_path.empty() ? "" : "/") +
-    // s_src_symlink.filename().string();
-
-    // Util::MkParentDir(dst_symlink);
-    // Util::Remove(dst_symlink);
-
-    // if (target.is_absolute()) {
-    // if (Util::StartWith(target, src)) {
-    // std::filesystem::create_symlink(dst + "/" + target_relative_path,
-    // dst_symlink);
-    //} else {
-    // std::filesystem::create_symlink(target, dst_symlink);
-    //}
-    //} else {
-    //// TODO handle ../../.. situation
-    // std::filesystem::create_symlink(target, dst_symlink);
-    //}
     return true;
   } catch (std::filesystem::filesystem_error &e) {
     LOG(ERROR) << e.what();
@@ -607,6 +613,7 @@ int32_t Util::FilePartitionNum(const int64_t size) {
 }
 
 bool Util::PrepareFile(const string &path, common::FileAttr *attr) {
+  attr->path = path;
   if (!FileSHA256(path, &attr->sha256)) {
     LOG(ERROR) << "Calc " << path << " sha256 error";
     return false;
@@ -619,6 +626,35 @@ bool Util::PrepareFile(const string &path, common::FileAttr *attr) {
   }
 
   attr->partition_num = FilePartitionNum(attr->size);
+  return true;
+}
+
+bool Util::SimplifyPath(const string &path, string *out) {
+  std::stack<std::string> dirs;
+  std::stringstream ss(path);
+  std::string token;
+  while (std::getline(ss, token, '/')) {
+    if (token == "..") {
+      if (!dirs.empty()) {
+        dirs.pop();
+      } else {
+        return false;
+      }
+    } else if (!token.empty() && token != ".") {
+      dirs.push(token);
+    }
+  }
+
+  while (!dirs.empty()) {
+    *out = dirs.top() + "/" + *out;
+    dirs.pop();
+  }
+
+  if (!path.empty() && path[0] == '/') {
+    *out = "/" + *out;
+  }
+
+  UnifyDir(out);
   return true;
 }
 
@@ -727,6 +763,19 @@ void Util::ToHexStr(string_view in, std::string *out, bool use_upper_case) {
       out->append(fmt::format("{:02x}", (unsigned char)in[i]));
     }
   }
+}
+
+string Util::ToHexStr(string_view in, bool use_upper_case) {
+  string out;
+  out.reserve(in.size() * 2);
+  for (std::size_t i = 0; i < in.size(); ++i) {
+    if (use_upper_case) {
+      out.append(fmt::format("{:02X}", (unsigned char)in[i]));
+    } else {
+      out.append(fmt::format("{:02x}", (unsigned char)in[i]));
+    }
+  }
+  return out;
 }
 
 bool Util::HexStrToInt64(string_view in, int64_t *out) {

@@ -50,9 +50,8 @@ class FileClient
         mark_[res_.partition_num()] = -1;
       }
       StartRead(&res_);
-    } else {
-      LOG(ERROR) << "Read error";
-      send_status_ = common::SendStatus::FATAL;
+      LOG(ERROR) << "Store success: " << res_.sha256()
+                 << ", part: " << res_.partition_num();
     }
   }
 
@@ -77,7 +76,7 @@ class FileClient
       if (m > 1) {
         return common::SendStatus::TOO_MANY_RETRY;
       }
-      if (m == 1) {
+      if (m >= 0) {
         success = false;
       }
     }
@@ -118,7 +117,7 @@ class FileClient
     mark_.resize(attr.partition_num, 0);
 
     std::vector<char> buffer(common::BUFFER_SIZE_BYTES);
-    req_.mutable_content()->reserve(common::BUFFER_SIZE_BYTES);
+    req_.mutable_content()->resize(common::BUFFER_SIZE_BYTES);
     req_.set_op(proto::Op::File_Put);
     req_.set_path(path);
     req_.set_sha256(attr.sha256);
@@ -126,7 +125,7 @@ class FileClient
 
     int32_t partition_num = 0;
 
-    auto BatchSend = [this, buffer, &file](const int32_t partition_num) {
+    auto BatchSend = [this, &buffer, &file](const int32_t partition_num) {
       req_.mutable_content()->resize(file.gcount());
       req_.set_partition_num(partition_num);
 
@@ -139,21 +138,13 @@ class FileClient
 
     while (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
            file.gcount()) {
-      LOG(INFO) << "Now send part: " << partition_num;
+      LOG(INFO) << "Now send " << req_.sha256() << ", part: " << partition_num;
       BatchSend(partition_num);
-      if (send_status_ == common::SendStatus::FATAL) {
-        StartWritesDone();
-        return false;
-      }
       ++partition_num;
     }
 
     while (GetStatus() == common::SendStatus::RETRING) {
       for (size_t i = 0; i < mark_.size(); ++i) {
-        if (send_status_ == common::SendStatus::FATAL) {
-          StartWritesDone();
-          return false;
-        }
         if (mark_[i] == 1) {
           file.seekg(i * common::BUFFER_SIZE_BYTES);
           if (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
@@ -165,8 +156,15 @@ class FileClient
       util::Util::Sleep(10);
     }
 
+    bool success = true;
+    for (size_t i = 0; i < mark_.size(); ++i) {
+      if (mark_[i] != -1) {
+        success = false;
+      }
+    }
+
     StartWritesDone();
-    return true;
+    return success;
   }
 
  private:

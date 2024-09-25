@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_set>
 
@@ -233,6 +234,8 @@ class RepoManager {
       LOG(ERROR) << "Invalid repo file path";
       return false;
     }
+    LOG(INFO) << "Now store file " << repo_file_path
+              << ", part: " << partition_num;
 
     Util::MkParentDir(repo_file_path);
 
@@ -243,10 +246,13 @@ class RepoManager {
 
     int64_t start = 0, end = 0;
     Util::CalcPartitionStart(size, partition_num, &start, &end);
-    if (end - start != static_cast<int64_t>(content.size())) {
-      LOG(ERROR) << "Calc size error";
+    if (end - start + 1 != static_cast<int64_t>(content.size())) {
+      LOG(ERROR) << "Calc size error, partition_num: " << partition_num
+                 << ", start: " << start << ", end: " << end;
       return false;
     }
+
+    std::unique_lock<std::shared_mutex> locker(mutex_);
     return Util::WriteToFile(repo_file_path, content, start);
   }
 
@@ -388,6 +394,7 @@ class RepoManager {
   const int max_thread = 5;
   mutable absl::base_internal::SpinLock lock_;
   std::atomic<bool> stop_ = false;
+  std::shared_mutex mutex_;
 };
 
 }  // namespace util

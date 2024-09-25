@@ -48,10 +48,7 @@ class GrpcServer final {
  public:
   void WaitForShutdown() { server_->WaitForShutdown(); }
 
-  void SignalHandler(int sig) {
-    LOG(INFO) << "Caught signal: " << sig;
-    server_->Shutdown();
-  }
+  void Shutdown() { server_->Shutdown(); }
 
   std::shared_ptr<async_grpc::Server> GetGrpcServer() { return server_; }
 

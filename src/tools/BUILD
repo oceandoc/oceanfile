@@ -32,3 +32,9 @@ cc_binary(
     srcs = ["conf_replace.cc"],
     deps = ["//src/tools:common"],
 )
+
+cc_binary(
+    name = "validate_file",
+    srcs = ["validate_file.cc"],
+    deps = ["//src/util"],
+)

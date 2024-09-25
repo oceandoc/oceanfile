@@ -20,9 +20,24 @@
 #include "src/util/thread_pool.h"
 
 #if !defined(_WIN32)
-oceandoc::server::GrpcServer *server;
 
-void SignalHandler(int sig) { server->SignalHandler(sig); }
+// https://github.com/grpc/grpc/issues/24884
+oceandoc::server::GrpcServer *server;
+bool shutdown_required = false;
+std::mutex mutex;
+std::condition_variable cv;
+
+void SignalHandler(int sig) {
+  std::cout << "Got signal: " << strsignal(sig) << std::endl;
+  shutdown_required = true;
+  cv.notify_one();
+}
+
+void ShutdownCheckingThread(void) {
+  std::unique_lock<std::mutex> lock(mutex);
+  cv.wait(lock, []() { return shutdown_required; });
+  server->Shutdown();
+}
 
 void RegisterSignalHandler() {
   signal(SIGTERM, &SignalHandler);
@@ -41,7 +56,6 @@ int main(int argc, char **argv) {
   // google::InitGoogleLogging(argv[0]); // already called in folly::Init
   google::SetStderrLogging(google::GLOG_INFO);
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-
   oceandoc::common::InitAllModules(&argc, &argv);
 
   oceandoc::util::ConfigManager::Instance()->Init("./conf/base_config.json");
@@ -49,17 +63,23 @@ int main(int argc, char **argv) {
   oceandoc::util::ScanManager::Instance()->Init();
   oceandoc::util::RepoManager::Instance()->Init();
 
-  oceandoc::server::GrpcServer server;
-  LOG(INFO) << "CommandLine: " << google::GetArgv();
-
 #if !defined(_WIN32)
-  ::server = &server;
   RegisterSignalHandler();
+  std::thread shutdown_thread(ShutdownCheckingThread);
 #endif
 
-  server.WaitForShutdown();
-  LOG(INFO) << "Now stop grpc server";
+  oceandoc::server::GrpcServer server;
+  ::server = &server;
+  LOG(INFO) << "CommandLine: " << google::GetArgv();
 
+  server.WaitForShutdown();
+  LOG(INFO) << "Now stopped grpc server";
+
+#if !defined(_WIN32)
+  if (shutdown_thread.joinable()) {
+    shutdown_thread.join();
+  }
+#endif
   oceandoc::util::ThreadPool::Instance()->Stop();
   oceandoc::util::RepoManager::Instance()->Stop();
 
