@@ -20,7 +20,6 @@
 #include "src/util/thread_pool.h"
 
 #if !defined(_WIN32)
-
 // https://github.com/grpc/grpc/issues/24884
 oceandoc::server::GrpcServer *server;
 bool shutdown_required = false;

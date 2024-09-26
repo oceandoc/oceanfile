@@ -3,8 +3,8 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_SERVER_GRPC_HANDLERS_STATUS_HANDLER_H
-#define BAZEL_TEMPLATE_SERVER_GRPC_HANDLERS_STATUS_HANDLER_H
+#ifndef BAZEL_TEMPLATE_SERVER_GRPC_HANDLERS_USER_HANDLER_H
+#define BAZEL_TEMPLATE_SERVER_GRPC_HANDLERS_USER_HANDLER_H
 
 #include "src/async_grpc/rpc_handler.h"
 #include "src/proto/service.pb.h"
@@ -15,12 +15,12 @@ namespace oceandoc {
 namespace server {
 namespace grpc_handler {
 
-class StatusHandler : public async_grpc::RpcHandler<StatusMethod> {
+class UserHandler : public async_grpc::RpcHandler<UserMethod> {
  public:
-  void OnRequest(const proto::StatusReq& req) override {
+  void OnRequest(const proto::UserReq& req) override {
     LOG(INFO) << "qid: " << req.request_id();
-    auto res = std::make_unique<proto::StatusRes>();
-    res->set_status(
+    auto res = std::make_unique<proto::UserRes>();
+    res->set_repo_uuid(
         static_cast<oceandoc::server::ServerContext*>(execution_context_)
             ->ToString());
     Send(std::move(res));
@@ -31,4 +31,4 @@ class StatusHandler : public async_grpc::RpcHandler<StatusMethod> {
 }  // namespace server
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_SERVER_GRPC_HANDLERS_STATUS_HANDLER_H
+#endif  // BAZEL_TEMPLATE_SERVER_GRPC_HANDLERS_USER_HANDLER_H

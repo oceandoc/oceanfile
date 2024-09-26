@@ -3,19 +3,16 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_HTTP_HANDLER_H
-#define BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_HTTP_HANDLER_H
-
-#include <memory>
+#ifndef BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_REPO_HANDLER_H
+#define BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_REPO_HANDLER_H
 
 #include "proxygen/httpserver/RequestHandler.h"
-#include "proxygen/httpserver/RequestHandlerFactory.h"
 
 namespace oceandoc {
 namespace server {
 namespace http_handler {
 
-class HTTPHandler : public proxygen::RequestHandler {
+class RepoHandler : public proxygen::RequestHandler {
  public:
   void onRequest(
       std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
@@ -26,17 +23,8 @@ class HTTPHandler : public proxygen::RequestHandler {
   void onError(proxygen::ProxygenError err) noexcept override;
 };
 
-class HTTPHandlerFactory : public proxygen::RequestHandlerFactory {
- public:
-  void onServerStart(folly::EventBase* evb) noexcept override;
-  void onServerStop() noexcept override;
-  proxygen::RequestHandler* onRequest(
-      proxygen::RequestHandler* handler,
-      proxygen::HTTPMessage* msg) noexcept override;
-};
-
 }  // namespace http_handler
 }  // namespace server
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_HTTP_HANDLER_H
+#endif  // BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_REPO_HANDLER_H

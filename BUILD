@@ -8,6 +8,7 @@ refresh_compile_commands(
     name = "refresh_compile_commands",
     targets = {
         "//...": "",
+        "@proxygen//:all": "",
         #"//:my_output_1": "--important_flag1 --important_flag2=true",
     },
 )

@@ -22,7 +22,7 @@ class RepoHandler : public async_grpc::RpcHandler<RepoOpMethod> {
     std::string uuid;
     bool ret = true;
     switch (req.op()) {
-      case proto::Op::Repo_Create:
+      case proto::RepoOp::RepoCreate:
         ret = util::RepoManager::Instance()->CreateRepo(req.path(), &uuid);
         break;
       default:

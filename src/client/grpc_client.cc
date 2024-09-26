@@ -9,7 +9,7 @@
 #include "glog/logging.h"
 #include "src/client/grpc_client/grpc_file_client.h"
 #include "src/client/grpc_client/grpc_repo_client.h"
-#include "src/client/grpc_client/grpc_status_client.h"
+#include "src/client/grpc_client/grpc_server_client.h"
 #include "src/util/util.h"
 
 int main(int argc, char** argv) {
@@ -18,12 +18,12 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Program initializing ...";
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  oceandoc::client::StatusClient status_client("localhost", "10001");
-  oceandoc::proto::StatusReq status_req;
-  oceandoc::proto::StatusRes status_res;
-  status_req.set_request_id(oceandoc::util::Util::UUID());
-  if (status_client.Status(status_req, &status_res)) {
-    LOG(INFO) << "Server status: \n" << status_res.status();
+  oceandoc::client::ServerClient server_client("localhost", "10001");
+  oceandoc::proto::ServerReq server_req;
+  oceandoc::proto::ServerRes server_res;
+  server_req.set_request_id(oceandoc::util::Util::UUID());
+  if (server_client.Status(server_req, &server_res)) {
+    LOG(INFO) << "Server status: \n" << server_res.status();
   } else {
     LOG(ERROR) << "Get server status error";
     return -1;
@@ -32,8 +32,8 @@ int main(int argc, char** argv) {
   oceandoc::client::RepoClient repo_client("localhost", "10001");
   oceandoc::proto::RepoReq repo_req;
   oceandoc::proto::RepoRes repo_res;
-  status_req.set_request_id(oceandoc::util::Util::UUID());
-  repo_req.set_op(oceandoc::proto::Op::Repo_Create);
+  server_req.set_request_id(oceandoc::util::Util::UUID());
+  repo_req.set_op(oceandoc::proto::RepoOp::RepoCreate);
   repo_req.set_path("/tmp/test_repo");
   if (repo_client.CreateRepo(repo_req, &repo_res)) {
     LOG(INFO) << "Create repo success, path: " << repo_req.path()

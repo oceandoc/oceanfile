@@ -18,16 +18,16 @@
 namespace oceandoc {
 namespace client {
 
-class StatusClient {
+class ServerClient {
  public:
-  explicit StatusClient(const std::string& addr, const std::string& port)
+  explicit ServerClient(const std::string& addr, const std::string& port)
       : channel_(grpc::CreateChannel(addr + ":" + port,
                                      grpc::InsecureChannelCredentials())),
         stub_(oceandoc::proto::OceanFile::NewStub(channel_)) {}
 
-  bool Status(const proto::StatusReq& req, proto::StatusRes* res) {
+  bool Status(const proto::ServerReq& req, proto::ServerRes* res) {
     grpc::ClientContext context;
-    auto status = stub_->Status(&context, req, res);
+    auto status = stub_->ServerOp(&context, req, res);
     if (!status.ok()) {
       LOG(ERROR) << "Grpc error";
       return false;

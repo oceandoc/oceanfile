@@ -13,12 +13,20 @@ namespace oceandoc {
 namespace server {
 namespace grpc_handler {
 
-struct StatusMethod {
+struct UserMethod {
   static constexpr const char* MethodName() {
-    return "/oceandoc.proto.OceanFile/Status";
+    return "/oceandoc.proto.OceanFile/UserOp";
   }
-  using IncomingType = oceandoc::proto::StatusReq;
-  using OutgoingType = oceandoc::proto::StatusRes;
+  using IncomingType = oceandoc::proto::UserReq;
+  using OutgoingType = oceandoc::proto::UserRes;
+};
+
+struct ServerMethod {
+  static constexpr const char* MethodName() {
+    return "/oceandoc.proto.OceanFile/ServerOp";
+  }
+  using IncomingType = oceandoc::proto::ServerReq;
+  using OutgoingType = oceandoc::proto::ServerRes;
 };
 
 struct RepoOpMethod {

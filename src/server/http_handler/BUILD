@@ -30,14 +30,18 @@ COPTS = GLOBAL_COPTS + select({
 
 cc_library(
     name = "http_handler",
-    srcs = [
-        "http_handler.cc",
-    ],
+    srcs = [],
     hdrs = [
-        "http_handler.h",
+        "file_handler.h",
+        "http_handler_factory.h",
+        "repo_handler.h",
+        "server_handler.h",
+        "user_handler.h",
     ],
     copts = COPTS,
     deps = [
+        "//src/server/grpc_handler",
+        "//src/server/http_handler",
         "//src/util",
         "//src/util:config_manager",
         "@proxygen",

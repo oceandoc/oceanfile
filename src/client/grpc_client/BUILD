@@ -65,7 +65,7 @@ cc_library(
     hdrs = [
         "grpc_file_client.h",
         "grpc_repo_client.h",
-        "grpc_status_client.h",
+        "grpc_server_client.h",
     ],
     copts = COPTS,
     linkopts = LINKOPTS,

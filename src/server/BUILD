@@ -68,8 +68,11 @@ cc_binary(
     local_defines = LOCAL_DEFINES,
     deps = [
         ":server_context",
+        "//src/common:module",
+        "//src/proto:cc_grpc_service",
         "//src/server/http_handler",
         "@folly",
+        "@libsodium//:sodium",
         "@openssl//:crypto",
         "@openssl//:ssl",
         "@proxygen",

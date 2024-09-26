@@ -223,6 +223,7 @@ class RepoManager {
   bool WriteToFile(const std::string& repo_uuid, const std::string& sha256,
                    const std::string& content, const int64_t size,
                    const int32_t partition_num) {
+    static thread_local std::shared_mutex mu;
     const auto& repo_path = RepoPathByUUID(repo_uuid);
     if (repo_path.empty()) {
       LOG(ERROR) << "Invalid repo path";
@@ -252,7 +253,7 @@ class RepoManager {
       return false;
     }
 
-    std::unique_lock<std::shared_mutex> locker(mutex_);
+    std::unique_lock<std::shared_mutex> locker(mu);
     return Util::WriteToFile(repo_file_path, content, start);
   }
 

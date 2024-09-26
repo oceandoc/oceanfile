@@ -12,31 +12,65 @@ message Context {
   repeated string mac = 5;
 }
 
-message StatusReq {
-  string request_id = 1;
-  Context context = 2;
+enum UserOp {
+  UserUnused = 0;
+  UserCreate = 1;
+  UserDel = 2;
+  UserAddGroup = 3;
+  UserDelGroup = 4;
 }
 
-message StatusRes {
+enum ServerOp {
+  ServerUnused = 0;
+  ServerStatus = 1;
+  ServerRestart = 2;
+  ServerShutdown = 3;
+  ServerFullScan = 4;
+}
+
+enum FileOp {
+  FileUnused = 0;
+  FilePut = 1;
+  FileDelete = 2;
+  FileChmod = 3;
+  FileChowner = 4;
+}
+
+enum RepoOp {
+  RepoUnused = 0;
+  RepoCreate = 1;
+  RepoDelete = 2;
+  RepoChmod = 3;
+  RepoChowner = 4;
+}
+
+message UserReq {
+  string request_id = 1;
+  UserOp op = 2;
+  string path = 3;
+  string repo_uuid = 4;
+}
+
+message UserRes {
+  ErrCode err_code = 1;
+  string repo_uuid = 2;
+}
+
+message ServerReq {
+  string request_id = 1;
+  ServerOp op = 2;
+  string path = 3;
+  string repo_uuid = 4;
+}
+
+message ServerRes {
   ErrCode err_code = 1;
   string status = 2;
 }
 
-enum Op {
-  Op_Unused = 0;
-  File_Put = 1;
-  File_Delete = 2;
-  File_Chmod = 3;
-  File_Chowner = 4;
-  Repo_Create = 5;
-  Repo_Delete = 6;
-  Repo_Chmod = 7;
-  Repo_Chowner = 8;
-}
-
 message FileReq {
   string request_id = 1;
-  Op op = 3;
+  FileOp op = 3;
   string path = 4;
   string sha256 = 5;
   int64 size = 6;
@@ -54,7 +88,7 @@ message FileRes {
 
 message RepoReq {
   string request_id = 1;
-  Op op = 2;
+  RepoOp op = 2;
   string path = 3;
   string repo_uuid = 4;
 }
@@ -65,7 +99,8 @@ message RepoRes {
 }
 
 service OceanFile {
-  rpc Status(StatusReq) returns (StatusRes);
+  rpc UserOp(UserReq) returns (UserRes);
+  rpc ServerOp(ServerReq) returns (ServerRes);
   rpc FileOp(stream FileReq) returns (stream FileRes);
   rpc RepoOp(RepoReq) returns (RepoRes);
 }

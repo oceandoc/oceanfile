@@ -13,7 +13,8 @@
 #include "src/async_grpc/server.h"
 #include "src/server/grpc_handler/file_handler.h"
 #include "src/server/grpc_handler/repo_handler.h"
-#include "src/server/grpc_handler/status_handler.h"
+#include "src/server/grpc_handler/server_handler.h"
+#include "src/server/grpc_handler/user_handler.h"
 #include "src/server/server_context.h"
 #include "src/util/config_manager.h"
 
@@ -33,7 +34,8 @@ class GrpcServer final {
     server_builder.SetNumEventThreads(
         util::ConfigManager::Instance()->EventThreads());
 
-    server_builder.RegisterHandler<grpc_handler::StatusHandler>();
+    server_builder.RegisterHandler<grpc_handler::UserHandler>();
+    server_builder.RegisterHandler<grpc_handler::ServerHandler>();
     server_builder.RegisterHandler<grpc_handler::RepoHandler>();
     server_builder.RegisterHandler<grpc_handler::FileHandler>();
 

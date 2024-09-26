@@ -118,7 +118,7 @@ class FileClient
 
     std::vector<char> buffer(common::BUFFER_SIZE_BYTES);
     req_.mutable_content()->resize(common::BUFFER_SIZE_BYTES);
-    req_.set_op(proto::Op::File_Put);
+    req_.set_op(proto::FileOp::FilePut);
     req_.set_path(path);
     req_.set_sha256(attr.sha256);
     req_.set_size(attr.size);

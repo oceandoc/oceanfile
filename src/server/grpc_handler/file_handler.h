@@ -21,7 +21,7 @@ class FileHandler : public async_grpc::RpcHandler<FileOpMethod> {
     auto res = std::make_unique<proto::FileRes>();
     bool ret = true;
     switch (req.op()) {
-      case proto::Op::File_Put:
+      case proto::FileOp::FilePut:
         if (req.repo_uuid().empty()) {
           ret = false;
           LOG(ERROR) << "Repo uuid empty";
