@@ -18,7 +18,7 @@
 namespace oceandoc {
 namespace client {
 
-Class FileClient{};
+class FileClient {};
 
 }  // namespace client
 }  // namespace oceandoc

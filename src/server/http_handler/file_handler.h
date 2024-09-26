@@ -21,6 +21,9 @@ class FileHandler : public proxygen::RequestHandler {
  public:
   FileHandler() { body_.reserve(common::BUFFER_SIZE_BYTES + 100); }
 
+  void onUpgrade(proxygen::UpgradeProtocol) noexcept override {}
+  void onRequest(std::unique_ptr<proxygen::HTTPMessage>) noexcept override {}
+
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override {
     if (body) {
       body_.append(reinterpret_cast<const char*>(body->data()), body->length());
