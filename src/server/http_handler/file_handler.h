@@ -40,7 +40,7 @@ class FileHandler : public proxygen::RequestHandler {
     handler_proxy::HandlerProxy::FileOpHandle(req, &res);
 
     if (!util::Util::PrintProtoMessage(res, &res_body)) {
-      res_body = "Res pb to error";
+      res_body = "Res pb to json error";
       Util::InternalServerError(res_body, downstream_);
       return;
     }
