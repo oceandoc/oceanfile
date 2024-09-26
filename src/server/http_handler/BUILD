@@ -37,13 +37,13 @@ cc_library(
         "repo_handler.h",
         "server_handler.h",
         "user_handler.h",
+        "util.h",
     ],
     copts = COPTS,
     deps = [
-        "//src/server/grpc_handler",
-        "//src/server/http_handler",
-        "//src/util",
+        "//src/server/handler_proxy",
         "//src/util:config_manager",
+        "//src/util:repo_manager",
         "@proxygen",
     ],
 )

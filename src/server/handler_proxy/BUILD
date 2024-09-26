@@ -61,20 +61,15 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 })
 
 cc_library(
-    name = "grpc_handler",
+    name = "handler_proxy",
     hdrs = [
-        "file_handler.h",
-        "meta.h",
-        "repo_handler.h",
-        "server_handler.h",
-        "user_handler.h",
+        "handler_proxy.h",
     ],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
         "//src/async_grpc",
         "//src/proto:cc_grpc_service",
-        "//src/server/handler_proxy",
         "//src/util",
         "//src/util:repo_manager",
     ],

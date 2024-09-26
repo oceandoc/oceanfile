@@ -981,9 +981,7 @@ void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
 
 bool Util::PrintProtoMessage(const google::protobuf::Message &msg,
                              string *json) {
-  JsonPrintOptions option;
-  option.add_whitespace = false;
-  option.preserve_proto_field_names = true;
+  JsonPrintOptions option = {false, false, false, true, false};
   if (!MessageToJsonString(msg, json, option).ok()) {
     return false;
   }
@@ -992,10 +990,8 @@ bool Util::PrintProtoMessage(const google::protobuf::Message &msg,
 
 bool Util::JsonToMessage(const std::string &json,
                          google::protobuf::Message *msg) {
-  JsonParseOptions option;
-  option.case_insensitive_enum_parsing = false;
-  option.ignore_unknown_fields = true;
-  if (!google::protobuf::util::JsonStringToMessage(json, msg).ok()) {
+  static JsonParseOptions option = {true, true};
+  if (!google::protobuf::util::JsonStringToMessage(json, msg, option).ok()) {
     LOG(ERROR) << "json string to msg failed";
     return false;
   }

@@ -9,7 +9,7 @@
 #include "src/async_grpc/rpc_handler.h"
 #include "src/proto/service.pb.h"
 #include "src/server/grpc_handler/meta.h"
-#include "src/util/repo_manager.h"
+#include "src/server/handler_proxy/handler_proxy.h"
 
 namespace oceandoc {
 namespace server {
@@ -19,32 +19,7 @@ class FileHandler : public async_grpc::RpcHandler<FileOpMethod> {
  public:
   void OnRequest(const proto::FileReq& req) override {
     auto res = std::make_unique<proto::FileRes>();
-    bool ret = true;
-    switch (req.op()) {
-      case proto::FileOp::FilePut:
-        if (req.repo_uuid().empty()) {
-          ret = false;
-          LOG(ERROR) << "Repo uuid empty";
-        } else {
-          ret = util::RepoManager::Instance()->WriteToFile(
-              req.repo_uuid(), req.sha256(), req.content(), req.size(),
-              req.partition_num());
-        }
-        break;
-      default:
-        LOG(ERROR) << "Unsupported operation";
-    }
-
-    if (!ret) {
-      LOG(INFO) << "Store file error: " << req.sha256()
-                << ", part: " << req.partition_num();
-      res->set_err_code(proto::ErrCode::FAIL);
-    } else {
-      res->set_err_code(proto::ErrCode::SUCCESS);
-    }
-    res->set_path(req.path());
-    res->set_sha256(req.sha256());
-    res->set_partition_num(req.partition_num());
+    handler_proxy::HandlerProxy::FileOpHandle(req, res.get());
     Send(std::move(res));
   }
 
