@@ -79,15 +79,20 @@ class FileClient {
         req.set_partition_num(partition_num);
         std::copy(buffer.data(), buffer.data() + file.gcount(),
                   req.mutable_content()->begin());
-        req.SerializeToString(&serialized);
+        if (!util::Util::FileReqToJson(req, &serialized)) {
+          // if (!req.SerializeToString(&serialized)) {
+          LOG(ERROR) << "Req to json error: " << serialized;
+        }
+
         curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
+        // curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 1L);
+        // curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 2L);
         curl_easy_setopt(curl_, CURLOPT_POST, 1L);
         curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, serialized.data());
         curl_easy_setopt(curl_, CURLOPT_POSTFIELDSIZE, serialized.size());
 
         struct curl_slist* headers = nullptr;
-        headers =
-            curl_slist_append(headers, "Content-Type: application/x-protobuf");
+        headers = curl_slist_append(headers, "Content-Type: application/json");
         curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, headers);
 
         std::string response_string;
@@ -106,8 +111,12 @@ class FileClient {
         }
         ++partition_num;
         proto::FileRes res;
-        res.ParseFromString(response_string);
-        oceandoc::util::Util::PrintProtoMessage(res);
+        if (!util::Util::JsonToMessage(response_string, &res)) {
+          // if(!res.ParseFromString(response_string)) {;
+          // oceandoc::util::Util::PrintProtoMessage(res);
+          LOG(ERROR) << "To Res message error";
+        }
+        LOG(INFO) << response_string;
         response_string.clear();
       }
     }
@@ -126,7 +135,8 @@ int main() {
   curl_global_init(CURL_GLOBAL_DEFAULT);
   oceandoc::client::FileClient file_client;
   file_client.Send(
-      "localhost:10003/file",
+      // "https://code.xiamu.com:10003/file",
+      "http://code.xiamu.com:10003/file",
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus",
       "8636ac78-d409-4c27-8827-c6ddb1a3230c");
 

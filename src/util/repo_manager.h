@@ -56,7 +56,7 @@ class RepoManager {
     std::string content;
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
-      if (!Util::PrintProtoMessage(repos_, &content)) {
+      if (!Util::MessageToJson(repos_, &content)) {
         LOG(ERROR) << "Repos config convert to json error";
         return false;
       }
@@ -171,7 +171,7 @@ class RepoManager {
     }
 
     std::string content;
-    if (!Util::PrintProtoMessage(repo, &content)) {
+    if (!Util::MessageToJson(repo, &content)) {
       LOG(ERROR) << "Convert to json error";
       return false;
     }
@@ -249,7 +249,8 @@ class RepoManager {
     Util::CalcPartitionStart(size, partition_num, &start, &end);
     if (end - start + 1 != static_cast<int64_t>(content.size())) {
       LOG(ERROR) << "Calc size error, partition_num: " << partition_num
-                 << ", start: " << start << ", end: " << end;
+                 << ", start: " << start << ", end: " << end
+                 << ", content size: " << content.size();
       return false;
     }
 

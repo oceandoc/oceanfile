@@ -16,9 +16,9 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
-#include <utility>
 
 #include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "boost/algorithm/string/predicate.hpp"
 #include "boost/algorithm/string/split.hpp"
 #include "boost/algorithm/string/trim_all.hpp"
@@ -28,12 +28,16 @@
 #include "crc32c/crc32c.h"
 #include "fmt/core.h"
 #include "glog/logging.h"
-#include "google/protobuf/util/json_util.h"
+#include "google/protobuf/json/json.h"
 #include "lzma.h"
 #include "openssl/evp.h"
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 #include "sodium/crypto_hash_sha256.h"
 #include "src/MurmurHash2.h"
 #include "src/common/defs.h"
+#include "src/proto/service.pb.h"
 
 #if defined(_WIN32)
 #include "src/util/util_windows.h"
@@ -55,8 +59,8 @@
 #include <windows.h>
 #endif
 
-using google::protobuf::util::JsonParseOptions;
-using google::protobuf::util::JsonPrintOptions;
+using google::protobuf::json::ParseOptions;
+using google::protobuf::json::PrintOptions;
 using std::string;
 using std::string_view;
 
@@ -789,22 +793,31 @@ bool Util::HexStrToInt64(string_view in, int64_t *out) {
 
 uint32_t Util::CRC32(string_view content) { return crc32c::Crc32c(content); }
 
-string Util::Base64Encode(string_view input) {
-  string output;
-  output.resize(boost::beast::detail::base64::encoded_size(input.size()));
+void Util::Base64Encode(string_view input, string *out) {
+  out->resize(boost::beast::detail::base64::encoded_size(input.size()));
   auto const ret = boost::beast::detail::base64::encode(
-      output.data(), input.data(), input.size());
-  output.resize(ret);
-  return output;
+      out->data(), input.data(), input.size());
+  out->resize(ret);
+}
+
+string Util::Base64Encode(string_view input) {
+  string out;
+  Base64Encode(input, &out);
+  return out;
+}
+
+void Util::Base64Decode(string_view input, string *out) {
+  out->resize(boost::beast::detail::base64::decoded_size(input.size()));
+  auto const ret = boost::beast::detail::base64::decode(
+      out->data(), input.data(), input.size());
+  out->resize(ret.first);
+  return;
 }
 
 string Util::Base64Decode(string_view input) {
-  string output;
-  output.resize(boost::beast::detail::base64::decoded_size(input.size()));
-  auto const ret = boost::beast::detail::base64::decode(
-      output.data(), input.data(), input.size());
-  output.resize(ret.first);
-  return output;
+  string out;
+  Base64Decode(input, &out);
+  return out;
 }
 
 int64_t Util::MurmurHash64A(string_view str) {
@@ -968,34 +981,6 @@ bool Util::FileSHA256(const std::string &path, string *out,
   return FileHash(path, EVP_sha256(), out, use_upper_case);
 }
 
-void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
-  static JsonPrintOptions option = {false, true, false, true, false};
-  string json_value;
-  if (!MessageToJsonString(msg, &json_value, option).ok()) {
-    LOG(ERROR) << "to json string failed";
-  }
-  LOG(INFO) << "json_value: " << json_value;
-}
-
-bool Util::PrintProtoMessage(const google::protobuf::Message &msg,
-                             string *json) {
-  JsonPrintOptions option = {false, true, false, true, false};
-  if (!MessageToJsonString(msg, json, option).ok()) {
-    return false;
-  }
-  return true;
-}
-
-bool Util::JsonToMessage(const std::string &json,
-                         google::protobuf::Message *msg) {
-  static JsonParseOptions option = {true, true};
-  if (!google::protobuf::util::JsonStringToMessage(json, msg, option).ok()) {
-    LOG(ERROR) << "json string to msg failed";
-    return false;
-  }
-  return true;
-}
-
 bool Util::LZMACompress(string_view data, string *out) {
   lzma_stream strm = LZMA_STREAM_INIT;
   lzma_ret ret =
@@ -1060,6 +1045,128 @@ bool Util::LZMADecompress(string_view data, string *out) {
   }
 
   lzma_end(&strm);
+  return true;
+}
+
+void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
+  static PrintOptions option = {false, true, true, true, true};
+  string json_value;
+  if (!MessageToJsonString(msg, &json_value, option).ok()) {
+    LOG(ERROR) << "to json string failed";
+  }
+  LOG(INFO) << "json_value: " << json_value;
+}
+
+bool Util::MessageToJson(const google::protobuf::Message &msg, string *json) {
+  static PrintOptions option = {false, true, true, true, true};
+  if (!MessageToJsonString(msg, json, option).ok()) {
+    return false;
+  }
+  return true;
+}
+
+bool Util::JsonToMessage(const std::string &json,
+                         google::protobuf::Message *msg) {
+  static ParseOptions option = {true, false};
+  if (!JsonStringToMessage(json, msg, option).ok()) {
+    return false;
+  }
+  return true;
+}
+
+void Util::PrintFileReq(const proto::FileReq &req) {
+  LOG(INFO) << "request_id: " << req.request_id() << ", op: " << req.op()
+            << ", path: " << req.path() << ", sha256: " << req.sha256()
+            << ", size: " << req.size()
+            << ", partition_num: " << req.partition_num()
+            << ", repo_uuid: " << req.repo_uuid()
+            << ", content size: " << req.content().size();
+}
+
+bool Util::FileReqToJson(const proto::FileReq &req, std::string *json) {
+  // PrintFileReq(req);
+  rapidjson::Document document;
+  document.SetObject();
+  rapidjson::Document::AllocatorType &allocator = document.GetAllocator();
+
+  // Add Protobuf fields to the JSON document
+  document.AddMember(
+      "request_id",
+      rapidjson::Value().SetString(req.request_id().c_str(), allocator),
+      allocator);
+  document.AddMember(
+      "path", rapidjson::Value().SetString(req.path().c_str(), allocator),
+      allocator);
+  document.AddMember(
+      "sha256", rapidjson::Value().SetString(req.sha256().c_str(), allocator),
+      allocator);
+
+  std::string base64_content;
+  Base64Encode(req.content(), &base64_content);
+  document.AddMember(
+      "content",
+      rapidjson::Value().SetString(base64_content.c_str(), allocator),
+      allocator);
+
+  document.AddMember(
+      "repo_uuid",
+      rapidjson::Value().SetString(req.repo_uuid().c_str(), allocator),
+      allocator);
+
+  document.AddMember("op", req.op(), allocator);
+  document.AddMember("size", req.size(), allocator);
+  document.AddMember("partition_num", req.partition_num(), allocator);
+
+  rapidjson::StringBuffer buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+  document.Accept(writer);
+
+  *json = buffer.GetString();
+  return true;
+}
+
+bool Util::JsonToFileReq(const std::string &json, proto::FileReq *req) {
+  rapidjson::Document doc;
+  if (doc.Parse(json).HasParseError()) {
+    LOG(ERROR) << "Parse error";
+    return 1;
+  }
+
+  if (doc.HasMember("request_id") && doc["request_id"].IsString()) {
+    req->set_request_id(doc["request_id"].GetString());
+  }
+
+  if (doc.HasMember("op") && doc["op"].IsInt()) {
+    req->set_op(proto::FileOp(doc["op"].GetInt()));
+  }
+
+  if (doc.HasMember("path") && doc["path"].IsString()) {
+    req->set_path(doc["path"].GetString());
+  }
+
+  if (doc.HasMember("sha256") && doc["sha256"].IsString()) {
+    req->set_sha256(doc["sha256"].GetString());
+  }
+
+  if (doc.HasMember("size") && doc["size"].IsInt64()) {
+    req->set_size(doc["size"].GetInt64());
+  }
+
+  if (doc.HasMember("content") && doc["content"].IsString()) {
+    std::string base64_content;
+    Base64Decode(doc["content"].GetString(), &base64_content);
+    req->set_content(std::move(base64_content));
+  }
+
+  if (doc.HasMember("partition_num") && doc["partition_num"].IsInt()) {
+    req->set_partition_num(doc["partition_num"].GetInt());
+  }
+
+  if (doc.HasMember("repo_uuid") && doc["repo_uuid"].IsString()) {
+    req->set_repo_uuid(doc["repo_uuid"].GetString());
+  }
+  // PrintFileReq(*req);
+
   return true;
 }
 

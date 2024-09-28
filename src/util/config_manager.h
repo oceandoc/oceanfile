@@ -52,7 +52,7 @@ class ConfigManager {
 
   std::string ToString() {
     std::string json;
-    Util::PrintProtoMessage(base_config_, &json);
+    Util::MessageToJson(base_config_, &json);
     return json;
   }
 

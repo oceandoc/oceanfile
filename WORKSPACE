@@ -595,6 +595,13 @@ new_git_repository(
     remote = "git@github.com:google/crc32c.git",
 )
 
+new_git_repository(
+    name = "rapidjson",
+    build_file = "//bazel:rapidjson.BUILD",
+    commit = "815e6e7e7e14be44a6c15d9aefed232ff064cad0",
+    remote = "git@github.com:Tencent/rapidjson.git",
+)
+
 git_repository(
     name = "hedron_compile_commands",
     commit = "e43e8eaeed3e252ac7c02983f4b1792bdff2e2f0",

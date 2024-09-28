@@ -11,11 +11,11 @@
 #include <string_view>
 #include <vector>
 
-#include "absl/time/time.h"
 #include "boost/algorithm/string/replace.hpp"
 #include "google/protobuf/message.h"
 #include "openssl/types.h"
 #include "src/common/defs.h"
+#include "src/proto/service.pb.h"
 
 namespace oceandoc {
 namespace util {
@@ -130,6 +130,10 @@ class Util final {
 
   static std::string Base64Decode(std::string_view input);
 
+  static void Base64Encode(std::string_view input, std::string *out);
+
+  static void Base64Decode(std::string_view input, std::string *out);
+
   static uint32_t CRC32(std::string_view content);
 
   static EVP_MD_CTX *HashInit(const EVP_MD *type);
@@ -188,10 +192,13 @@ class Util final {
 
   static void PrintProtoMessage(const google::protobuf::Message &msg);
 
-  static bool PrintProtoMessage(const google::protobuf::Message &msg,
-                                std::string *json);
+  static bool MessageToJson(const google::protobuf::Message &msg,
+                            std::string *json);
   static bool JsonToMessage(const std::string &json,
                             google::protobuf::Message *msg);
+  static void PrintFileReq(const proto::FileReq &req);
+  static bool FileReqToJson(const proto::FileReq &req, std::string *json);
+  static bool JsonToFileReq(const std::string &json, proto::FileReq *req);
 };
 
 }  // namespace util

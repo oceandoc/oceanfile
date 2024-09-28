@@ -163,6 +163,7 @@ cc_library(
     local_defines = LOCAL_DEFINES,
     deps = [
         "//src/common:defs",
+        "//src/proto:cc_service",
         "@boost//:algorithm",
         "@boost//:beast",
         "@boost//:iostreams",
@@ -176,6 +177,7 @@ cc_library(
         "@fmt",
         "@folly",
         "@openssl",
+        "@rapidjson",
         "@smhasher",
         "@xz//:lzma",
     ] + select({

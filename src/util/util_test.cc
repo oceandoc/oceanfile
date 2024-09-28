@@ -6,13 +6,14 @@
 #include "src/util/util.h"
 
 #include <filesystem>
-#include <fstream>
 #include <functional>
+#include <iomanip>
 #include <thread>
 
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "src/common/defs.h"
+#include "src/proto/service.pb.h"
 
 namespace oceandoc {
 namespace util {
@@ -381,7 +382,7 @@ TEST(Util, WriteToFile) {
   EXPECT_EQ(Util::SmallFileSHA256("test_data/util_test/write_to_file", &sha256),
             true);
   EXPECT_EQ(sha256,
-            "a35f8984bc0f1c415ae8edcc77bb841ac0ab9deb23b48966c56a7ba12cc20657");
+            "b979494e28d88b1fa87f19a3a5632b93f67e315208b1141404dd5a97778a8367");
 }
 ///////////////////////////////////////////////////
 
@@ -563,6 +564,51 @@ TEST(Util, LZMA) {
   }
 
   EXPECT_EQ(decompressed_data, "/usr/local/llvm");
+}
+
+TEST(Util, MessageToJson) {
+  proto::FileReq req;
+  req.set_op(proto::FileOp::FilePut);
+  req.set_path("tesxt");
+  req.set_sha256("abbc");
+  req.set_size(50);
+  req.set_repo_uuid("/tmp/test_repo");
+  req.set_content("test");
+
+  std::string serialized;
+  if (!Util::MessageToJson(req, &serialized)) {
+    LOG(ERROR) << "Req to json error: " << serialized;
+  }
+  std::string result =
+      R"({"request_id":"","op":"FilePut","path":"tesxt","sha256":"abbc","size":50,"content":"dGVzdA==","partition_num":0,"repo_uuid":"/tmp/test_repo"})";
+  EXPECT_EQ(serialized, result);
+}
+
+TEST(Util, JsonToMessage) {
+  proto::FileReq req;
+
+  std::string serialized =
+      R"({"request_id":"","op":"FilePut","path":"tesxt","sha256":"abbc","size":50,"content":"dGVzdA==","partition_num":0,"repo_uuid":"/tmp/test_repo"})";
+  if (!Util::JsonToMessage(serialized, &req)) {
+    LOG(ERROR) << "Req to json error: " << serialized;
+  }
+  EXPECT_EQ(req.path(), "tesxt");
+  serialized =
+      R"({"request_id":"","op":"FilePut","path":"/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus","sha256":"4084ec48f2affbd501c02a942b674abcfdbbc6475070049de2c89fb6aa25a3f0","size":359621552,"content":"f0VMRgIBAQMAAAAAAAAAAAIAPgABAAAAMNl8AAAAAABAAAAAAAAAADBZbxUAAAAAAAAAAEAAOAAOAEA","partition_num":2,"repo_uuid":"8636ac78-d409-4c27-8827-c6ddb1a3230c"})";
+  if (!Util::JsonToMessage(serialized, &req)) {
+    LOG(ERROR) << "Req to json error: " << serialized;
+  }
+  EXPECT_EQ(
+      req.path(),
+      "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus");
+
+  // Util::LoadSmallFile("req", &serialized);
+  // if (!Util::JsonToMessage(serialized, &req)) {
+  // LOG(ERROR) << "Req to json error: " << serialized;
+  // }
+  // EXPECT_EQ(
+  // req.path(),
+  // "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus");
 }
 
 }  // namespace util

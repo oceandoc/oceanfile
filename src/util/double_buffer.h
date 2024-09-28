@@ -37,7 +37,7 @@ class DoubleBuffer {
     std::string json;
     absl::base_internal::SpinLockHolder locker(&lock_);
     for (const auto& item : holder_[1 - pos_]) {
-      Util::PrintProtoMessage(item, &json);
+      Util::MessageToJson(item, &json);
       content.append(json);
 #if defined(_WIN32)
       content.append("\r\n");
