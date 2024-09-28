@@ -969,9 +969,7 @@ bool Util::FileSHA256(const std::string &path, string *out,
 }
 
 void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
-  JsonPrintOptions option;
-  option.add_whitespace = false;
-  option.preserve_proto_field_names = true;
+  static JsonPrintOptions option = {false, true, false, true, false};
   string json_value;
   if (!MessageToJsonString(msg, &json_value, option).ok()) {
     LOG(ERROR) << "to json string failed";
@@ -981,7 +979,7 @@ void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
 
 bool Util::PrintProtoMessage(const google::protobuf::Message &msg,
                              string *json) {
-  JsonPrintOptions option = {false, false, false, true, false};
+  JsonPrintOptions option = {false, true, false, true, false};
   if (!MessageToJsonString(msg, json, option).ok()) {
     return false;
   }

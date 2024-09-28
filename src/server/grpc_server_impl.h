@@ -23,7 +23,8 @@ namespace server {
 
 class GrpcServer final {
  public:
-  GrpcServer() : terminated(false) {
+  GrpcServer(std::shared_ptr<ServerContext> server_context)
+      : terminated(false) {
     async_grpc::Server::Builder server_builder;
     std::string addr_port =
         util::ConfigManager::Instance()->ServerAddr() + ":" +
@@ -38,20 +39,17 @@ class GrpcServer final {
     server_builder.RegisterHandler<grpc_handler::ServerHandler>();
     server_builder.RegisterHandler<grpc_handler::RepoHandler>();
     server_builder.RegisterHandler<grpc_handler::FileHandler>();
-
     server_ = server_builder.Build();
-
-    server_->SetExecutionContext(std::make_shared<ServerContext>());
-    server_->Start();
-
-    server_->GetContext<ServerContext>()->MarkedServerInitedDone();
+    server_->SetExecutionContext(server_context);
   }
 
  public:
-  void WaitForShutdown() { server_->WaitForShutdown(); }
-
+  void Start() {
+    server_->Start();
+    server_->GetContext<ServerContext>()->MarkedGrpcServerInitedDone();
+  }
   void Shutdown() { server_->Shutdown(); }
-
+  void WaitForShutdown() { server_->WaitForShutdown(); }
   std::shared_ptr<async_grpc::Server> GetGrpcServer() { return server_; }
 
  private:

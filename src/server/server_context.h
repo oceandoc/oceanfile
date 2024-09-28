@@ -6,9 +6,6 @@
 #ifndef BAZEL_TEMPLATE_CONTEXT_SERVER_CONTEXT_H
 #define BAZEL_TEMPLATE_CONTEXT_SERVER_CONTEXT_H
 
-#include <atomic>
-#include <future>
-
 #include "fmt/core.h"
 #include "glog/logging.h"
 #include "src/async_grpc/execution_context.h"
@@ -25,18 +22,19 @@ using EchoResponder = std::function<bool()>;
 class ServerContext : public async_grpc::ExecutionContext {
  public:
   ServerContext()
-      : is_inited_(false),
-        git_commit_(GIT_VERSION),
-        uptime_(util::Util::CurrentTimeMillis()) {}
+      : git_commit_(GIT_VERSION), uptime_(util::Util::CurrentTimeMillis()) {}
 
-  void MarkedServerInitedDone() {
-    is_inited_.store(true);
+  void MarkedGrpcServerInitedDone() {
     LOG(INFO) << "Grpc server started on: "
               << util::ConfigManager::Instance()->ServerAddr() << ", port: "
               << util::ConfigManager::Instance()->GrpcServerPort();
   }
 
-  bool IsInitYet() { return is_inited_.load(); }
+  void MarkedHttpServerInitedDone() {
+    LOG(INFO) << "Http server started on: "
+              << util::ConfigManager::Instance()->ServerAddr() << ", port: "
+              << util::ConfigManager::Instance()->HttpServerPort();
+  }
 
   std::string ToString() {
     std::string info;
@@ -48,11 +46,7 @@ class ServerContext : public async_grpc::ExecutionContext {
     return info;
   }
 
- public:
-  std::promise<EchoResponder> echo_responder;
-
  private:
-  std::atomic_bool is_inited_;
   std::string git_commit_;
   const int64_t uptime_;
 };

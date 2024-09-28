@@ -2,10 +2,9 @@
 * repo ctl interface
 * check scan status
 * increment validation
-* log client failed part
+* log client failed part and retry use queue
 * authentic
 * session cookie
-* operation log
 * check system time
 * public and private ip address, mac address, system info
 

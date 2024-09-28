@@ -7,6 +7,7 @@
 #define BAZEL_TEMPLATE_COMMON_DEFS_H
 
 #include <string>
+#include <fstream>
 
 namespace oceandoc {
 namespace common {
@@ -26,6 +27,11 @@ constexpr int64_t BUFFER_SIZE_BYTES = 64 * 1024 * 1024;  // 64MB unit:Bytes
 
 constexpr int64_t MAX_GRPC_MSG_SIZE = 2 * 64 * 1024 * 1024 * 8;  // 128MB
 constexpr double TRACING_SAMPLER_PROBALITITY = 0.01;             // 1 Percent
+
+struct UploadContext {
+  std::ifstream file;
+  size_t remaining;
+};
 
 struct FileAttr {
   std::string path;

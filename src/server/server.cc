@@ -6,15 +6,17 @@
 #include "folly/init/Init.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
+#include "src/server/http_server_impl.h"
 // #include "gperftools/profiler.h"
+
 #if !defined(_WIN32)
 #include <signal.h>
 #endif
 
-#include "proxygen/httpserver/HTTPServer.h"
-#include "proxygen/httpserver/HTTPServerOptions.h"
 #include "src/common/module.h"
-#include "src/server/http_handler/http_handler_factory.h"
+#include "src/server/grpc_server_impl.h"
+#include "src/server/http_server_impl.h"
+#include "src/server/server_context.h"
 #include "src/util/config_manager.h"
 #include "src/util/repo_manager.h"
 #include "src/util/scan_manager.h"
@@ -22,21 +24,23 @@
 
 #if !defined(_WIN32)
 // https://github.com/grpc/grpc/issues/24884
-proxygen::HTTPServer* server;
+oceandoc::server::GrpcServer *grpc_server_ptr = nullptr;
+oceandoc::server::HttpServer *http_server_ptr = nullptr;
 bool shutdown_required = false;
 std::mutex mutex;
 std::condition_variable cv;
 
 void SignalHandler(int sig) {
-  std::cout << "Got signal: " << strsignal(sig) << std::endl;
+  LOG(INFO) << "Got signal: " << strsignal(sig) << std::endl;
   shutdown_required = true;
-  cv.notify_one();
+  cv.notify_all();
 }
 
 void ShutdownCheckingThread(void) {
   std::unique_lock<std::mutex> lock(mutex);
   cv.wait(lock, []() { return shutdown_required; });
-  server->stop();
+  grpc_server_ptr->Shutdown();
+  http_server_ptr->Shutdown();
 }
 
 void RegisterSignalHandler() {
@@ -48,13 +52,17 @@ void RegisterSignalHandler() {
 }
 #endif
 
-int main(int argc, char* argv[]) {
+int main(int argc, char **argv) {
+  // ProfilerStart("oceandoc_profile");
+  LOG(INFO) << "Grpc server initializing ...";
+
   folly::Init init(&argc, &argv, false);
   // google::InitGoogleLogging(argv[0]); // already called in folly::Init
   google::SetStderrLogging(google::GLOG_INFO);
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-  oceandoc::common::InitAllModules(&argc, &argv);
+  LOG(INFO) << "CommandLine: " << google::GetArgv();
 
+  oceandoc::common::InitAllModules(&argc, &argv);
   oceandoc::util::ConfigManager::Instance()->Init("./conf/base_config.json");
   oceandoc::util::ThreadPool::Instance()->Init();
   oceandoc::util::ScanManager::Instance()->Init();
@@ -65,38 +73,31 @@ int main(int argc, char* argv[]) {
   std::thread shutdown_thread(ShutdownCheckingThread);
 #endif
 
-  proxygen::HTTPServerOptions options;
-  options.threads = static_cast<size_t>(sysconf(_SC_NPROCESSORS_ONLN));
-  options.idleTimeout = std::chrono::milliseconds(60000);
-  options.handlerFactories =
-      proxygen::RequestHandlerChain()
-          .addThen<oceandoc::server::http_handler::HTTPHandlerFactory>()
-          .build();
+  std::shared_ptr<oceandoc::server::ServerContext> server_context =
+      std::make_shared<oceandoc::server::ServerContext>();
 
-  std::string addr = oceandoc::util::ConfigManager::Instance()->ServerAddr();
-  int32_t port = oceandoc::util::ConfigManager::Instance()->HttpServerPort();
+  oceandoc::server::GrpcServer grpc_server(server_context);
+  ::grpc_server_ptr = &grpc_server;
 
-  std::vector<proxygen::HTTPServer::IPConfig> IPs = {
-      {folly::SocketAddress(addr, port, true),
-       proxygen::HTTPServer::Protocol::HTTP},
-      {folly::SocketAddress(addr, port, true),
-       proxygen::HTTPServer::Protocol::HTTP2}};
+  oceandoc::server::HttpServer http_server(server_context);
+  ::http_server_ptr = &http_server;
 
-  proxygen::HTTPServer server(std::move(options));
-  server.bind(IPs);
+  grpc_server.Start();
+  http_server.Start();
 
-  std::thread t([&]() { server.start(); });
+  grpc_server.WaitForShutdown();
 
-  t.join();
+  LOG(INFO) << "Now stopped grpc server";
+  LOG(INFO) << "Now stopped http server";
 
 #if !defined(_WIN32)
   if (shutdown_thread.joinable()) {
     shutdown_thread.join();
   }
 #endif
-
   oceandoc::util::ThreadPool::Instance()->Stop();
   oceandoc::util::RepoManager::Instance()->Stop();
 
+  // ProfilerStop();
   return 0;
 }

@@ -35,14 +35,19 @@ class FileHandler : public proxygen::RequestHandler {
     proto::FileRes res;
 
     std::string res_body = "Parse request error";
-    if (!util::Util::JsonToMessage(body_, &req)) {
+    // if (!util::Util::JsonToMessage(body_, &req)) {
+    // Util::InternalServerError(res_body, downstream_);
+    // return;
+    // }
+    if (!req.ParseFromString(body_)) {
+      LOG(ERROR) << "Parse error";
       Util::InternalServerError(res_body, downstream_);
       return;
     }
 
     handler_proxy::HandlerProxy::FileOpHandle(req, &res);
 
-    if (!util::Util::PrintProtoMessage(res, &res_body)) {
+    if (!res.SerializeToString(&res_body)) {
       res_body = "Res pb to json error";
       Util::InternalServerError(res_body, downstream_);
       return;

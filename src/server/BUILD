@@ -61,8 +61,8 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 })
 
 cc_binary(
-    name = "http_server",
-    srcs = ["http_server.cc"],
+    name = "server",
+    srcs = ["server.cc"],
     copts = COPTS,
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
@@ -74,33 +74,16 @@ cc_binary(
         "@folly",
         "@libsodium//:sodium",
         "@openssl//:crypto",
-        "@openssl//:ssl",
-        "@proxygen",
-    ],
-)
-
-cc_binary(
-    name = "grpc_server",
-    srcs = ["grpc_server.cc"],
-    copts = COPTS,
-    linkopts = LINKOPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
         ":grpc_server_impl",
+        ":http_server_impl",
         #"@jemalloc",
-        "@openssl//:crypto",
         "@openssl//:ssl",
-        "@libsodium//:sodium",
-        "//src/common:module",
     ],
 )
 
 cc_library(
     name = "grpc_server_impl",
-    srcs = ["grpc_server_impl.cc"],
-    hdrs = [
-        "grpc_server_impl.h",
-    ],
+    hdrs = ["grpc_server_impl.h"],
     copts = COPTS,
     defines = [
         "BOOST_BIND_GLOBAL_PLACEHOLDERS",
@@ -126,6 +109,35 @@ cc_library(
         "//src/server:server_context",
         "//src/server/grpc_handler",
         "//src/util:config_manager",
+    ],
+)
+
+cc_library(
+    name = "http_server_impl",
+    hdrs = ["http_server_impl.h"],
+    copts = COPTS,
+    defines = [
+        "BOOST_BIND_GLOBAL_PLACEHOLDERS",
+        "BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
+        "BOOST_THREAD_PROVIDES_EXECUTORS",
+        "BOOST_THREAD_BUILD_LIB=1",
+        "BOOST_THREAD_USES_CHRONO",
+        "BOOST_THREAD_USES_MOVE",
+    ] + select({
+        "@platforms//os:windows": [
+            "BOOST_THREAD_PLATFORM_WIN32",
+            "BOOST_THREAD_WIN32",
+        ],
+        "//conditions:default": [
+            "BOOST_THREAD_PLATFORM_PTHREAD",
+            "BOOST_THREAD_POSIX",
+        ],
+    }),
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        "//src/server:server_context",
+        "//src/util:config_manager",
+        "@proxygen",
     ],
 )
 
