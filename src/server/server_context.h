@@ -31,7 +31,9 @@ class ServerContext : public async_grpc::ExecutionContext {
   }
 
   void MarkedHttpServerInitedDone() {
-    LOG(INFO) << "Http server started on: "
+    LOG(INFO) << (util::ConfigManager::Instance()->UseHttps() ? "Https"
+                                                              : "Http")
+              << " server started on: "
               << util::ConfigManager::Instance()->ServerAddr() << ", port: "
               << util::ConfigManager::Instance()->HttpServerPort();
   }

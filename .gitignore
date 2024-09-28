@@ -1,3 +1,4 @@
+*.pem
 compile_commands.json
 pprof.out
 bazel-*

@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 
+#include "folly/io/async/SSLContext.h"
 #include "proxygen/httpserver/HTTPServer.h"
 #include "proxygen/httpserver/HTTPServerOptions.h"
 #include "src/server/http_handler/http_handler_factory.h"
@@ -30,11 +31,28 @@ class HttpServer final {
             .addThen<oceandoc::server::http_handler::HTTPHandlerFactory>()
             .build();
 
-    std::string addr = oceandoc::util::ConfigManager::Instance()->ServerAddr();
-    int32_t port = oceandoc::util::ConfigManager::Instance()->HttpServerPort();
-    std::vector<proxygen::HTTPServer::IPConfig> IPs = {
-        {folly::SocketAddress(addr, port, true),
-         proxygen::HTTPServer::Protocol::HTTP}};
+    std::string addr = util::ConfigManager::Instance()->ServerAddr();
+    int32_t port = util::ConfigManager::Instance()->HttpServerPort();
+
+    proxygen::HTTPServer::IPConfig ip_config{
+        folly::SocketAddress(addr, port, true),
+        proxygen::HTTPServer::Protocol::HTTP};
+
+    if (util::ConfigManager::Instance()->UseHttps()) {
+      auto ca = util::ConfigManager::Instance()->SslCa();
+      auto cert = util::ConfigManager::Instance()->SslCert();
+      auto key = util::ConfigManager::Instance()->SslKey();
+
+      wangle::SSLContextConfig ssl_config;
+      ssl_config.isDefault = true;
+      ssl_config.setCertificate(cert, key, "");
+      ssl_config.clientCAFile = ca;
+      ssl_config.clientVerification =
+          folly::SSLContext::VerifyClientCertificate::IF_PRESENTED;
+      ip_config.sslConfigs.push_back(ssl_config);
+    }
+
+    std::vector<proxygen::HTTPServer::IPConfig> IPs{ip_config};
 
     server_ = std::make_shared<proxygen::HTTPServer>(std::move(options));
     server_->bind(IPs);
