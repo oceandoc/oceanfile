@@ -609,11 +609,25 @@ int32_t Util::FilePartitionNum(const std::string &path) {
 }
 
 int32_t Util::FilePartitionNum(const int64_t size) {
-  if (size <= 0) {
-    return 0;
-  }
   // file size unit is Bytes
-  return std::ceil((double)size / (double)common::BUFFER_SIZE_BYTES);  // NOLINT
+  return size / common::BUFFER_SIZE_BYTES +
+         ((size % common::BUFFER_SIZE_BYTES) > 0 ? 1 : 0);
+}
+
+int32_t Util::FilePartitionNum(const std::string &path,
+                               const int64_t partition_size) {
+  auto ret = FileSize(path);
+  if (ret == -1) {
+    return -1;
+  }
+  return FilePartitionNum(ret, partition_size);
+}
+
+int32_t Util::FilePartitionNum(const int64_t total_size,
+                               const int64_t partition_size) {
+  // file size unit is Bytes
+  return total_size / partition_size +
+         ((total_size % partition_size) > 0 ? 1 : 0);
 }
 
 bool Util::PrepareFile(const string &path, common::FileAttr *attr) {
@@ -675,10 +689,11 @@ std::string Util::RepoFilePath(const std::string &repo_path,
 }
 
 void Util::CalcPartitionStart(const int64_t size, const int32_t partition,
-                              int64_t *start, int64_t *end) {
-  *start = partition * common::BUFFER_SIZE_BYTES;
-  if (size - *start >= common::BUFFER_SIZE_BYTES) {
-    *end = *start + common::BUFFER_SIZE_BYTES - 1;
+                              const int64_t partition_size, int64_t *start,
+                              int64_t *end) {
+  *start = partition * partition_size;
+  if (size - *start >= partition_size) {
+    *end = *start + partition_size - 1;
     return;
   }
   *end = size - 1;

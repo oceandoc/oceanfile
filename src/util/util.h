@@ -84,7 +84,13 @@ class Util final {
 
   static int32_t FilePartitionNum(const std::string &path);
 
-  static int32_t FilePartitionNum(const int64_t size);
+  static int32_t FilePartitionNum(const int64_t total_size);
+
+  static int32_t FilePartitionNum(const std::string &path,
+                                  const int64_t partition_size);
+
+  static int32_t FilePartitionNum(const int64_t total_size,
+                                  int64_t partition_size);
 
   static bool PrepareFile(const std::string &path, common::FileAttr *attr);
 
@@ -93,7 +99,8 @@ class Util final {
                                   const std::string &sha256);
 
   static void CalcPartitionStart(const int64_t size, const int32_t partition,
-                                 int64_t *start, int64_t *end);
+                                 const int64_t partition_size, int64_t *start,
+                                 int64_t *end);
 
   static std::string UUID();
   static std::string ToUpper(const std::string &str);

@@ -485,15 +485,18 @@ TEST(Util, RepoFilePath) {
 
 TEST(Util, CalcPartitionStart) {
   int64_t start = 0, end = 0;
-  Util::CalcPartitionStart(359621552, 0, &start, &end);
+  Util::CalcPartitionStart(359621552, 0, common::BUFFER_SIZE_BYTES, &start,
+                           &end);
   EXPECT_EQ(start, 0);
   EXPECT_EQ(end, common::BUFFER_SIZE_BYTES - 1);
 
-  Util::CalcPartitionStart(359621552, 1, &start, &end);
+  Util::CalcPartitionStart(359621552, 1, common::BUFFER_SIZE_BYTES, &start,
+                           &end);
   EXPECT_EQ(start, common::BUFFER_SIZE_BYTES);
   EXPECT_EQ(end, common::BUFFER_SIZE_BYTES * 2 - 1);
 
-  Util::CalcPartitionStart(359621552, 6, &start, &end);
+  Util::CalcPartitionStart(359621552, 6, common::BUFFER_SIZE_BYTES, &start,
+                           &end);
   EXPECT_EQ(start, common::BUFFER_SIZE_BYTES * 6);
   EXPECT_EQ(end, 359621552 - 1);
 }

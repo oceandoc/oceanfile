@@ -6,8 +6,8 @@
 #ifndef BAZEL_TEMPLATE_COMMON_DEFS_H
 #define BAZEL_TEMPLATE_COMMON_DEFS_H
 
-#include <string>
 #include <fstream>
+#include <string>
 
 namespace oceandoc {
 namespace common {

@@ -222,7 +222,7 @@ class RepoManager {
 
   bool WriteToFile(const std::string& repo_uuid, const std::string& sha256,
                    const std::string& content, const int64_t size,
-                   const int32_t partition_num) {
+                   const int32_t partition_num, const int64_t partition_size) {
     static thread_local std::shared_mutex mu;
     const auto& repo_path = RepoPathByUUID(repo_uuid);
     if (repo_path.empty()) {
@@ -246,7 +246,7 @@ class RepoManager {
     }
 
     int64_t start = 0, end = 0;
-    Util::CalcPartitionStart(size, partition_num, &start, &end);
+    Util::CalcPartitionStart(size, partition_num, partition_size, &start, &end);
     if (end - start + 1 != static_cast<int64_t>(content.size())) {
       LOG(ERROR) << "Calc size error, partition_num: " << partition_num
                  << ", start: " << start << ", end: " << end

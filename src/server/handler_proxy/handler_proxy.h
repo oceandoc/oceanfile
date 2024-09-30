@@ -29,7 +29,9 @@ class HandlerProxy {
         } else {
           ret = util::RepoManager::Instance()->WriteToFile(
               req.repo_uuid(), req.sha256(), req.content(), req.size(),
-              req.partition_num());
+              req.partition_num(),
+              req.partition_size() > 0 ? req.partition_size()
+                                       : common::BUFFER_SIZE_BYTES);
         }
         break;
       default:

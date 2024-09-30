@@ -33,6 +33,7 @@ cc_library(
     srcs = [],
     hdrs = [
         "file_handler.h",
+        "file_json_handler.h",
         "http_handler_factory.h",
         "repo_handler.h",
         "server_handler.h",
