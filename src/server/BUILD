@@ -63,7 +63,10 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_binary(
     name = "server",
     srcs = ["server.cc"],
-    copts = COPTS,
+    copts = COPTS + [
+        "-Wno-implicit-fallthrough",
+        "-Wno-unused-parameter",
+    ],
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [

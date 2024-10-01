@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <string>
+#include <string_view>
 
 namespace oceandoc {
 namespace common {

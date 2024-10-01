@@ -4,6 +4,8 @@ load("//bazel:cpplint.bzl", "cpplint")
 
 package(default_visibility = ["//visibility:public"])
 
+cpplint()
+
 COPTS = GLOBAL_COPTS + select({
     "@oceandoc//bazel:not_cross_compiling_on_windows": [
         "/Iexternal/double-conversion",
@@ -43,10 +45,16 @@ cc_library(
     copts = COPTS,
     deps = [
         "//src/server/handler_proxy",
+        "//src/util",
         "//src/util:config_manager",
         "//src/util:repo_manager",
+        "@multipart-parser",
         "@proxygen",
     ],
 )
 
-cpplint()
+cc_test(
+    name = "util_test",
+    srcs = ["util_test.cc"],
+    deps = [":http_handler"],
+)

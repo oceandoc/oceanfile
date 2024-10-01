@@ -22,6 +22,7 @@ wasm_copts = [
 linux_or_darwin_copts = wasm_copts + [
     "-D_GNU_SOURCE",
     "-DHAVE_SYS_SYSCALL_H",
+    "-Wno-sign-compare",
 ]
 
 freebsd_only_copts = [
@@ -30,6 +31,7 @@ freebsd_only_copts = [
 
 darwin_only_copts = [
     "-DHAVE_DLADDR",
+    "-Wno-sign-compare",
 ]
 
 windows_only_copts = [

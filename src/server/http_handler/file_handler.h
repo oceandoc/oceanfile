@@ -17,12 +17,18 @@ namespace oceandoc {
 namespace server {
 namespace http_handler {
 
+// https://tonybai.com/2021/01/16/upload-and-download-file-using-multipart-form-over-http/
 class FileHandler : public proxygen::RequestHandler {
  public:
   FileHandler() { body_.reserve(common::BUFFER_SIZE_BYTES + 100); }
 
   void onUpgrade(proxygen::UpgradeProtocol) noexcept override {}
-  void onRequest(std::unique_ptr<proxygen::HTTPMessage>) noexcept override {}
+  void onRequest(
+      std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override {
+    const std::string& contentType =
+        headers->getHeaders().getSingleOrEmpty("Content-Type");
+    boundary_ = contentType.substr(30);
+  }
 
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override {
     if (body) {
@@ -35,13 +41,13 @@ class FileHandler : public proxygen::RequestHandler {
     proto::FileRes res;
 
     std::string res_body = "Parse request error";
-    if (!util::Util::JsonToFileReq(body_, &req)) {
+    if (!Util::HandleMultipart(body_, boundary_, &req)) {
       // if (!req.ParseFromString(body_)) {
       LOG(ERROR) << "Req parse error";
-      util::Util::WriteToFile("req", body_);
       Util::InternalServerError(res_body, downstream_);
       return;
     }
+    util::Util::PrintFileReq(req);
 
     handler_proxy::HandlerProxy::FileOpHandle(req, &res);
 
@@ -64,6 +70,7 @@ class FileHandler : public proxygen::RequestHandler {
 
  private:
   std::string body_;
+  std::string boundary_;
 };
 
 }  // namespace http_handler

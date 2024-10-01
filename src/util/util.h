@@ -6,6 +6,7 @@
 #ifndef BAZEL_TEMPLATE_UTIL_UTIL_H
 #define BAZEL_TEMPLATE_UTIL_UTIL_H
 
+#include <charconv>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -113,7 +114,24 @@ class Util final {
 
   static std::string Trim(const std::string &s);
 
-  static bool ToInt(const std::string &str, uint32_t *value);
+  template <class TypeName>
+  static bool ToInt(std::string_view str, TypeName *value) {
+    auto result = std::from_chars(str.data(), str.data() + str.size(), *value);
+    if (result.ec != std::errc{}) {
+      return false;
+    }
+    return true;
+  }
+
+  template <class TypeName>
+  static TypeName ToInt(std::string_view str) {
+    TypeName num = 0;
+    auto result = std::from_chars(str.data(), str.data() + str.size(), num);
+    if (result.ec != std::errc{}) {
+      return 0;
+    }
+    return num;
+  }
 
   static bool StartWith(const std::string &str, const std::string &prefix);
 

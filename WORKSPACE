@@ -621,6 +621,13 @@ new_local_repository(
     path = "../systemd",
 )
 
+new_git_repository(
+    name = "multipart-parser",
+    build_file = "//bazel:multipart-parser.BUILD",
+    commit = "61e234f2100f39d405b6e9c2689e2482b31f3976",
+    remote = "git@github.com:FooBarWidget/multipart-parser.git",
+)
+
 gen_local_config_git(name = "local_config_git")
 
 #################### java ####################

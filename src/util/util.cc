@@ -6,7 +6,6 @@
 #include "src/util/util.h"
 
 #include <algorithm>
-#include <charconv>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -727,14 +726,6 @@ string Util::Trim(const string &str) {
   boost::algorithm::trim_right(trimmed_str);
   boost::algorithm::trim_left(trimmed_str);
   return trimmed_str;
-}
-
-bool Util::ToInt(const string &str, uint32_t *value) {
-  auto result = std::from_chars(str.data(), str.data() + str.size(), *value);
-  if (result.ec != std::errc{}) {
-    return false;
-  }
-  return true;
 }
 
 bool Util::StartWith(const string &str, const string &prefix) {

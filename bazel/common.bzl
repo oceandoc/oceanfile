@@ -72,6 +72,7 @@ GLOBAL_COPTS = select({
         "-Wextra",
         "-O2",
         "-g",
+        "-Wno-sign-compare",
     ],
 })
 
