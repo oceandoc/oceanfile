@@ -253,7 +253,6 @@ class RepoManager {
                  << ", content size: " << content.size();
       return false;
     }
-
     std::unique_lock<std::shared_mutex> locker(mu);
     return Util::WriteToFile(repo_file_path, content, start);
   }

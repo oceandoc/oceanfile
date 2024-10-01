@@ -11,6 +11,7 @@
 #include "src/common/defs.h"
 #include "src/server/handler_proxy/handler_proxy.h"
 #include "src/server/http_handler/util.h"
+#include "src/util/timer.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -33,12 +34,10 @@ class FileJsonHandler : public proxygen::RequestHandler {
   void onEOM() noexcept override {
     proto::FileReq req;
     proto::FileRes res;
-
     std::string res_body = "Parse request error";
+
     if (!util::Util::JsonToFileReq(body_, &req)) {
       // if (!req.ParseFromString(body_)) {
-      LOG(ERROR) << "Req parse error";
-      util::Util::WriteToFile("req", body_);
       Util::InternalServerError(res_body, downstream_);
       return;
     }

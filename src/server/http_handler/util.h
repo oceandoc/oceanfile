@@ -158,7 +158,6 @@ class Util {
     size_t pos = 0;
     do {
       pos = reader.feed(body.data(), body.size());
-      LOG(INFO) << "pos: " << pos;
     } while (reader.succeeded() && pos < body.size());
     if (reader.hasError()) {
       LOG(INFO) << reader.getErrorMessage();

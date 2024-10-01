@@ -48,6 +48,7 @@ cc_library(
         "//src/util",
         "//src/util:config_manager",
         "//src/util:repo_manager",
+        "//src/util:timer",
         "@multipart-parser",
         "@proxygen",
     ],

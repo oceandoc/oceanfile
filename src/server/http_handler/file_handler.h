@@ -42,12 +42,9 @@ class FileHandler : public proxygen::RequestHandler {
 
     std::string res_body = "Parse request error";
     if (!Util::HandleMultipart(body_, boundary_, &req)) {
-      // if (!req.ParseFromString(body_)) {
-      LOG(ERROR) << "Req parse error";
       Util::InternalServerError(res_body, downstream_);
       return;
     }
-    util::Util::PrintFileReq(req);
 
     handler_proxy::HandlerProxy::FileOpHandle(req, &res);
 

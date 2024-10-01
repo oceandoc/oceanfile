@@ -83,6 +83,7 @@ cc_library(
     local_defines = LOCAL_DEFINES,
     deps = [
         ":scan_manager",
+        ":timer",
         ":util",
         "//src/proto:cc_config",
         "//src/proto:cc_data",
@@ -185,6 +186,12 @@ cc_library(
         "@oceandoc//bazel:tcmalloc": ["@tcmalloc//tcmalloc"],
         "//conditions:default": [],
     }),
+)
+
+cc_library(
+    name = "timer",
+    hdrs = ["timer.h"],
+    deps = [":util"],
 )
 
 cc_test(

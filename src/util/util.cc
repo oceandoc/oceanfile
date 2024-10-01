@@ -691,11 +691,11 @@ void Util::CalcPartitionStart(const int64_t size, const int32_t partition,
                               const int64_t partition_size, int64_t *start,
                               int64_t *end) {
   *start = partition * partition_size;
-  if (size - *start >= partition_size) {
-    *end = *start + partition_size - 1;
+  *end = *start + partition_size - 1;
+  if (*end > size) {
+    *end = size - 1;
     return;
   }
-  *end = size - 1;
 }
 
 string Util::ToUpper(const string &str) {
@@ -1086,6 +1086,7 @@ void Util::PrintFileReq(const proto::FileReq &req) {
             << ", size: " << req.size()
             << ", partition_num: " << req.partition_num()
             << ", repo_uuid: " << req.repo_uuid()
+            << ", partition_size: " << req.partition_size()
             << ", content size: " << req.content().size();
 }
 
@@ -1166,6 +1167,10 @@ bool Util::JsonToFileReq(const std::string &json, proto::FileReq *req) {
 
   if (doc.HasMember("partition_num") && doc["partition_num"].IsInt()) {
     req->set_partition_num(doc["partition_num"].GetInt());
+  }
+
+  if (doc.HasMember("partition_size") && doc["partition_size"].IsInt()) {
+    req->set_partition_size(doc["partition_size"].GetInt64());
   }
 
   if (doc.HasMember("repo_uuid") && doc["repo_uuid"].IsString()) {
