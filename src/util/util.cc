@@ -312,7 +312,8 @@ bool Util::Create(const string &path) {
     }
     CloseHandle(hFile);
 #else
-    int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0640);
+    // int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0640);
+    int fd = creat(path.c_str(), 0640);
     if (fd == -1) {
       LOG(ERROR) << "Create file error: " << path;
       return false;

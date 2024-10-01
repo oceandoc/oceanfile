@@ -137,12 +137,23 @@ TEST(Util, FileSize) {
 }
 
 TEST(Util, FileInfo) {
-  const auto& path = "test_data/util_test/never_modify";
+  std::string path = "test_data/util_test/never_modify";
   int64_t create_time = -1, update_time = -1, size = -1;
   EXPECT_EQ(Util::FileInfo(path, &create_time, &update_time, &size), true);
   EXPECT_EQ(create_time, 1727156828142);
   EXPECT_EQ(update_time, 1727156828142);
   EXPECT_EQ(size, 5);
+
+  path = "test_data/util_test/test_update_time";
+  EXPECT_EQ(Util::FileInfo(path, &create_time, &update_time, &size), true);
+  LOG(INFO) << "create_time: " << create_time
+            << ", update_time: " << update_time << ", size: " << size;
+  path = "test_data/util_test/test_update_time/test";
+  EXPECT_EQ(Util::Create(path), true);
+  path = "/root/src/oceandoc/oceanfile";
+  EXPECT_EQ(Util::FileInfo(path, &create_time, &update_time, &size), true);
+  LOG(INFO) << "create_time: " << create_time
+            << ", update_time: " << update_time << ", size: " << size;
 }
 
 TEST(Util, Path) {
@@ -583,7 +594,7 @@ TEST(Util, MessageToJson) {
     LOG(ERROR) << "Req to json error: " << serialized;
   }
   std::string result =
-      R"({"request_id":"","op":"FilePut","path":"tesxt","sha256":"abbc","size":50,"content":"dGVzdA==","partition_num":0,"repo_uuid":"/tmp/test_repo"})";
+      R"({"request_id":"","op":1,"path":"tesxt","sha256":"abbc","size":50,"content":"dGVzdA==","partition_num":0,"repo_uuid":"/tmp/test_repo","partition_size":0})";
   EXPECT_EQ(serialized, result);
 }
 
