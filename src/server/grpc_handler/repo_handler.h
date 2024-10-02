@@ -30,9 +30,9 @@ class RepoHandler : public async_grpc::RpcHandler<RepoOpMethod> {
     }
 
     if (!ret) {
-      res->set_err_code(proto::ErrCode::FAIL);
+      res->set_err_code(proto::ErrCode::Fail);
     } else {
-      res->set_err_code(proto::ErrCode::SUCCESS);
+      res->set_err_code(proto::ErrCode::Success);
     }
     res->set_repo_uuid(uuid);
     Send(std::move(res));

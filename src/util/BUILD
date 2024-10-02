@@ -116,6 +116,32 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "sync_manager",
+    srcs = ["sync_manager.cc"],
+    hdrs = ["sync_manager.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        ":double_buffer",
+        ":scan_manager",
+        ":thread_pool",
+        ":util",
+        "//src/common:defs",
+        "//src/proto:cc_data",
+        "@folly",
+    ],
+)
+
+cc_test(
+    name = "sync_manager_test",
+    srcs = ["sync_manager_test.cc"],
+    copts = COPTS,
+    data = ["//conf:base_config.json"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":sync_manager"],
+)
+
 cc_test(
     name = "scan_manager_test",
     srcs = ["scan_manager_test.cc"],

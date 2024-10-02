@@ -3,19 +3,19 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/util/repo_manager.h"
+#include "src/util/sync_manager.h"
 
 #include "gtest/gtest.h"
 
 namespace oceandoc {
 namespace util {
 
-TEST(RepoManager, SyncLocal) {
+TEST(SyncManager, SyncLocal) {
   ConfigManager::Instance()->Init("./conf/base_config.json");
   ThreadPool::Instance()->Init();
   std::string src("/zfs");
   std::string dst("/data");
-  // RepoManager::Instance()->SyncLocal(src, dst);
+  SyncManager::Instance()->SyncLocal(src, dst);
 }
 
 }  // namespace util

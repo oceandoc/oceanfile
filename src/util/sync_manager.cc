@@ -3,18 +3,16 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/swig/config_manager.h"
-
-#include "gtest/gtest.h"
+#include "src/util/sync_manager.h"
 
 namespace oceandoc {
-namespace swig {
+namespace util {
 
-TEST(ConfigManager, Init) {
-  ConfigManager config_manager;
-  EXPECT_TRUE(config_manager.Init("./conf/base_config.json"));
-  LOG(INFO) << config_manager.ToString();
+static folly::Singleton<SyncManager> sync_manager;
+
+std::shared_ptr<SyncManager> SyncManager::Instance() {
+  return sync_manager.try_get();
 }
 
-}  // namespace swig
+}  // namespace util
 }  // namespace oceandoc

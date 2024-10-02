@@ -16,6 +16,7 @@
 #include "google/protobuf/message.h"
 #include "openssl/types.h"
 #include "src/common/defs.h"
+#include "src/proto/error.pb.h"
 #include "src/proto/service.pb.h"
 
 namespace oceandoc {
@@ -57,7 +58,8 @@ class Util final {
   static bool MkParentDir(const std::filesystem::path &path);
   static bool Remove(std::string_view path);
   static bool Create(const std::string &path);
-  static bool CreateFileWithSize(const std::string &path, const int64_t size);
+  static proto::ErrCode CreateFileWithSize(const std::string &path,
+                                           const int64_t size);
   static bool CreateSymlink(std::string_view src, std::string_view target);
 
   static std::filesystem::path FindCommonRoot(
@@ -70,11 +72,12 @@ class Util final {
                            std::filesystem::copy_options::overwrite_existing);
   static bool Copy(std::string_view src, std::string_view dst);
   static bool TruncateFile(const std::filesystem::path &path);
-  static bool WriteToFile(const std::filesystem::path &path,
-                          const std::string &content,
-                          const bool append = false);
-  static bool WriteToFile(const std::filesystem::path &path,
-                          const std::string &content, const int64_t start);
+  static proto::ErrCode WriteToFile(const std::filesystem::path &path,
+                                    const std::string &content,
+                                    const bool append = false);
+  static proto::ErrCode WriteToFile(const std::filesystem::path &path,
+                                    const std::string &content,
+                                    const int64_t start);
   static bool LoadSmallFile(const std::string &path, std::string *content);
 
   static std::string PartitionUUID(std::string_view path);

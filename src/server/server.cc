@@ -13,7 +13,6 @@
 #include <signal.h>
 #endif
 
-#include "src/common/module.h"
 #include "src/server/grpc_server_impl.h"
 #include "src/server/http_server_impl.h"
 #include "src/server/server_context.h"
@@ -62,7 +61,6 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
   LOG(INFO) << "CommandLine: " << google::GetArgv();
 
-  oceandoc::common::InitAllModules(&argc, &argv);
   oceandoc::util::ConfigManager::Instance()->Init("./conf/base_config.json");
   oceandoc::util::ThreadPool::Instance()->Init();
   oceandoc::util::ScanManager::Instance()->Init();

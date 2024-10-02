@@ -37,7 +37,7 @@ class RepoClient {
           bool ret;
           if (!status.ok()) {
             ret = false;
-          } else if (res->err_code() == proto::SUCCESS) {
+          } else if (res->err_code() == proto::Success) {
             ret = true;
           } else {
             ret = false;

@@ -11,10 +11,8 @@ enum FileType {
 message FileItem {
   string path = 1;
   uint64 size = 2;
-  uint64 create_time = 3;  // local create time
   uint64 update_time = 4;  // local update time
   FileType file_type = 5;
-
   string owner = 6;
   uint64 remote_access_time = 7;  // remote access time
   string sha256 = 8;
@@ -31,26 +29,33 @@ message ScanStatus {
   uint64 symlink_num = 4;
   repeated string scanned_dirs = 5;
   repeated FileItem scanned_files = 6;
-  int64 create_time = 7;
   int64 update_time = 8;
   int64 complete_time = 9;
   map<string, bool> ignored_dirs = 10;
   string uuid = 11;
 }
 
-message Repo {
+message RepoMeta {
+  string name = 1;
+  string path = 2;
+  string uuid = 3;
+  string create_time = 4;
+  int64 update_time = 5;
+}
+
+message RepoData {
   string name = 1;
   string path = 2;
   string uuid = 3;
   uint64 file_num = 4;
-  uint64 dir_num = 5;
-  uint64 symlink_num = 6;
-  string create_time = 7;
-  int64 update_time = 8;
-  repeated FileItem files = 9;
+  repeated FileItem files = 5;
 }
 
 message Repos {
-  map<string, Repo> repos = 1;
-  map<string, Repo> uuid_repos = 2;
+  map<string, RepoMeta> repos = 1;
+  map<string, RepoMeta> uuid_repos = 2;
+}
+
+message RepoDatas {
+  map<string, RepoData> uuid_repos_data = 1;
 }

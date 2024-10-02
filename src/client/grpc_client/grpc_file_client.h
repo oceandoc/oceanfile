@@ -42,7 +42,7 @@ class FileClient
 
   void OnReadDone(bool ok) override {
     if (ok) {
-      if (res_.err_code() != proto::ErrCode::SUCCESS) {
+      if (res_.err_code() != proto::ErrCode::Success) {
         absl::base_internal::SpinLockHolder locker(&lock_);
         ++mark_[res_.partition_num()];
       } else {

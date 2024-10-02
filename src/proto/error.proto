@@ -3,7 +3,13 @@ syntax = "proto3";
 package oceandoc.proto;
 
 enum ErrCode {
-  SUCCESS = 0;
-  FAST_FAIL = 1;
-  FAIL = 2;
+  Success = 0;
+  Fail = 1;
+  Repo_not_exists = 2;
+  Repo_uuid_error = 3;
+  Permission = 4;
+  Disk_full = 5;
+  File_exists = 6;
+  File_size_set_error = 7;
+  Partition_size_check_error = 8;
 }

@@ -328,16 +328,24 @@ bool Util::Create(const string &path) {
   return true;
 }
 
-bool Util::CreateFileWithSize(const std::string &path, const int64_t size) {
+proto::ErrCode Util::CreateFileWithSize(const std::string &path,
+                                        const int64_t size) {
   if (std::filesystem::exists(std::filesystem::symlink_status(path))) {
-    return true;
+    return proto::ErrCode::Success;
   }
+
 #if defined(_WIN32)
   HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 
   if (hFile == INVALID_HANDLE_VALUE) {
-    return false;
+    DWORD errorCode = GetLastError();
+    if (errorCode == ERROR_ACCESS_DENIED) {
+      return proto::ErrCode::Permission;
+    } else if (errorCode == ERROR_DISK_FULL) {
+      return proto::ErrCode::Disk_full;
+    }
+    return proto::ErrCode::Fail;
   }
 
   LARGE_INTEGER liSize;
@@ -346,25 +354,28 @@ bool Util::CreateFileWithSize(const std::string &path, const int64_t size) {
   if (!SetFilePointerEx(hFile, liSize, nullptr, FILE_BEGIN) ||
       !SetEndOfFile(hFile)) {
     CloseHandle(hFile);
-    return false;
+    return proto::ErrCode::Fail;
   }
 
   CloseHandle(hFile);
 #else
   int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
   if (fd == -1) {
-    LOG(ERROR) << "Open file error: " << path;
-    return false;
+    if (errno == EACCES) {
+      return proto::ErrCode::Permission;
+    } else if (errno == ENOSPC) {
+      return proto::ErrCode::Disk_full;
+    }
+    return proto::ErrCode::Fail;
   }
 
   if (ftruncate(fd, size) == -1) {
-    LOG(ERROR) << "Truncate size error: " << path;
     close(fd);
-    return false;
+    return proto::ErrCode::File_size_set_error;
   }
   close(fd);
 #endif
-  return true;
+  return proto::ErrCode::Success;
 }
 
 bool Util::CreateSymlink(std::string_view src, std::string_view target) {
@@ -460,8 +471,8 @@ bool Util::TruncateFile(const std::filesystem::path &path) {
   return true;
 }
 
-bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
-                       const bool append) {
+proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
+                                 const string &content, const bool append) {
   try {
     if (!std::filesystem::exists(path)) {
       if (path.has_parent_path()) {
@@ -473,35 +484,52 @@ bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
     if (ofs && ofs.is_open()) {
       ofs << content;
       ofs.close();
-      return true;
+      return proto::ErrCode::Success;
+    } else {
+      if (errno == EACCES) {
+        return proto::ErrCode::Permission;
+      } else if (errno == ENOSPC) {
+        return proto::ErrCode::Disk_full;
+      }
+      return proto::ErrCode::Fail;
     }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << (!append ? "Write to " : "Append to ") << path.string()
                << ", error: " << e.what();
   }
-  return false;
+  return proto::ErrCode::Fail;
 }
 
-bool Util::WriteToFile(const std::filesystem::path &path, const string &content,
-                       const int64_t start) {
+proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
+                                 const string &content, const int64_t start) {
   try {
     std::ofstream ofs(path, std::ios::binary | std::ios::out | std::ios::in);
     if (ofs && ofs.is_open()) {
       ofs.seekp(start);
       if (ofs.fail()) {
-        return false;
+        if (errno == EACCES) {
+          return proto::ErrCode::Permission;
+        } else if (errno == ENOSPC) {
+          return proto::ErrCode::Disk_full;
+        }
+        return proto::ErrCode::Fail;
       }
       ofs.write(content.data(), content.size());
       if (ofs.fail()) {
-        return false;
+        if (errno == EACCES) {
+          return proto::ErrCode::Permission;
+        } else if (errno == ENOSPC) {
+          return proto::ErrCode::Disk_full;
+        }
+        return proto::ErrCode::Fail;
       }
       ofs.close();
-      return true;
+      return proto::ErrCode::Success;
     }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << "Write to " << path << ", error: " << e.what();
   }
-  return false;
+  return proto::ErrCode::Fail;
 }
 
 bool Util::LoadSmallFile(const std::string &path, string *content) {

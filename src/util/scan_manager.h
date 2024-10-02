@@ -174,7 +174,6 @@ class ScanManager {
     if (!Util::FileInfo(path, &create_time, &update_time, &size)) {
       return false;
     }
-    file_item->set_create_time(create_time);
     file_item->set_update_time(update_time);
     file_item->set_size(size);
     file_item->set_file_type(type);
@@ -198,7 +197,6 @@ class ScanManager {
       return false;
     }
 
-    file_item->set_create_time(create_time);
     file_item->set_update_time(update_time);
     file_item->set_size(size);
     file_item->set_file_type(type);

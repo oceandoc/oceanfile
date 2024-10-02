@@ -16,7 +16,7 @@ namespace handler_proxy {
 class HandlerProxy {
  public:
   static void FileOpFailResponse(proto::FileRes* res) {
-    res->set_err_code(proto::ErrCode::FAIL);
+    res->set_err_code(proto::ErrCode::Fail);
   }
 
   static void FileOpHandle(const proto::FileReq& req, proto::FileRes* res) {
@@ -41,9 +41,9 @@ class HandlerProxy {
     if (!ret) {
       LOG(INFO) << "Store file error: " << req.sha256()
                 << ", part: " << req.partition_num();
-      res->set_err_code(proto::ErrCode::FAIL);
+      res->set_err_code(proto::ErrCode::Fail);
     } else {
-      res->set_err_code(proto::ErrCode::SUCCESS);
+      res->set_err_code(proto::ErrCode::Success);
     }
     res->set_path(req.path());
     res->set_sha256(req.sha256());
