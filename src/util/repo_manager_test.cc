@@ -10,12 +10,10 @@
 namespace oceandoc {
 namespace util {
 
-TEST(RepoManager, SyncLocal) {
-  ConfigManager::Instance()->Init("./conf/base_config.json");
-  ThreadPool::Instance()->Init();
-  std::string src("/zfs");
-  std::string dst("/data");
-  // RepoManager::Instance()->SyncLocal(src, dst);
+TEST(RepoManager, CreateRepo) {
+  std::string path("/tmp");
+  std::string uuid;
+  RepoManager::Instance()->CreateRepo(path, &uuid);
 }
 
 }  // namespace util

@@ -14,12 +14,16 @@ message FileItem {
   uint64 update_time = 4;  // local update time
   FileType file_type = 5;
   string owner = 6;
-  uint64 remote_access_time = 7;  // remote access time
   string sha256 = 8;
-  string enc_sha256 = 9;
-  // remote file permiss, 1bit: need auth, 2bit: group, 3bit: all
-  uint32 permission = 10;
-  bool sync_finished = 11;
+  string encrypted_sha256 = 9;
+  uint32 permission = 10;  // 1bit: need auth, 2bit: group, 3bit: all
+}
+
+message DirItem {
+  string path = 1;
+  uint64 update_time = 4;  // local update time
+  string owner = 6;
+  uint32 permission = 10;  // 1bit: need auth, 2bit: group, 3bit: all
 }
 
 message ScanStatus {
@@ -27,7 +31,7 @@ message ScanStatus {
   uint64 file_num = 2;
   uint64 dir_num = 3;
   uint64 symlink_num = 4;
-  repeated string scanned_dirs = 5;
+  repeated DirItem scanned_dirs = 5;
   repeated FileItem scanned_files = 6;
   int64 update_time = 8;
   int64 complete_time = 9;
@@ -49,6 +53,7 @@ message RepoData {
   string uuid = 3;
   uint64 file_num = 4;
   repeated FileItem files = 5;
+  repeated DirItem dirs = 6;
 }
 
 message Repos {

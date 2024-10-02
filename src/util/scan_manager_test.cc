@@ -39,35 +39,26 @@ TEST(ScanManager, SymlinkCharacter) {
   LOG(INFO) << path << " size: " << Util::FileSize(path.string());
 }
 
-TEST(ScanManager, Scan) {
-  // std::string path = "/usr";
-  std::string path = "/usr/local/llvm";
-  proto::ScanStatus scan_status;
-  std::unordered_set<std::string> scanned_dirs;
-  scan_status.mutable_ignored_dirs()->insert({common::CONFIG_DIR, true});
-  ScanManager::Instance()->Scan(path, &scan_status, &scanned_dirs, false);
-  ScanManager::Instance()->Print(scan_status);
-}
-
 TEST(ScanManager, ParallelScan) {
   ConfigManager::Instance()->Init("./conf/base_config.json");
   ThreadPool::Instance()->Init();
   // std::string path = "/usr";
   std::string path = "/usr/local/llvm";
   proto::ScanStatus scan_status;
-  std::unordered_set<std::string> scanned_dirs;
+  std::unordered_map<std::string, int64_t> scanned_dirs;
+  std::unordered_map<std::string, proto::FileItem> scanned_files;
   scan_status.mutable_ignored_dirs()->insert({common::CONFIG_DIR, true});
   ScanManager::Instance()->ParallelScan(path, &scan_status, &scanned_dirs,
-                                        false);
+                                        &scanned_files, true, false);
   ScanManager::Instance()->Print(scan_status);
 }
 
-TEST(ScanManager, ValidateCachedStatusFile) {
-  std::string path = "/usr/local/llvm";
-  proto::ScanStatus scan_status;
-  std::unordered_set<std::string> scanned_dirs;
-  ScanManager::Instance()->ValidateCachedStatusFile(path);
-}
+// TEST(ScanManager, ValidateCachedStatusFile) {
+// std::string path = "/usr/local/llvm";
+// proto::ScanStatus scan_status;
+// std::unordered_set<std::string> scanned_dirs;
+// ScanManager::Instance()->ValidateCachedStatusFile(path);
+//}
 
 }  // namespace util
 }  // namespace oceandoc

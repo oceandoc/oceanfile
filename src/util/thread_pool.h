@@ -12,6 +12,7 @@
 
 #include "boost/asio/post.hpp"
 #include "boost/asio/thread_pool.hpp"
+#include "src/proto/error.pb.h"
 #include "src/util/config_manager.h"
 
 namespace oceandoc {
@@ -48,19 +49,20 @@ class ThreadPool final {
     }
   }
 
-  bool Post(std::packaged_task<bool()>& task) {
+  void Post(std::packaged_task<bool()>& task) {
     boost::asio::post(*pool_.get(), std::move(task));
-    return true;
   }
 
-  bool Post(std::function<void()> task) {
+  void Post(std::packaged_task<proto::ErrCode()>& task) {
     boost::asio::post(*pool_.get(), std::move(task));
-    return true;
   }
 
-  bool Post(std::packaged_task<int()>& task) {
+  void Post(std::function<void()> task) {
     boost::asio::post(*pool_.get(), std::move(task));
-    return true;
+  }
+
+  void Post(std::packaged_task<int()>& task) {
+    boost::asio::post(*pool_.get(), std::move(task));
   }
 
  private:

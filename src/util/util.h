@@ -186,6 +186,8 @@ class Util final {
   static bool SHA256(std::string_view str, std::string *out,
                      bool use_upper_case = false);
 
+  static std::string SHA256(std::string_view str, bool use_upper_case = false);
+
   static bool SHA256_libsodium(std::string_view str, std::string *out,
                                bool use_upper_case = false);
 

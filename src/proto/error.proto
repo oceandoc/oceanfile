@@ -5,11 +5,29 @@ package oceandoc.proto;
 enum ErrCode {
   Success = 0;
   Fail = 1;
-  Repo_not_exists = 2;
-  Repo_uuid_error = 3;
-  Permission = 4;
-  Disk_full = 5;
-  File_exists = 6;
-  File_size_set_error = 7;
-  Partition_size_check_error = 8;
+
+  // 10000
+  Path_not_absolute = 10000;
+  Path_dst_is_src_subdir = 10001;
+  Path_not_exists = 10002;
+  Path_exists = 10003;
+  Path_not_dir = 10004;
+
+  // 11000
+  File_size_set_error = 11000;
+  File_permission = 11001;
+  File_disk_full = 11002;
+  File_partition_size_error = 11003;
+  File_permission_or_not_exists = 11004;
+
+  // 12000
+  Scan_error = 12001;
+  Scan_busy = 12002;
+  Scan_set_running_error = 12003;
+  Scan_interrupted = 12004;
+  Scan_dump_error = 12005;
+
+  // 13000
+  Repo_not_exists = 13000;
+  Repo_uuid_error = 13001;
 }

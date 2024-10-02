@@ -258,7 +258,7 @@ class RepoManager {
       LOG(ERROR) << "Calc size error, partition_num: " << partition_num
                  << ", start: " << start << ", end: " << end
                  << ", content size: " << content.size();
-      return proto::ErrCode::Partition_size_check_error;
+      return proto::ErrCode::File_partition_size_error;
     }
     LOG(INFO) << "Now store file " << repo_file_path
               << ", part: " << partition_num;

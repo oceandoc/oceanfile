@@ -362,9 +362,9 @@ proto::ErrCode Util::CreateFileWithSize(const std::string &path,
   int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
   if (fd == -1) {
     if (errno == EACCES) {
-      return proto::ErrCode::Permission;
+      return proto::ErrCode::File_permission;
     } else if (errno == ENOSPC) {
-      return proto::ErrCode::Disk_full;
+      return proto::ErrCode::File_disk_full;
     }
     return proto::ErrCode::Fail;
   }
@@ -487,9 +487,9 @@ proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
       return proto::ErrCode::Success;
     } else {
       if (errno == EACCES) {
-        return proto::ErrCode::Permission;
+        return proto::ErrCode::File_permission;
       } else if (errno == ENOSPC) {
-        return proto::ErrCode::Disk_full;
+        return proto::ErrCode::File_disk_full;
       }
       return proto::ErrCode::Fail;
     }
@@ -508,18 +508,18 @@ proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
       ofs.seekp(start);
       if (ofs.fail()) {
         if (errno == EACCES) {
-          return proto::ErrCode::Permission;
+          return proto::ErrCode::File_permission;
         } else if (errno == ENOSPC) {
-          return proto::ErrCode::Disk_full;
+          return proto::ErrCode::File_disk_full;
         }
         return proto::ErrCode::Fail;
       }
       ofs.write(content.data(), content.size());
       if (ofs.fail()) {
         if (errno == EACCES) {
-          return proto::ErrCode::Permission;
+          return proto::ErrCode::File_permission;
         } else if (errno == ENOSPC) {
-          return proto::ErrCode::Disk_full;
+          return proto::ErrCode::File_disk_full;
         }
         return proto::ErrCode::Fail;
       }
@@ -993,6 +993,12 @@ bool Util::FileMD5(const std::string &path, string *out, bool use_upper_case) {
 
 bool Util::SHA256(string_view str, string *out, bool use_upper_case) {
   return Hash(str, EVP_sha256(), out, use_upper_case);
+}
+
+string Util::SHA256(string_view str, bool use_upper_case) {
+  string out;
+  Hash(str, EVP_sha256(), &out, use_upper_case);
+  return out;
 }
 
 bool Util::SHA256_libsodium(string_view str, string *out, bool use_upper_case) {
