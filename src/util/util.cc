@@ -42,7 +42,9 @@
 #include "src/util/util_windows.h"
 #elif defined(__linux__)
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <utime.h>
 
 #include "src/util/util_linux.h"
 #elif defined(__APPLE__)
@@ -107,6 +109,13 @@ string Util::ToTimeStr(const int64_t ts, string_view format, string_view tz) {
   absl::TimeZone time_zone;
   absl::LoadTimeZone(tz, &time_zone);
   return absl::FormatTime(format, absl::FromUnixMillis(ts), time_zone);
+}
+
+struct timespec Util::ToTimeSpec(const int64_t ts) {
+  struct timespec time;
+  time.tv_sec = ts / 1000;
+  time.tv_nsec = (ts % 1000) * 1000000;
+  return time;
 }
 
 int64_t Util::Random(int64_t start, int64_t end) {
@@ -199,8 +208,8 @@ int64_t Util::FileSize(const std::string &path) {
   return -1;
 }
 
-bool Util::FileInfo(const std::string &path, int64_t *create_time,
-                    int64_t *update_time, int64_t *size) {
+bool Util::FileInfo(const std::string &path, int64_t *update_time,
+                    int64_t *size) {
 #if defined(_WIN32)
   WIN32_FILE_ATTRIBUTE_DATA fileInfo;
   if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
@@ -223,11 +232,8 @@ bool Util::FileInfo(const std::string &path, int64_t *create_time,
   if (lstat(path.c_str(), &attr) == 0) {
     *size = attr.st_size;
 #ifdef __linux__
-    *create_time = attr.st_ctim.tv_sec * 1000 + attr.st_ctim.tv_nsec / 1000000;
     *update_time = attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
 #elif __APPLE__
-    *create_time =
-        attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
     *update_time = attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
 #endif
     return true;
@@ -326,6 +332,17 @@ bool Util::Create(const string &path) {
     return false;
   }
   return true;
+}
+
+bool Util::Rename(const std::string &src, const std::string &dst) {
+  if (!std::filesystem::exists(src)) {
+    return false;
+  }
+  try {
+    std::filesystem::rename(src, dst);
+  } catch (const std::filesystem::filesystem_error &e) {
+  }
+  return false;
 }
 
 proto::ErrCode Util::CreateFileWithSize(const std::string &path,
@@ -439,6 +456,41 @@ bool Util::CopyFile(string_view src, string_view dst,
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << "CopyFile error: " << src << " to " << dst << ", "
                << e.what();
+  }
+  return false;
+}
+
+bool Util::SetUpdateTime(const string &path, int64_t ts) {
+  try {
+#if defined(_WIN32)
+    HANDLE hFile = CreateFileA(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (hFile == INVALID_HANDLE_VALUE) {
+      std::cerr << "Failed to open file.\n";
+      return false;
+    }
+
+    if (!SetFileTime(hFile, NULL, NULL, &newTime)) {
+      std::cerr << "Failed to set file time.\n";
+      CloseHandle(hFile);
+      return false;
+    }
+
+    CloseHandle(hFile);
+#else
+    struct timespec times[2];
+    struct timespec time = ToTimeSpec(ts);
+    times[0] = time;
+    times[1] = time;
+
+    if (utimensat(AT_FDCWD, path.c_str(), times, 0) != 0) {
+      return false;
+    }
+
+#endif
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "SetUpdateTime error: " << path << ", " << e.what();
   }
   return false;
 }

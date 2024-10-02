@@ -64,7 +64,8 @@ class SyncManager {
     std::unordered_set<std::string> copy_failed_files;
     std::unordered_map<std::string, int64_t> scanned_dirs;
     std::unordered_map<std::string, proto::FileItem> scanned_files;
-    scan_status.mutable_ignored_dirs()->insert({common::CONFIG_DIR, true});
+    // scan_status.mutable_ignored_dirs()->insert(
+    // {unify_src + "/" + common::CONFIG_DIR, true});
 
     auto ret = ScanManager::Instance()->ParallelScan(
         unify_src, &scan_status, &scanned_dirs, &scanned_files, calc_hash,

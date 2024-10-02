@@ -38,6 +38,7 @@ class Util final {
   static std::string ToTimeStr(const int64_t ts, std::string_view format);
   static std::string ToTimeStr(const int64_t ts, std::string_view format,
                                std::string_view tz);
+  static struct timespec ToTimeSpec(const int64_t ts);
 
   static int64_t Random(int64_t start, int64_t end);
 
@@ -51,13 +52,15 @@ class Util final {
   static int64_t CreateTime(const std::string &path);
   static int64_t UpdateTime(const std::string &path);
   static int64_t FileSize(const std::string &path);
-  static bool FileInfo(const std::string &path, int64_t *create_time,
-                       int64_t *update_time, int64_t *size);
+  static bool FileInfo(const std::string &path, int64_t *update_time,
+                       int64_t *size);
   static bool Exists(std::string_view path);
   static bool Mkdir(std::string_view path);
   static bool MkParentDir(const std::filesystem::path &path);
   static bool Remove(std::string_view path);
   static bool Create(const std::string &path);
+  static bool SetUpdateTime(const std::string &path, int64_t ts);
+  static bool Rename(const std::string &src, const std::string &dst);
   static proto::ErrCode CreateFileWithSize(const std::string &path,
                                            const int64_t size);
   static bool CreateSymlink(std::string_view src, std::string_view target);

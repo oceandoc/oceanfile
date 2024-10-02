@@ -7,7 +7,6 @@
 
 #include <filesystem>
 #include <functional>
-#include <iomanip>
 #include <thread>
 
 #include "glog/logging.h"
@@ -138,22 +137,19 @@ TEST(Util, FileSize) {
 
 TEST(Util, FileInfo) {
   std::string path = "test_data/util_test/never_modify";
-  int64_t create_time = -1, update_time = -1, size = -1;
-  EXPECT_EQ(Util::FileInfo(path, &create_time, &update_time, &size), true);
-  EXPECT_EQ(create_time, 1727156828142);
+  int64_t update_time = -1, size = -1;
+  EXPECT_EQ(Util::FileInfo(path, &update_time, &size), true);
   EXPECT_EQ(update_time, 1727156828142);
   EXPECT_EQ(size, 5);
 
   path = "test_data/util_test/test_update_time";
-  EXPECT_EQ(Util::FileInfo(path, &create_time, &update_time, &size), true);
-  LOG(INFO) << "create_time: " << create_time
-            << ", update_time: " << update_time << ", size: " << size;
+  EXPECT_EQ(Util::FileInfo(path, &update_time, &size), true);
+  LOG(INFO) << ", update_time: " << update_time << ", size: " << size;
   path = "test_data/util_test/test_update_time/test";
   EXPECT_EQ(Util::Create(path), true);
   path = "/root/src/oceandoc/oceanfile";
-  EXPECT_EQ(Util::FileInfo(path, &create_time, &update_time, &size), true);
-  LOG(INFO) << "create_time: " << create_time
-            << ", update_time: " << update_time << ", size: " << size;
+  EXPECT_EQ(Util::FileInfo(path, &update_time, &size), true);
+  LOG(INFO) << ", update_time: " << update_time << ", size: " << size;
 }
 
 TEST(Util, Path) {
