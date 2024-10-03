@@ -74,12 +74,6 @@ class SyncManager {
       return proto::ErrCode::Scan_error;
     }
 
-    bool stop_dump_task = false;
-    auto dump_task = std::bind(
-        &ScanManager::DumpTask, ScanManager::Instance().get(), &stop_dump_task,
-        unify_src, &scan_status, &dirs_uptime, &scanned_dirs);
-    ThreadPool::Instance()->Post(dump_task);
-
     bool success = true;
     std::vector<std::future<bool>> rets;
     for (int i = 0; i < max_threads; ++i) {
@@ -95,7 +89,6 @@ class SyncManager {
       }
     }
 
-    stop_dump_task = true;
     ScanManager::Instance()->Print(scan_status);
     ScanManager::Instance()->Dump(unify_src, &scan_status, dirs_uptime,
                                   scanned_dirs);
@@ -119,19 +112,44 @@ class SyncManager {
       std::string relative_path;
       Util::Relative(status->scanned_files(i).path(), src, &relative_path);
       auto dst_path = std::filesystem::path(dst + "/" + relative_path);
+
+      auto update_time = Util::UpdateTime(dst_path.string());
+      if (update_time == status->scanned_files(i).update_time()) {
+        continue;
+      }
+
       Util::MkParentDir(dst_path);
       bool ret = true;
       if (status->scanned_files(i).file_type() == proto::Symlink) {
         ret = Util::SyncSymlink(src, dst, status->scanned_files(i).path());
+        if (!ret) {
+          LOG(ERROR) << "Sync symlink error: "
+                     << status->scanned_files(i).path();
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          copy_failed_files->insert(status->scanned_files(i).path());
+          success = false;
+          continue;
+        }
       } else {
         ret = Util::CopyFile(status->scanned_files(i).path(), dst_path.string(),
                              std::filesystem::copy_options::overwrite_existing);
-      }
-      if (!ret) {
-        LOG(ERROR) << "Sync error: " << status->scanned_files(i).path();
-        absl::base_internal::SpinLockHolder locker(&lock_);
-        copy_failed_files->insert(status->scanned_files(i).path());
-        success = false;
+
+        if (!ret) {
+          LOG(ERROR) << "Sync error: " << status->scanned_files(i).path();
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          copy_failed_files->insert(status->scanned_files(i).path());
+          success = false;
+          continue;
+        }
+
+        ret = Util::SetUpdateTime(dst_path.string(),
+                                  status->scanned_files(i).update_time());
+        if (!ret) {
+          LOG(ERROR) << "Set update_tim error: " << dst_path.string();
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          copy_failed_files->insert(status->scanned_files(i).path());
+          success = false;
+        }
       }
     }
 

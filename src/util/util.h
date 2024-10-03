@@ -55,6 +55,7 @@ class Util final {
   static bool FileInfo(const std::string &path, int64_t *update_time,
                        int64_t *size);
   static bool Exists(std::string_view path);
+  static bool TargetExists(std::string_view src, std::string_view dst);
   static bool Mkdir(std::string_view path);
   static bool MkParentDir(const std::filesystem::path &path);
   static bool Remove(std::string_view path);

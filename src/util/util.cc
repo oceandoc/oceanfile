@@ -220,7 +220,7 @@ bool Util::FileInfo(const std::string &path, int64_t *update_time,
 
     ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
     ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
-    *upadte_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+    *update_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
 
     ull.LowPart = fileInfo.nFileSizeLow;
     ull.HighPart = fileInfo.nFileSizeHigh;
@@ -246,6 +246,16 @@ bool Util::Exists(string_view path) {
   return std::filesystem::exists(std::filesystem::symlink_status(path));
 }
 
+bool Util::TargetExists(string_view src, string_view dst) {
+  if (!std::filesystem::exists(src)) {
+    return true;
+  }
+  if (!std::filesystem::exists(dst)) {
+    return false;
+  }
+  return true;
+}
+
 bool Util::Mkdir(string_view path) {
   try {
     if (!Exists(path)) {
@@ -260,13 +270,10 @@ bool Util::Mkdir(string_view path) {
 
 bool Util::MkParentDir(const std::filesystem::path &path) {
   try {
-    if (path.has_parent_path() && Exists(path.parent_path().string())) {
-      return true;
+    if (!path.has_parent_path()) {
+      return false;
     }
-
-    if (path.has_parent_path()) {
-      return Mkdir(path.parent_path().string());
-    }
+    return Mkdir(path.parent_path().string());
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << "Error: " << path.string() << ", e: " << e.what();
     return false;
@@ -659,20 +666,9 @@ bool Util::SyncSymlink(const std::string &src, const std::string &dst,
     Util::MkParentDir(dst_symlink);
     Util::Remove(dst_symlink);
     std::filesystem::create_symlink(target, dst_symlink);
-
-    // std::string target_relative_path =
-    // std::filesystem::relative(src_symlink, src);
-    // if (!target_relative_path.empty()) {
-    // auto src_target_path = src + "/" + target_relative_path;
-    // auto dst_target_path = dst + "/" + target_relative_path;
-    // if (std::filesystem::is_regular_file(src_target_path)) {
-    // if (!Exists(dst_target_path)) {
-    // CopyFile(src_target_path, dst_target_path);
-    // }
-    // } else {
-    // }
-    // }
-
+    if (!Util::TargetExists(src_symlink, dst_symlink)) {
+      LOG(INFO) << "dst_symlink target not exists";
+    }
     return true;
   } catch (std::filesystem::filesystem_error &e) {
     LOG(ERROR) << e.what();

@@ -272,8 +272,11 @@ class ScanManager {
                            DirMap* scanned_dirs, const bool calc_hash) {
     proto::ErrCode ret = proto::ErrCode::Success;
     try {
+      std::set<std::string> files;
+      std::set<std::string> dirs;
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
         if (entry.is_symlink()) {
+          files.insert(entry.path().string());
           auto ret = AddFileItemWithLock(entry.path().string(),
                                          proto::FileType::Symlink, scanned_dirs,
                                          calc_hash);
@@ -281,6 +284,7 @@ class ScanManager {
             return ret;
           }
         } else if (entry.is_regular_file()) {
+          files.insert(entry.path().string());
           auto ret = AddFileItemWithLock(entry.path().string(),
                                          proto::FileType::Regular, scanned_dirs,
                                          calc_hash);
@@ -288,6 +292,7 @@ class ScanManager {
             return ret;
           }
         } else if (entry.is_directory()) {
+          files.insert(entry.path().string());
           {
             absl::base_internal::SpinLockHolder locker(&lock_);
             if (dirs_uptime->find(entry.path().string()) !=
@@ -310,7 +315,18 @@ class ScanManager {
       LOG(ERROR) << "Scan " << path << " error: " << e.what();
       return proto::ErrCode::Fail;
     }
-    return ret;
+
+    if (ret != proto::ErrCode::Success) {
+      return ret;
+    }
+
+    auto it = scanned_dirs->find(path);
+    if (it == scanned_dirs->end()) {
+      LOG(ERROR) << "This should never happen";
+    }
+    auto& dir_map = it->second;
+    for (auto it = dir_map.begin(); it != dir_map.end()) {
+    }
   }
 
   proto::ErrCode ParallelScanWithCache(const int32_t thread_no,
