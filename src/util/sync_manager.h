@@ -8,7 +8,6 @@
 
 #include <filesystem>
 #include <memory>
-#include <unordered_map>
 
 #include "absl/base/internal/spinlock.h"
 #include "folly/Singleton.h"
@@ -62,13 +61,13 @@ class SyncManager {
 
     proto::ScanStatus scan_status;
     std::unordered_set<std::string> copy_failed_files;
-    std::unordered_map<std::string, int64_t> scanned_dirs;
-    std::unordered_map<std::string, proto::FileItem> scanned_files;
+    DirUpTimeMap dirs_uptime;
+    DirMap scanned_dirs;
     // scan_status.mutable_ignored_dirs()->insert(
     // {unify_src + "/" + common::CONFIG_DIR, true});
 
     auto ret = ScanManager::Instance()->ParallelScan(
-        unify_src, &scan_status, &scanned_dirs, &scanned_files, calc_hash,
+        unify_src, &scan_status, &dirs_uptime, &scanned_dirs, calc_hash,
         disable_scan_cache);
     if (!ret) {
       LOG(ERROR) << "Scan " << src << " error";
@@ -78,7 +77,7 @@ class SyncManager {
     bool stop_dump_task = false;
     auto dump_task = std::bind(
         &ScanManager::DumpTask, ScanManager::Instance().get(), &stop_dump_task,
-        unify_src, &scan_status, &scanned_dirs, &scanned_files);
+        unify_src, &scan_status, &dirs_uptime, &scanned_dirs);
     ThreadPool::Instance()->Post(dump_task);
 
     bool success = true;
@@ -98,8 +97,8 @@ class SyncManager {
 
     stop_dump_task = true;
     ScanManager::Instance()->Print(scan_status);
-    ScanManager::Instance()->Dump(unify_src, &scan_status, scanned_dirs,
-                                  scanned_files);
+    ScanManager::Instance()->Dump(unify_src, &scan_status, dirs_uptime,
+                                  scanned_dirs);
     SyncStatusDir(unify_src, unify_dst);
 
     for (const auto& file : copy_failed_files) {

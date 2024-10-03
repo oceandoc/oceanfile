@@ -14,16 +14,16 @@ message FileItem {
   uint64 update_time = 4;  // local update time
   FileType file_type = 5;
   string owner = 6;
-  string sha256 = 8;
-  string encrypted_sha256 = 9;
-  uint32 permission = 10;  // 1bit: need auth, 2bit: group, 3bit: all
+  string sha256 = 7;
+  string encrypted_sha256 = 8;
+  uint32 permission = 9;  // 1bit: need auth, 2bit: group, 3bit: all
 }
 
 message DirItem {
   string path = 1;
-  uint64 update_time = 4;  // local update time
-  string owner = 6;
-  uint32 permission = 10;  // 1bit: need auth, 2bit: group, 3bit: all
+  uint64 update_time = 2;  // local update time
+  string owner = 3;
+  uint32 permission = 4;  // 1bit: need auth, 2bit: group, 3bit: all
 }
 
 message ScanStatus {
@@ -33,10 +33,10 @@ message ScanStatus {
   uint64 symlink_num = 4;
   repeated DirItem scanned_dirs = 5;
   repeated FileItem scanned_files = 6;
-  int64 update_time = 8;
-  int64 complete_time = 9;
-  map<string, bool> ignored_dirs = 10;
-  string uuid = 11;
+  int64 update_time = 7;
+  int64 complete_time = 8;
+  map<string, bool> ignored_dirs = 9;
+  string uuid = 10;
 }
 
 message RepoMeta {

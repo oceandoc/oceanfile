@@ -45,11 +45,11 @@ TEST(ScanManager, ParallelScan) {
   // std::string path = "/usr";
   std::string path = "/usr/local/llvm";
   proto::ScanStatus scan_status;
-  std::unordered_map<std::string, int64_t> scanned_dirs;
-  std::unordered_map<std::string, proto::FileItem> scanned_files;
+  DirUpTimeMap dirs_uptime;
+  DirMap scanned_dirs;
   scan_status.mutable_ignored_dirs()->insert({common::CONFIG_DIR, true});
-  ScanManager::Instance()->ParallelScan(path, &scan_status, &scanned_dirs,
-                                        &scanned_files, true, false);
+  ScanManager::Instance()->ParallelScan(path, &scan_status, &dirs_uptime,
+                                        &scanned_dirs, true, false);
   ScanManager::Instance()->Print(scan_status);
 }
 
