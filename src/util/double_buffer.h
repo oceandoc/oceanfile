@@ -6,6 +6,8 @@
 #ifndef BAZEL_TEMPLATE_UTIL_DOUBLE_BUFFER_H
 #define BAZEL_TEMPLATE_UTIL_DOUBLE_BUFFER_H
 
+#include <string>
+
 #include "absl/base/internal/spinlock.h"
 #include "glog/logging.h"
 #include "src/util/util.h"
@@ -24,11 +26,6 @@ class DoubleBuffer {
       holder_[pos_].emplace_back(item);
     }
   }
-
-  // T& Hold() {
-  // absl::base_internal::SpinLockHolder locker(&lock_);
-  // return holder_[pos_];
-  // }
 
   bool Dump(const std::string& path) {
     Swap();

@@ -15,6 +15,7 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <utility>
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -28,7 +29,7 @@
 #include "fmt/core.h"
 #include "glog/logging.h"
 #include "google/protobuf/json/json.h"
-#include "lzma.h"
+#include "lzma.h"  // NOLINT
 #include "openssl/evp.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"

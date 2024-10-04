@@ -5,10 +5,15 @@
 
 #include "src/util/thread_pool.h"
 
+#include <chrono>
+
 #include "gtest/gtest.h"
 
 namespace oceandoc {
 namespace util {
+
+std::mutex mu;
+std::condition_variable cond_var;
 
 TEST(ThreadPool, Lambda) {
   ConfigManager::Instance()->Init("./conf/base_config.json");
@@ -25,12 +30,14 @@ TEST(ThreadPool, Lambda) {
 }
 
 // must use point
-int TestFunc(const bool* const stop) {
-  absl::Mutex mtx;
+int TestFunc(const bool* stop) {
   int cnt = 0;
   while (!*stop) {
-    absl::MutexLock lock(&mtx);
-    mtx.AwaitWithTimeout(absl::Condition(stop), absl::Seconds(2));
+    std::unique_lock<std::mutex> lock(mu);
+    if (cond_var.wait_for(lock, std::chrono::seconds(2),
+                          [stop] { return *stop; })) {
+      break;
+    }
     LOG(INFO) << "cnt: " << cnt;
     ++cnt;
   }
@@ -48,6 +55,7 @@ TEST(ThreadPool, Ref) {
   ThreadPool::Instance()->Post(task);
   Util::Sleep(8 * 1000);
   stop = true;
+  cond_var.notify_all();
   auto cnt = result.get();
   LOG(INFO) << cnt;
 

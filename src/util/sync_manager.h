@@ -8,6 +8,8 @@
 
 #include <filesystem>
 #include <memory>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "absl/base/internal/spinlock.h"

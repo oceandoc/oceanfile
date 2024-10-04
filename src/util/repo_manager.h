@@ -43,20 +43,10 @@ class RepoManager {
       repos_.mutable_uuid_repos()->insert({p.second.uuid(), p.second});
     }
 
-    CheckRepos();
     return true;
   }
 
-  // TODO
-  bool CheckRepos() {
-    for (const auto& p : repos_.repos()) {
-      if (!Util::Exists(p.second.path())) {
-      }
-    }
-    return true;
-  }
-
-  // TODO: copy to a tmp file first
+  // TODO(xiedeacc): copy to a tmp file first
   bool FlushReposConfig() {
     std::string content;
     {

@@ -9,6 +9,7 @@
 #include <functional>
 #include <future>
 #include <memory>
+#include <utility>
 
 #include "boost/asio/post.hpp"
 #include "boost/asio/thread_pool.hpp"
@@ -49,11 +50,11 @@ class ThreadPool final {
     }
   }
 
-  void Post(std::packaged_task<bool()>& task) {
+  void Post(std::packaged_task<bool()>& task) {  // NOLINT
     boost::asio::post(*pool_.get(), std::move(task));
   }
 
-  void Post(std::packaged_task<proto::ErrCode()>& task) {
+  void Post(std::packaged_task<proto::ErrCode()>& task) {  // NOLINT
     boost::asio::post(*pool_.get(), std::move(task));
   }
 
@@ -61,7 +62,7 @@ class ThreadPool final {
     boost::asio::post(*pool_.get(), std::move(task));
   }
 
-  void Post(std::packaged_task<int()>& task) {
+  void Post(std::packaged_task<int()>& task) {  // NOLINT
     boost::asio::post(*pool_.get(), std::move(task));
   }
 

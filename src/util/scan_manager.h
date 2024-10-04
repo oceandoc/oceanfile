@@ -10,6 +10,7 @@
 #include <functional>
 #include <future>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -222,7 +223,7 @@ class ScanManager {
       }
       for (int32_t i = 0; i < max_threads; ++i) {
         std::packaged_task<proto::ErrCode()> task(std::bind(
-            static_cast<proto::ErrCode (ScanManager::*)(
+            static_cast<proto::ErrCode (ScanManager::*)(  // NOLINT
                 const int32_t thread_no, proto::ScanStatus*,
                 const std::vector<std::string>*, const bool calc_hash)>(
                 &ScanManager::ParallelScanWithCache),
@@ -237,7 +238,7 @@ class ScanManager {
       }
     } else {
       std::packaged_task<proto::ErrCode()> task(std::bind(
-          static_cast<proto::ErrCode (ScanManager::*)(
+          static_cast<proto::ErrCode (ScanManager::*)(  // NOLINT
               const std::string&, proto::ScanStatus*, const bool calc_hash)>(
               &ScanManager::ParallelFullScan),
           this, path, scan_status, calc_hash));
@@ -390,7 +391,7 @@ class ScanManager {
             continue;
           }
           std::packaged_task<proto::ErrCode()> task(std::bind(
-              static_cast<proto::ErrCode (ScanManager::*)(
+              static_cast<proto::ErrCode (ScanManager::*)(  // NOLINT
                   const std::string&, proto::ScanStatus*, const bool)>(
                   &ScanManager::ParallelFullScan),
               this, it->path().string(), scan_status, calc_hash));

@@ -6,7 +6,10 @@
 #ifndef BAZEL_TEMPLATE_UTIL_PERIODIC_TASK_H
 #define BAZEL_TEMPLATE_UTIL_PERIODIC_TASK_H
 
+#include <map>
 #include <memory>
+#include <string>
+#include <utility>
 
 #include "folly/Singleton.h"
 #include "glog/logging.h"
@@ -30,11 +33,11 @@ class PeriodicTask {
   void Run() {
     while (!terminated.load()) {
       auto now = Util::CurrentTimeMillis();
-      // TODO write read lock
+      // TODO(xiedeacc) write read lock
       for (auto& p : task_time_info_) {
         if (now <= p.second.second) {
           p.second.second += p.second.first;
-          // TODO
+          // TODO(xiedeacc)
           // post task;
         }
       }

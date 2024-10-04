@@ -168,6 +168,7 @@ cc_test(
     name = "thread_pool_test",
     srcs = ["thread_pool_test.cc"],
     copts = COPTS,
+    data = ["//conf:base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":thread_pool"],
 )

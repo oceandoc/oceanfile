@@ -19,8 +19,6 @@
 namespace oceandoc {
 namespace util {
 
-using namespace std;
-
 TEST(Util, CurrentTimeMillis) {
   LOG(INFO) << Util::CurrentTimeMillis();
   EXPECT_GT(Util::CurrentTimeMillis(), 1704038400000);
