@@ -11,11 +11,9 @@
 #include <future>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "absl/base/internal/spinlock.h"
-#include "absl/synchronization/mutex.h"
 #include "folly/Singleton.h"
 #include "glog/logging.h"
 #include "src/common/defs.h"
@@ -25,12 +23,6 @@
 
 namespace oceandoc {
 namespace util {
-
-using DirUpTimeMap = std::unordered_map<std::string, int64_t>;
-using DirMap =
-    std::unordered_map<std::string,
-                       std::unordered_map<std::string, proto::FileItem>>;
-using FileMap = std::unordered_map<std::string, proto::FileItem>;
 
 class ScanManager {
  private:
@@ -50,19 +42,8 @@ class ScanManager {
     return GenFileDir(path) + "/" + Util::SHA256(path);
   }
 
-  void InsertFileItem(DirMap* scanned_dirs, const proto::FileItem& file_item) {
-    std::filesystem::path s_path(file_item.path());
-    auto it = scanned_dirs->find(s_path.parent_path().string());
-    if (it != scanned_dirs->end()) {
-      it->second.insert({file_item.path(), file_item});
-    }
-    FileMap file_map{{file_item.path(), file_item}};
-    scanned_dirs->insert({s_path.parent_path().string(), file_map});
-  }
-
   bool LoadCachedScanStatus(const std::string& path,
-                            proto::ScanStatus* scan_status,
-                            DirUpTimeMap* dirs_uptime, DirMap* scanned_dirs) {
+                            proto::ScanStatus* scan_status) {
     const std::string& cached_status_path = GenFileName(path);
     if (!Util::Exists(cached_status_path)) {
       return false;
@@ -71,46 +52,19 @@ class ScanManager {
     std::string content, decompressed_content;
     if (Util::LoadSmallFile(cached_status_path, &content)) {
       LOG(INFO) << "Load cached scan_status success: " << cached_status_path;
-      Util::LZMADecompress(content, &decompressed_content);
-      scan_status->ParseFromString(decompressed_content);
+      if (!Util::LZMADecompress(content, &decompressed_content)) {
+        return false;
+      }
+      if (!scan_status->ParseFromString(decompressed_content)) {
+        return false;
+      }
       Print(*scan_status);
-
-      for (const auto& dir_item : scan_status->scanned_dirs()) {
-        dirs_uptime->insert({dir_item.path(), dir_item.update_time()});
-      }
-
-      for (const auto& file_item : scan_status->scanned_files()) {
-        InsertFileItem(scanned_dirs, file_item);
-      }
       return true;
     }
     return false;
   }
 
-  void UpdateScanStatus(proto::ScanStatus* scan_status,
-                        const DirUpTimeMap& dirs_uptime,
-                        const DirMap& scanned_dirs) {
-    scan_status->mutable_scanned_dirs()->Clear();
-    scan_status->mutable_scanned_dirs()->Reserve(dirs_uptime.size());
-    scan_status->mutable_scanned_files()->Clear();
-    scan_status->mutable_scanned_files()->Reserve(scanned_dirs.size());
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    for (const auto& d : dirs_uptime) {
-      auto dir_item = *scan_status->mutable_scanned_dirs()->Add();
-      dir_item.set_path(d.first);
-      dir_item.set_update_time(d.second);
-    }
-    for (const auto& dir : scanned_dirs) {
-      for (const auto& file : dir.second) {
-        *scan_status->mutable_scanned_files()->Add() = file.second;
-      }
-    }
-  }
-
-  proto::ErrCode Dump(const std::string& path, proto::ScanStatus* scan_status,
-                      const DirUpTimeMap& dirs_uptime,
-                      const DirMap& scanned_dirs) {
-    UpdateScanStatus(scan_status, dirs_uptime, scanned_dirs);
+  proto::ErrCode Dump(const std::string& path, proto::ScanStatus* scan_status) {
     if (scan_status->uuid().empty()) {
       scan_status->set_uuid(Util::UUID());
     }
@@ -129,14 +83,15 @@ class ScanManager {
     return proto::ErrCode::Scan_dump_error;
   }
 
-  void DumpTask(const bool* const stop, const std::string& path,
-                proto::ScanStatus* scan_status, DirUpTimeMap* dirs_uptime,
-                DirMap* scanned_dirs) {
-    absl::Mutex mtx;
-    while (!*stop) {
-      absl::MutexLock lock(&mtx);
-      mtx.AwaitWithTimeout(absl::Condition(stop), absl::Seconds(120));
-      Dump(GenFileName(path), scan_status, *dirs_uptime, *scanned_dirs);
+  void DumpTask(bool* stop, const std::string& path,
+                proto::ScanStatus* scan_status) {
+    while (!(*stop)) {
+      std::unique_lock<std::mutex> lock(mu_);
+      if (cond_var_.wait_for(lock, std::chrono::minutes(2),
+                             [stop] { return *stop; })) {
+        break;
+      }
+      Dump(GenFileName(path), scan_status);
     }
     LOG(INFO) << "DumpTask Exists";
   }
@@ -146,6 +101,7 @@ class ScanManager {
     if (!scanning_.compare_exchange_strong(expected, true)) {
       return false;
     }
+    stop_ = false;
     current_threads = 0;
     return true;
   }
@@ -163,10 +119,27 @@ class ScanManager {
               << ", ignored_dirs num: " << scan_status.ignored_dirs().size();
   }
 
-  proto::ErrCode AddFileItemWithLock(const std::string& path,
-                                     const proto::FileType type,
-                                     DirMap* scanned_dirs,
-                                     const bool calc_hash) {
+  proto::ErrCode AddDirItem(const std::string& path,
+                            proto::ScanStatus* scan_status) {
+    proto::DirItem dir_item;
+    dir_item.set_path(path);
+    int64_t update_time = 0, size = 0;
+    if (!Util::FileInfo(path, &update_time, &size)) {
+      return proto::ErrCode::File_permission_or_not_exists;
+    }
+
+    dir_item.set_update_time(update_time);
+    {
+      absl::base_internal::SpinLockHolder locker(&lock_);
+      scan_status->mutable_scanned_dirs()->insert({path, dir_item});
+    }
+    return proto::ErrCode::Success;
+  }
+
+  proto::ErrCode AddFileItem(const std::string& path,
+                             const proto::FileType type,
+                             proto::ScanStatus* scan_status,
+                             const bool calc_hash) {
     proto::FileItem file_item;
     file_item.set_path(path);
     int64_t update_time = 0, size = 0;
@@ -185,14 +158,28 @@ class ScanManager {
     file_item.set_file_type(type);
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
-      InsertFileItem(scanned_dirs, file_item);
+      scan_status->mutable_scanned_files()->insert({path, file_item});
+      std::filesystem::path s_path(path);
+      auto it = scan_status->mutable_scanned_dirs()->find(
+          s_path.parent_path().string());
+      it->second.mutable_files()->insert({path, update_time});
     }
+    return proto::ErrCode::Success;
+  }
+
+  proto::ErrCode RemoveDir(proto::ScanStatus* scan_status,
+                           const std::string& dir) {
+    absl::base_internal::SpinLockHolder locker(&lock_);
+    auto it = scan_status->mutable_scanned_dirs()->find(dir);
+    for (const auto& p : it->second.files()) {
+      scan_status->mutable_scanned_files()->erase(p.first);
+    }
+    scan_status->mutable_scanned_dirs()->erase(dir);
     return proto::ErrCode::Success;
   }
 
   proto::ErrCode ParallelScan(const std::string& path,
                               proto::ScanStatus* scan_status,
-                              DirUpTimeMap* dirs_uptime, DirMap* scanned_dirs,
                               const bool calc_hash,
                               const bool disable_scan_cache) {
     if (!Util::Exists(path)) {
@@ -217,25 +204,29 @@ class ScanManager {
 
     bool loaded_cached_status = false;
     if (!disable_scan_cache) {
-      loaded_cached_status =
-          LoadCachedScanStatus(path, scan_status, dirs_uptime, scanned_dirs);
+      loaded_cached_status = LoadCachedScanStatus(path, scan_status);
     }
 
     bool stop_dump_task = false;
     auto dump_task = std::bind(&ScanManager::DumpTask, this, &stop_dump_task,
-                               path, scan_status, dirs_uptime, scanned_dirs);
+                               path, scan_status);
     ThreadPool::Instance()->Post(dump_task);
 
     proto::ErrCode ret = proto::ErrCode::Success;
+    std::vector<std::string> dirs;
     if (loaded_cached_status) {
       std::vector<std::future<proto::ErrCode>> rets;
-      for (int i = 0; i < max_threads; ++i) {
+      dirs.reserve(scan_status->scanned_dirs().size());
+      for (const auto& p : scan_status->scanned_dirs()) {
+        dirs.push_back(p.first);
+      }
+      for (int32_t i = 0; i < max_threads; ++i) {
         std::packaged_task<proto::ErrCode()> task(std::bind(
             static_cast<proto::ErrCode (ScanManager::*)(
-                const int32_t thread_no, const proto::ScanStatus&,
-                DirUpTimeMap*, DirMap*, const bool calc_hash)>(
+                const int32_t thread_no, proto::ScanStatus*,
+                const std::vector<std::string>*, const bool calc_hash)>(
                 &ScanManager::ParallelScanWithCache),
-            this, i, *scan_status, dirs_uptime, scanned_dirs, calc_hash));
+            this, i, scan_status, &dirs, calc_hash));
         ThreadPool::Instance()->Post(task);
       }
 
@@ -247,9 +238,9 @@ class ScanManager {
     } else {
       std::packaged_task<proto::ErrCode()> task(std::bind(
           static_cast<proto::ErrCode (ScanManager::*)(
-              const std::string&, proto::ScanStatus*, DirUpTimeMap*, DirMap*,
-              const bool calc_hash)>(&ScanManager::ParallelFullScan),
-          this, path, scan_status, dirs_uptime, scanned_dirs, calc_hash));
+              const std::string&, proto::ScanStatus*, const bool calc_hash)>(
+              &ScanManager::ParallelFullScan),
+          this, path, scan_status, calc_hash));
 
       auto task_future = task.get_future();
       ++current_threads;
@@ -257,92 +248,46 @@ class ScanManager {
       ret = task_future.get();
     }
 
-    if (ret == proto::ErrCode::Success) {
-      ret = Dump(GenFileName(path), scan_status, *dirs_uptime, *scanned_dirs);
-      if (ret == proto::ErrCode::Success) {
-        scan_status->set_complete_time(Util::CurrentTimeMillis());
-      }
-    }
+    stop_dump_task = true;
+    cond_var_.notify_all();
     current_threads = 0;
-    scanning_.store(false);
-    return ret;
-  }
-
-  proto::ErrCode ReScanDir(const std::string& path, DirUpTimeMap* dirs_uptime,
-                           DirMap* scanned_dirs, const bool calc_hash) {
-    proto::ErrCode ret = proto::ErrCode::Success;
-    try {
-      std::set<std::string> files;
-      std::set<std::string> dirs;
-      for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        if (entry.is_symlink()) {
-          files.insert(entry.path().string());
-          auto ret = AddFileItemWithLock(entry.path().string(),
-                                         proto::FileType::Symlink, scanned_dirs,
-                                         calc_hash);
-          if (ret != proto::ErrCode::Success) {
-            return ret;
-          }
-        } else if (entry.is_regular_file()) {
-          files.insert(entry.path().string());
-          auto ret = AddFileItemWithLock(entry.path().string(),
-                                         proto::FileType::Regular, scanned_dirs,
-                                         calc_hash);
-          if (ret != proto::ErrCode::Success) {
-            return ret;
-          }
-        } else if (entry.is_directory()) {
-          files.insert(entry.path().string());
-          {
-            absl::base_internal::SpinLockHolder locker(&lock_);
-            if (dirs_uptime->find(entry.path().string()) !=
-                dirs_uptime->end()) {
-              continue;
-            }
-          }
-          ret = ReScanDir(entry.path().string(), dirs_uptime, scanned_dirs,
-                          calc_hash);
-          if (ret == proto::ErrCode::Success) {
-            auto update_time = Util::UpdateTime(path);
-            absl::base_internal::SpinLockHolder locker(&lock_);
-            dirs_uptime->insert({entry.path().string(), update_time});
-          }
-        } else {
-          LOG(ERROR) << "Unknow file type: " << entry.path();
-        }
-      }
-    } catch (const std::filesystem::filesystem_error& e) {
-      LOG(ERROR) << "Scan " << path << " error: " << e.what();
-      return proto::ErrCode::Fail;
-    }
-
     if (ret != proto::ErrCode::Success) {
+      scanning_.store(false);
       return ret;
     }
 
-    auto it = scanned_dirs->find(path);
-    if (it == scanned_dirs->end()) {
-      LOG(ERROR) << "This should never happen";
+    ret = Dump(GenFileName(path), scan_status);
+    scanning_.store(false);
+    if (ret == proto::ErrCode::Success) {
+      scan_status->set_complete_time(Util::CurrentTimeMillis());
     }
-    auto& dir_map = it->second;
-    for (auto it = dir_map.begin(); it != dir_map.end()) {
-    }
+    return ret;
   }
 
   proto::ErrCode ParallelScanWithCache(const int32_t thread_no,
-                                       const proto::ScanStatus& scan_status,
-                                       DirUpTimeMap* dirs_uptime,
-                                       DirMap* scanned_dirs,
+                                       proto::ScanStatus* scan_status,
+                                       const std::vector<std::string>* dirs,
                                        const bool calc_hash) {
-    for (int i = thread_no; i < scan_status.scanned_dirs().size();
-         i += max_threads) {
-      const auto& dir_item = scan_status.scanned_dirs(i);
-      auto update_time = Util::UpdateTime(dir_item.path());
-      if (dir_item.update_time() == update_time) {
+    for (size_t i = thread_no; i < dirs->size(); i += max_threads) {
+      if (stop_.load()) {
+        return proto::ErrCode::Scan_interrupted;
+      }
+
+      auto ret = proto::ErrCode::Success;
+      const auto& dir = (*dirs)[i];
+      if (!Util::Exists(dir)) {
+        RemoveDir(scan_status, dir);
         continue;
       }
-      auto ret =
-          ReScanDir(dir_item.path(), dirs_uptime, scanned_dirs, calc_hash);
+
+      auto update_time = Util::UpdateTime((*dirs)[i]);
+      auto it = scan_status->mutable_scanned_dirs()->find(dir);
+      if (it->second.update_time() == update_time) {
+        continue;
+      }
+      it->second.set_update_time(update_time);
+
+      ret = Scan(dir, scan_status, calc_hash);
       if (ret != proto::ErrCode::Success) {
         return ret;
       }
@@ -351,10 +296,65 @@ class ScanManager {
     return proto::ErrCode::Success;
   }
 
+  proto::ErrCode Scan(const std::string& path, proto::ScanStatus* scan_status,
+                      const bool calc_hash) {
+    if (stop_.load()) {
+      return proto::ErrCode::Scan_interrupted;
+    }
+
+    std::set<std::string> files;
+    try {
+      for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        files.insert(entry.path().string());
+        auto ret = proto::ErrCode::Success;
+        if (entry.is_symlink()) {
+          ret = AddFileItem(entry.path().string(), proto::FileType::Symlink,
+                            scan_status, calc_hash);
+        } else if (entry.is_regular_file()) {
+          ret = AddFileItem(entry.path().string(), proto::FileType::Regular,
+                            scan_status, calc_hash);
+        } else if (entry.is_directory()) {
+          {
+            absl::base_internal::SpinLockHolder locker(&lock_);
+            auto it = scan_status->scanned_dirs().find(entry.path().string());
+            if (it != scan_status->scanned_dirs().end()) {
+              continue;
+            }
+          }
+          ret = AddDirItem(entry.path().string(), scan_status);
+          ret = Scan(entry.path().string(), scan_status, calc_hash);
+        } else {
+          LOG(ERROR) << "Unknow file type: " << entry.path();
+        }
+        if (ret != proto::ErrCode::Success) {
+          return ret;
+        }
+      }
+    } catch (const std::filesystem::filesystem_error& e) {
+      LOG(ERROR) << "Scan " << path << " error: " << e.what();
+      return proto::ErrCode::Fail;
+    }
+
+    auto it = scan_status->scanned_dirs().find(path);
+    if (it == scan_status->scanned_dirs().end()) {
+      LOG(ERROR) << "This should never happen";
+    }
+
+    auto dir_item = it->second;
+    for (auto file_it = dir_item.mutable_files()->begin();
+         file_it != dir_item.mutable_files()->end();) {
+      if (files.find(file_it->first) == files.end()) {
+        file_it = dir_item.mutable_files()->erase(file_it);
+      } else {
+        ++file_it;
+      }
+    }
+    return proto::ErrCode::Success;
+  }
+
   proto::ErrCode ParallelFullScan(const std::string& path,
                                   proto::ScanStatus* scan_status,
-                                  DirUpTimeMap* dirs_uptime,
-                                  DirMap* scanned_dirs, const bool calc_hash) {
+                                  const bool calc_hash) {
     if (stop_.load()) {
       return proto::ErrCode::Scan_interrupted;
     }
@@ -364,7 +364,7 @@ class ScanManager {
       return proto::ErrCode::Success;
     }
 
-    // LOG(INFO) << "Now scan " << path;
+    LOG(INFO) << "Now scan " << path;
     proto::ErrCode all_ret = proto::ErrCode::Success;
     for (auto it = std::filesystem::directory_iterator(path);
          it != std::filesystem::directory_iterator();) {
@@ -379,7 +379,7 @@ class ScanManager {
 
       auto cur_thread_next_dir = it->path().string();
       ++it;
-
+      LOG(INFO) << "current_threads: " << current_threads;
       std::vector<std::future<proto::ErrCode>> rets;
       {
         absl::base_internal::SpinLockHolder locker(&lock_);
@@ -391,10 +391,9 @@ class ScanManager {
           }
           std::packaged_task<proto::ErrCode()> task(std::bind(
               static_cast<proto::ErrCode (ScanManager::*)(
-                  const std::string&, proto::ScanStatus*, DirUpTimeMap*,
-                  DirMap*, const bool)>(&ScanManager::ParallelFullScan),
-              this, it->path().string(), scan_status, dirs_uptime, scanned_dirs,
-              calc_hash));
+                  const std::string&, proto::ScanStatus*, const bool)>(
+                  &ScanManager::ParallelFullScan),
+              this, it->path().string(), scan_status, calc_hash));
           rets.emplace_back(task.get_future());
           ThreadPool::Instance()->Post(task);
           ++current_threads;
@@ -410,36 +409,34 @@ class ScanManager {
         --current_threads;
       }
 
-      auto ret = ParallelFullScan(cur_thread_next_dir, scan_status, dirs_uptime,
-                                  scanned_dirs, calc_hash);
-
+      auto ret = ParallelFullScan(cur_thread_next_dir, scan_status, calc_hash);
       if (ret != proto::ErrCode::Success) {
         all_ret = ret;
       }
     }
 
     if (all_ret != proto::ErrCode::Success) {
-      return proto::ErrCode::Fail;
+      return all_ret;
     }
+
+    AddDirItem(path, scan_status);
 
     try {
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        auto ret = proto::ErrCode::Success;
         if (entry.is_symlink()) {
-          auto ret = AddFileItemWithLock(entry.path().string(),
-                                         proto::FileType::Symlink, scanned_dirs,
-                                         calc_hash);
-          if (ret != proto::ErrCode::Success) {
-            return ret;
-          }
+          ret = AddFileItem(entry.path().string(), proto::FileType::Symlink,
+                            scan_status, calc_hash);
         } else if (entry.is_regular_file()) {
-          auto ret = AddFileItemWithLock(entry.path().string(),
-                                         proto::FileType::Regular, scanned_dirs,
-                                         calc_hash);
-          if (ret != proto::ErrCode::Success) {
-            return ret;
-          }
+          ret = AddFileItem(entry.path().string(), proto::FileType::Regular,
+                            scan_status, calc_hash);
+        } else if (entry.is_directory()) {
+          ret = AddDirItem(entry.path().string(), scan_status);
         } else {
           LOG(ERROR) << "Unknow file type: " << entry.path();
+        }
+        if (ret != proto::ErrCode::Success) {
+          return ret;
         }
       }
     } catch (const std::filesystem::filesystem_error& e) {
@@ -447,9 +444,6 @@ class ScanManager {
       return proto::ErrCode::Fail;
     }
 
-    auto update_time = Util::UpdateTime(path);
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    dirs_uptime->insert({path, update_time});
     return proto::ErrCode::Success;
   }
 
@@ -458,7 +452,9 @@ class ScanManager {
   std::atomic<bool> scanning_ = false;
   std::atomic<bool> stop_ = false;
   int current_threads = 0;
-  const int max_threads = 3;
+  const int max_threads = 4;
+  std::mutex mu_;
+  std::condition_variable cond_var_;
 };
 
 }  // namespace util

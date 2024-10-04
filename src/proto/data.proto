@@ -24,19 +24,17 @@ message DirItem {
   uint64 update_time = 2;  // local update time
   string owner = 3;
   uint32 permission = 4;  // 1bit: need auth, 2bit: group, 3bit: all
+  map<string, int64> files = 5;
 }
 
 message ScanStatus {
   string path = 1;
-  uint64 file_num = 2;
-  uint64 dir_num = 3;
-  uint64 symlink_num = 4;
-  repeated DirItem scanned_dirs = 5;
-  repeated FileItem scanned_files = 6;
-  int64 update_time = 7;
-  int64 complete_time = 8;
-  map<string, bool> ignored_dirs = 9;
-  string uuid = 10;
+  map<string, DirItem> scanned_dirs = 2;
+  map<string, FileItem> scanned_files = 3;
+  int64 update_time = 4;
+  int64 complete_time = 5;
+  map<string, bool> ignored_dirs = 6;
+  string uuid = 7;
 }
 
 message RepoMeta {

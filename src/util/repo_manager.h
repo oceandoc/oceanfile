@@ -266,10 +266,7 @@ class RepoManager {
     return Util::WriteToFile(repo_file_path, content, start);
   }
 
-  void Stop() {
-    stop_.store(true);
-    ScanManager::Instance()->Stop();
-  }
+  void Stop() { stop_.store(true); }
 
  private:
   proto::Repos repos_;

@@ -17,6 +17,19 @@ cc_library(
 )
 
 cc_library(
+    name = "test_util",
+    hdrs = ["test_util.h"],
+    copts = [
+        "-isystem external/double-conversion",
+        "-isystem external/folly",
+        "-isystem $(GENDIR)/external/folly",
+    ],
+    deps = [
+        "//src/util",
+    ],
+)
+
+cc_library(
     name = "test_main",
     srcs = ["test_main.cc"],
     copts = [

@@ -174,18 +174,8 @@ cc_test(
 
 cc_library(
     name = "util",
-    srcs = ["util.cc"] + select({
-        "@platforms//os:linux": ["util_linux.cc"],
-        "@platforms//os:osx": [],
-        "@platforms//os:windows": [],
-        "//conditions:default": [],
-    }),
-    hdrs = ["util.h"] + select({
-        "@platforms//os:linux": ["util_linux.h"],
-        "@platforms//os:osx": [],
-        "@platforms//os:windows": [],
-        "//conditions:default": [],
-    }),
+    srcs = ["util.cc"],
+    hdrs = ["util.h"],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
@@ -226,23 +216,12 @@ cc_test(
     srcs = ["util_test.cc"],
     data = [
         "//conf:base_config.json",
-        "//test_data/util_test:txt",
-        "//test_data/util_test:txt_symlink",
-        "//test_data/util_test/target_dir:test",
+        "//test_data/util_test",
     ],
-    deps = [":util"],
-)
-
-cc_test(
-    name = "util_platform_test",
-    timeout = "short",
-    srcs = select({
-        "@platforms//os:linux": ["util_linux_test.cc"],
-        "@platforms//os:osx": [],
-        "@platforms//os:windows": [],
-        "//conditions:default": [],
-    }),
-    deps = [":util"],
+    deps = [
+        ":util",
+        "//src/test:test_util",
+    ],
 )
 
 cc_test(

@@ -10,6 +10,8 @@ common --enable_platform_specific_config
 # 2. go install github.com/google/pprof@latest
 # 3. tcmalloc not support windows
 
+test --test_env='TZDIR=/usr/share/zoneinfo'
+test --test_env='TZ=Asia/Shanghai'
 test:cpplint --test_tag_filters='cpplint'
 test:cpplint --build_tests_only
 test:unit_test --test_tag_filters='-cpplint'

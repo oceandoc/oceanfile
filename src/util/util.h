@@ -30,14 +30,22 @@ class Util final {
  public:
   static int64_t CurrentTimeMillis();
   static int64_t CurrentTimeNanos();
+  static int64_t StrToTimeStampUTC(std::string_view time);
+  static int64_t StrToTimeStampUTC(std::string_view time,
+                                   std::string_view format);
   static int64_t StrToTimeStamp(std::string_view time);
   static int64_t StrToTimeStamp(std::string_view time, std::string_view format);
+  static int64_t StrToTimeStamp(std::string_view time, std::string_view format,
+                                std::string_view tz_str);
 
+  static std::string ToTimeStrUTC();
+  static std::string ToTimeStrUTC(const int64_t ts, std::string_view format);
+  // CST chines standard time
   static std::string ToTimeStr();
   static std::string ToTimeStr(const int64_t ts);
   static std::string ToTimeStr(const int64_t ts, std::string_view format);
   static std::string ToTimeStr(const int64_t ts, std::string_view format,
-                               std::string_view tz);
+                               std::string_view tz_str);
   static struct timespec ToTimeSpec(const int64_t ts);
 
   static int64_t Random(int64_t start, int64_t end);
@@ -49,7 +57,7 @@ class Util final {
 
   static bool IsAbsolute(std::string_view src);
 
-  static int64_t CreateTime(const std::string &path);
+  static bool SetUpdateTime(const std::string &path, int64_t ts);
   static int64_t UpdateTime(const std::string &path);
   static int64_t FileSize(const std::string &path);
   static bool FileInfo(const std::string &path, int64_t *update_time,
@@ -60,7 +68,6 @@ class Util final {
   static bool MkParentDir(const std::filesystem::path &path);
   static bool Remove(std::string_view path);
   static bool Create(const std::string &path);
-  static bool SetUpdateTime(const std::string &path, int64_t ts);
   static bool Rename(const std::string &src, const std::string &dst);
   static proto::ErrCode CreateFileWithSize(const std::string &path,
                                            const int64_t size);
@@ -84,9 +91,6 @@ class Util final {
                                     const int64_t start);
   static bool LoadSmallFile(const std::string &path, std::string *content);
 
-  static std::string PartitionUUID(std::string_view path);
-  static std::string Partition(std::string_view path);
-  static bool SetFileInvisible(std::string_view path);
   static bool SyncSymlink(const std::string &src, const std::string &dst,
                           const std::string &src_symlink);
 
@@ -233,6 +237,15 @@ class Util final {
   static void PrintFileReq(const proto::FileReq &req);
   static bool FileReqToJson(const proto::FileReq &req, std::string *json);
   static bool JsonToFileReq(const std::string &json, proto::FileReq *req);
+
+  static std::optional<std::string_view> GetEnv(const char *var_name) {
+    const char *value = std::getenv(var_name);
+    if (value) {
+      return std::string_view(value);
+    } else {
+      return std::nullopt;
+    }
+  }
 };
 
 }  // namespace util

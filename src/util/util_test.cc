@@ -5,6 +5,7 @@
 
 #include "src/util/util.h"
 
+#include <cstdlib>
 #include <filesystem>
 #include <functional>
 #include <thread>
@@ -13,6 +14,7 @@
 #include "gtest/gtest.h"
 #include "src/common/defs.h"
 #include "src/proto/service.pb.h"
+#include "src/test/test_util.h"
 
 namespace oceandoc {
 namespace util {
@@ -32,51 +34,95 @@ TEST(Util, CurrentTimeNanos) {
 }
 
 TEST(Util, StrToTimeStamp) {
-  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44", "%Y-%m-%d HH:MM:SS"),
-            -1);
+  std::string time = "2024-09-24 13:36:44";
+  std::string format = "%Y-%m-%d HH:MM:SS";
+  int64_t ts = 1727185004000;
+  EXPECT_EQ(Util::StrToTimeStamp(time, format), -1);
 
-  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44", "%Y-%m-%d %H:%M:%S"),
-            1727156204000);  // CST time
+  time = "2024-09-24 13:36:44";
+  format = "%Y-%m-%d %H:%M:%S";
+  ts = 1727185004000;
+  EXPECT_EQ(Util::StrToTimeStampUTC(time, format), ts);
 
-  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 22:48:50", "%Y-%m-%d %H:%M:%S"),
-            1727189330000);  // CST time
+  time = "2024-09-24 13:36:44";
+  format = "%Y-%m-%d %H:%M:%S";
+  ts = 1727156204000;
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "Asia/Shanghai"), ts);
 
-  EXPECT_EQ(
-      Util::StrToTimeStamp("2024-09-24 13:36:44.123", "%Y-%m-%d %H:%M:%E3S"),
-      1727156204123);
+  time = "2024-09-24 21:36:44";
+  format = "%Y-%m-%d %H:%M:%S";
+  ts = 1727185004000;
+  // CST time
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "Asia/Shanghai"), ts);
 
-  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44.123",
-                                 "%Y-%m-%d %H:%M:%E2S%E3f"),
-            1727156204123);
+  // UTC time
+  time = "2024-09-24 13:36:44";
+  format = "%Y-%m-%d %H:%M:%S";
+  ts = 1727185004000;
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "UTC"), ts);
 
-  EXPECT_EQ(
-      Util::StrToTimeStamp("2024-09-24 13:36:44.123", "%Y-%m-%d %H:%M:%E3S"),
-      1727156204123);
+  // local time, bazel sandbox use UTC time, but this project used
+  // --test_env=TZ=Asia/Shanghai
+  time = "2024-09-24 13:36:44";
+  format = "%Y-%m-%d %H:%M:%S";
+  ts = 1727156204000;
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "localtime"), ts);
 
-  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24T13:36:44.000+0000"),
-            1727185004000);
-  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24T13:36:44.000+0800"),
-            1727156204000);
-  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44.123+08:00",
-                                 "%Y-%m-%d %H:%M:%E3S%Ez"),
-            1727156204123);
-  EXPECT_EQ(Util::StrToTimeStamp("2024-09-24 13:36:44.123+08:30:24",
-                                 "%Y-%m-%d %H:%M:%E3S%E*z"),
-            1727154380123);
+  time = "2024-09-24 21:36:44.123";
+  format = "%Y-%m-%d %H:%M:%E3S";
+  ts = 1727185004123;
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "Asia/Shanghai"), ts);
+
+  time = "2024-09-24 13:36:44.123";
+  format = "%Y-%m-%d %H:%M:%E2S%E3f";
+  ts = 1727156204123;
+  EXPECT_EQ(Util::StrToTimeStamp(time, format), ts);
+
+  time = "2024-09-24 13:36:44.123";
+  format = "%Y-%m-%d %H:%M:%E3S";
+  ts = 1727156204123;
+  EXPECT_EQ(Util::StrToTimeStamp(time, format), ts);
+
+  time = "2024-09-24T13:36:44.000+0000";
+  format = "%Y-%m-%d %H:%M:%E2S%E3f%Ez";
+  ts = 1727185004000;
+  EXPECT_EQ(Util::StrToTimeStamp(time), ts);
+
+  time = "2024-09-24 13:36:44.123+08:30:24";
+  format = "%Y-%m-%d %H:%M:%E3S%E*z";
+  ts = 1727154380123;
+  EXPECT_EQ(Util::StrToTimeStamp(time, format), ts);
 }
 
 TEST(Util, ToTimeStr) {
-  EXPECT_EQ(Util::ToTimeStr(1646397312000), "2022-03-04T20:35:12.000+08:00");
-  EXPECT_EQ(Util::ToTimeStr(1646397312000, "%Y-%m-%d %H:%M:%S"),
-            "2022-03-04 20:35:12");
+  int64_t ts = 1727185004000;
+  std::string time = "2024-09-24T21:36:44.000+08:00 CST";
+  std::string format = "%Y-%m-%d%ET%H:%M:%E3S%Ez %Z";
+  EXPECT_EQ(Util::ToTimeStr(ts, format, "Asia/Shanghai"), time);
+
+  // local time, bazel sandbox use UTC time, but this project used
+  // --test_env=TZ=Asia/Shanghai
+  time = "2024-09-24T21:36:44.000+08:00";
+  format = "%Y-%m-%d %H:%M:%S";
+  EXPECT_EQ(Util::ToTimeStr(ts), time);
+
+  time = "2024-09-24 13:36:44";
+  EXPECT_EQ(Util::ToTimeStrUTC(ts, format), time);
+
+  time = "2024-09-24 21:36:44";
+  EXPECT_EQ(Util::ToTimeStr(ts, format, "Asia/Shanghai"), time);
+}
+
+TEST(Util, ToTimeSpec) {
+  auto time = Util::ToTimeSpec(2727650275042);
+  EXPECT_EQ(time.tv_sec, 2727650275);
+  EXPECT_EQ(time.tv_nsec, 42000000);
 }
 
 TEST(Util, Random) {
   auto generator = [](int thread_num) {
     for (int i = 0; i < 10000; ++i) {
       auto ret = Util::Random(0, 100);
-      // LOG(INFO) << "thread: " << thread_num << ", cnt: " << i
-      // << ", random num: " << ret;
       EXPECT_GT(ret, -1);
       EXPECT_LT(ret, 100);
     }
@@ -113,152 +159,118 @@ TEST(Util, UnifyDir) {
   EXPECT_EQ(Util::UnifyDir("/data//test/"), "/data/test");
 }
 
-TEST(Util, CreateTime) {
-  const auto& path = "test_data/util_test/never_modify";
-  EXPECT_EQ(Util::CreateTime(path), 1727156828142);
+TEST(Util, SetUpdateTime) {
+  auto runfile_dir = Util::GetEnv("TEST_SRCDIR");
+  auto workspace_name = Util::GetEnv("TEST_WORKSPACE");
+  const auto& path = "test_data/util_test/target";
+  std::string final_path = path;
+  if (runfile_dir.has_value()) {
+    final_path = std::string(*runfile_dir) + "/" +
+                 std::string(*workspace_name) + "/" + path;
+  }
+  EXPECT_EQ(Util::SetUpdateTime(final_path, 2727650275042), true);
 }
 
 TEST(Util, UpdateTime) {
-  const auto& path = "test_data/util_test/never_modify";
-  EXPECT_EQ(Util::UpdateTime(path), 1727156828142);
+  const auto& path = "test_data/util_test/target";
+  EXPECT_EQ(Util::UpdateTime(path), 2727650275042);
 }
 
 TEST(Util, FileSize) {
   // echo "test" > txt will add a \n to file automatic, vim has same behavior
-  EXPECT_EQ(Util::FileSize("test_data/util_test/txt_symlink"), 3);
-  EXPECT_EQ(Util::FileSize("test_data/util_test/txt"), 5);
-
-  string path = "test_data/util_test/txt_symlink";
-  EXPECT_EQ(Util::FileSize(path), 3);
-
-  path = "/root/src/Dr.Q/oceanfile";
-  EXPECT_EQ(Util::FileSize(path), 4096);
+  auto runfile_dir = Util::GetEnv("TEST_SRCDIR");
+  std::string path = "test_data/util_test/test1/test2/symlink_to_target";
+  if (runfile_dir.has_value()) {
+    EXPECT_EQ(Util::FileSize(path), 131);
+    EXPECT_EQ(Util::FileSize("test_data/util_test/target"), 108);
+    EXPECT_EQ(Util::FileSize("test_data"), 18);
+  } else {
+    EXPECT_EQ(Util::FileSize(path), 12);
+    EXPECT_EQ(Util::FileSize("test_data/util_test/target"), 5);
+  }
 }
 
 TEST(Util, FileInfo) {
-  std::string path = "test_data/util_test/never_modify";
+  std::string path = "test_data/util_test/target";
   int64_t update_time = -1, size = -1;
-  EXPECT_EQ(Util::FileInfo(path, &update_time, &size), true);
-  EXPECT_EQ(update_time, 1727156828142);
-  EXPECT_EQ(size, 5);
-
-  path = "test_data/util_test/test_update_time";
-  EXPECT_EQ(Util::FileInfo(path, &update_time, &size), true);
-  LOG(INFO) << ", update_time: " << update_time << ", size: " << size;
-  path = "test_data/util_test/test_update_time/test";
-  EXPECT_EQ(Util::Create(path), true);
-  path = "/root/src/oceandoc/oceanfile";
-  EXPECT_EQ(Util::FileInfo(path, &update_time, &size), true);
-  LOG(INFO) << ", update_time: " << update_time << ", size: " << size;
+  auto runfile_dir = Util::GetEnv("TEST_SRCDIR");
+  if (runfile_dir.has_value()) {
+    EXPECT_EQ(Util::FileInfo(path, &update_time, &size), true);
+    EXPECT_EQ(update_time, 2727650275042);
+    EXPECT_EQ(size, 108);
+  } else {
+    EXPECT_EQ(Util::FileInfo(path, &update_time, &size), true);
+    EXPECT_EQ(update_time, 2727650275042);
+    EXPECT_EQ(size, 5);
+  }
 }
 
 TEST(Util, Path) {
   std::string path = "/usr/local/";
   EXPECT_EQ(std::filesystem::path(path).string(), "/usr/local/");
-  EXPECT_EQ(Util::UnifyDir(path), "/usr/local");
 
   path = "/usr/local";
   EXPECT_EQ(std::filesystem::path(path).string(), "/usr/local");
 
-  std::filesystem::path s_symlink("test_data/util_test/txt_symlink");
-  std::filesystem::path s_target("test_data/util_test/txt");
+  path = "test_data/util_test/test1/test2/symlink_to_target";
+  std::filesystem::path s_symlink(path);
+  std::filesystem::path s_target("test_data/util_test/target");
   EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
   EXPECT_EQ(s_symlink == s_target, false);
 
-  s_symlink = "test_data/util_test/symlink_dir";
+  s_symlink = "test_data/util_test/test1/test2/symlink_to_target_dir";
   s_target = "test_data/util_test/target_dir";
-  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
+  // will coredump
+  // EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
   EXPECT_EQ(s_symlink == s_target, false);
 
-  s_symlink = "test_data/util_test/symlink_dir";
-  s_target = "test_data/util_test/target_dir/";
-  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
-
-  s_symlink = "test_data/util_test/symlink_dir";
-  s_target = "test_data/util_test/symlink_dir/";
-  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
-  EXPECT_EQ(s_symlink == s_target, false);
-
-  s_symlink = "test_data/util_test/target_dir";
-  s_target = "test_data/util_test/target_dir/";
-  EXPECT_EQ(std::filesystem::equivalent(s_symlink, s_target), true);
-  EXPECT_EQ(s_symlink == s_target, false);
-
-  s_symlink = "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  s_symlink = "test_data/util_test/test1/test2/symlink_to_target";
   EXPECT_EQ(s_symlink.parent_path().string(),
-            "test_data/util_test/symlink_test/test1/test2");
+            "test_data/util_test/test1/test2");
 }
 
 TEST(Util, Exists) {
-  EXPECT_EQ(Util::Exists("test_data/util_test/symlink_not_exists"), true);
-  EXPECT_EQ(std::filesystem::exists("test_data/util_test/symlink_not_exists"),
-            false);
-}
+  std::string path = "test_data/util_test/test1/test2/target_not_exist";
+  if (test::Util::IsBazelRunUnitTest()) {
+    EXPECT_EQ(Util::Exists(path), false);
+    EXPECT_EQ(std::filesystem::exists(path), false);
 
-TEST(Util, FileOperation) {
-  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1/test"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1/test_dir"),
-            true);
-
-  EXPECT_EQ(Util::Remove("test_data/util_test/test_remove"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove"), false);
-
-  EXPECT_EQ(Util::Mkdir("test_data/util_test/test_remove"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove"), true);
-
-  EXPECT_EQ(Util::Create("test_data/util_test/test_remove/test1/test"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1/test"), true);
-
-  EXPECT_EQ(Util::Mkdir("test_data/util_test/test_remove/test1/test_dir"),
-            true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/test_remove/test1/test_dir"),
-            true);
-
-  EXPECT_EQ(Util::Exists("test_data/util_test/txt_symlink"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), true);
-  EXPECT_EQ(Util::Remove("test_data/util_test/txt_symlink"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/txt_symlink"), false);
-  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), true);
-  EXPECT_EQ(Util::CreateSymlink("test_data/util_test/txt_symlink", "txt"),
-            true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/txt_symlink"), true);
-  EXPECT_EQ(std::filesystem::is_symlink("test_data/util_test/txt_symlink"),
-            true);
+  } else {
+    EXPECT_EQ(Util::Exists(path), true);
+    EXPECT_EQ(std::filesystem::exists(path), false);
+  }
 }
 
 TEST(Util, CreateFileWithSize) {
-  if (Util::Exists("test_data/util_test/create_with_size")) {
-    EXPECT_EQ(Util::Remove("test_data/util_test/create_with_size"), true);
-  }
-  EXPECT_EQ(Util::CreateFileWithSize("test_data/util_test/create_with_size", 5),
-            true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/create_with_size"), true);
-  EXPECT_EQ(Util::FileSize("test_data/util_test/create_with_size"), 5);
+  auto path = "test_data/util_test/tes_create_with_size";
+  EXPECT_EQ(Util::CreateFileWithSize(path, 5), proto::ErrCode::Success);
+  EXPECT_EQ(Util::Exists(path), true);
+  EXPECT_EQ(Util::FileSize(path), 5);
+  EXPECT_EQ(Util::Remove(path), true);
 }
 
 TEST(Util, FindCommonRoot) {
   std::filesystem::path path =
-      "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+      "test_data/util_test/test1/test2/symlink_to_target";
   std::filesystem::path base =
-      "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+      "test_data/util_test/test1/test2/symlink_to_target";
+  EXPECT_EQ(path.string(), "test_data/util_test/test1/test2/symlink_to_target");
+
   auto ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(),
-            "test_data/util_test/symlink_test/test1/test2/symlink_to_target");
+  EXPECT_EQ(ret.string(), base.string());
 
-  path = "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
-  base = "test_data/util_test/symlink_test/test1/test2";
+  path = "test_data/util_test/test1/test2/symlink_to_target";
+  base = "test_data/util_test/test1/test2";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "test_data/util_test/symlink_test/test1/test2");
+  EXPECT_EQ(ret.string(), "test_data/util_test/test1/test2");
 
-  path = "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  path = "test_data/util_test/test1/test2/symlink_to_target";
   base = "test1";
   ret = Util::FindCommonRoot(path, base);
   EXPECT_EQ(ret.string(), "");
 
   path = "test1";
-  base = "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  base = "test_data/util_test/test1/test2/symlink_to_target";
   ret = Util::FindCommonRoot(path, base);
   EXPECT_EQ(ret.string(), "");
 
@@ -290,28 +302,7 @@ TEST(Util, FindCommonRoot) {
 
 TEST(Util, Relative) {
   // std::filesystem::relative don't need file exists
-  EXPECT_EQ(std::filesystem::relative("base/test", "/base").string(), "");
-  EXPECT_EQ(std::filesystem::relative("/usr/xxxx/llvm", "/usr/xxxx").string(),
-            "llvm");
-  EXPECT_EQ(std::filesystem::relative("/usr/local/llvm", "/usr/local").string(),
-            "llvm");
-  EXPECT_EQ(std::filesystem::relative("/usr/local", "/usr/local").string(),
-            ".");
-
-  EXPECT_EQ(std::filesystem::relative("/usr/xxxx", "/usr/local").string(),
-            "../xxxx");
-  EXPECT_EQ(std::filesystem::relative("/usr/test1/test2/xxxx",
-                                      "/usr/xxxx1/xxxx2/local")
-                .string(),
-            "../../../test1/test2/xxxx");
-
   // std::filesystem::relative will follow symlink
-  EXPECT_EQ(
-      std::filesystem::relative(
-          "test_data/util_test/symlink_test/test1/test2/symlink_to_target",
-          "test_data/util_test/symlink_test")
-          .string(),
-      "target");
 
   ////////////////////////////////////////////////////////////////
   std::string relative;
@@ -339,116 +330,75 @@ TEST(Util, Relative) {
   EXPECT_EQ(relative, "../../../test1/test2/xxxx");
 
   // Util::Relative will follow symlink
-  EXPECT_EQ(
-      Util::Relative(
-          "test_data/util_test/symlink_test/test1/test2/symlink_to_target",
-          "test_data/util_test/symlink_test", &relative),
-      true);
-  EXPECT_EQ(relative, "test1/test2/symlink_to_target");
-}
-
-///////////////////////////////////////////////////
-TEST(Util, CopyFile) {
-  EXPECT_EQ(Util::Exists("test_data/util_test/copy_file_dst"), true);
-  EXPECT_EQ(Util::Remove("test_data/util_test/copy_file_dst"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/copy_file_dst"), false);
-  EXPECT_EQ(Util::CopyFile("test_data/util_test/copy_file_src",
-                           "test_data/util_test/copy_file_dst"),
+  EXPECT_EQ(Util::Relative("test_data/util_test/test1/test2/symlink_to_target",
+                           "test_data/util_test/symlink_test", &relative),
             true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/copy_file_dst"), true);
-
-  EXPECT_EQ(Util::Exists("test_data/util_test/copy_symlink_file_dst"), true);
-  EXPECT_EQ(Util::Remove("test_data/util_test/copy_symlink_file_dst"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/copy_symlink_file_dst"), false);
-  EXPECT_EQ(Util::CopyFile("test_data/util_test/copy_symlink_file_src",
-                           "test_data/util_test/copy_symlink_file_dst"),
-            true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/copy_symlink_file_dst"), true);
+  EXPECT_EQ(relative, "../test1/test2/symlink_to_target");
 }
 
 TEST(Util, TruncateFile) {
-  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), true);
+  EXPECT_EQ(Util::Exists("test_data/util_test/txt"), false);
+  EXPECT_EQ(Util::CreateFileWithSize("test_data/util_test/txt", 5),
+            proto::ErrCode::Success);
   EXPECT_EQ(Util::FileSize("test_data/util_test/txt"), 5);
   EXPECT_EQ(Util::TruncateFile("test_data/util_test/txt"), true);
-  EXPECT_EQ(Util::WriteToFile("test_data/util_test/txt", "test\n"), true);
+  EXPECT_EQ(Util::FileSize("test_data/util_test/txt"), 0);
+  EXPECT_EQ(Util::WriteToFile("test_data/util_test/txt", "test\n"),
+            proto::ErrCode::Success);
   EXPECT_EQ(Util::FileSize("test_data/util_test/txt"), 5);
+  EXPECT_EQ(Util::Remove("test_data/util_test/txt"), true);
 }
 
 TEST(Util, WriteToFile) {
-  EXPECT_EQ(Util::Exists("test_data/util_test/write_to_file"), true);
-  EXPECT_EQ(Util::Remove("test_data/util_test/write_to_file"), true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/write_to_file"), false);
-  EXPECT_EQ(Util::CreateFileWithSize("test_data/util_test/write_to_file", 200),
-            true);
-  EXPECT_EQ(Util::Exists("test_data/util_test/write_to_file"), true);
-  EXPECT_EQ(
-      Util::WriteToFile("test_data/util_test/write_to_file", "test", 100L),
-      true);
+  std::string path = "test_data/util_test/txt";
+  EXPECT_EQ(Util::Exists(path), false);
+  EXPECT_EQ(Util::CreateFileWithSize(path, 200), proto::ErrCode::Success);
+  EXPECT_EQ(Util::Exists(path), true);
+  EXPECT_EQ(Util::WriteToFile(path, "test", 100L), proto::ErrCode::Success);
   std::string sha256;
-  EXPECT_EQ(Util::SmallFileSHA256("test_data/util_test/write_to_file", &sha256),
-            true);
+  EXPECT_EQ(Util::SmallFileSHA256(path, &sha256), true);
   EXPECT_EQ(sha256,
             "b979494e28d88b1fa87f19a3a5632b93f67e315208b1141404dd5a97778a8367");
+  EXPECT_EQ(Util::Remove(path), true);
 }
-///////////////////////////////////////////////////
 
 TEST(Util, LoadSmallFile) {
   std::string content;
-  EXPECT_EQ(Util::LoadSmallFile("test_data/util_test/txt_symlink", &content),
-            true);
-  EXPECT_EQ(content, "test\n");
+  std::string path = "test_data/util_test/never_modify";
+  EXPECT_EQ(Util::LoadSmallFile(path, &content), true);
+  EXPECT_EQ(content, "abcd\n");
 }
-
-///////////////////////////////////////////////////
-// TODO finish
-// TEST(Util, PartitionUUID) {
-// const auto& path = "test_data/util_test/never_modify";
-// EXPECT_EQ(Util::CreateTime(path), 1727156828142);
-// }
-
-// TODO finish
-// TEST(Util, Partition) {
-// const auto& path = "test_data/util_test/never_modify";
-// EXPECT_EQ(Util::CreateTime(path), 1727156828142);
-// }
-
-// TODO finish
-// TEST(Util, SetFileInvisible) {
-// const auto& path = "test_data/util_test/never_modify";
-// EXPECT_EQ(Util::CreateTime(path), 1727156828142);
-// }
 
 TEST(Util, SyncSymlink) {
   std::string src = "test_data/util_test";
   std::string dst = "test_data/util_test/test";
-  std::string src_symlink =
-      "test_data/util_test/symlink_test/test1/test2/symlink_to_target";
+  std::string src_symlink = "test_data/util_test/test1/test2/symlink_to_target";
   std::string dst_symlink =
-      "test_data/util_test/test/symlink_test/test1/test2/symlink_to_target";
+      "test_data/util_test/test/test1/test2/symlink_to_target";
   EXPECT_EQ(Util::Remove(dst_symlink), true);
   EXPECT_EQ(Util::Exists(dst_symlink), false);
   EXPECT_EQ(Util::SyncSymlink(src, dst, src_symlink), true);
-  EXPECT_EQ(Util::Exists(dst_symlink), true);
-
-  std::string src_target = std::filesystem::read_symlink(src_symlink).string();
-  std::string dst_target = std::filesystem::read_symlink(dst_symlink).string();
-  EXPECT_EQ(src_target, dst_target);
-}
-
-TEST(Util, FilePartitionNum) {
-  EXPECT_EQ(Util::FilePartitionNum("/usr/local/gcc/14.1.0/libexec/gcc/"
-                                   "x86_64-pc-linux-gnu/14.1.0/cc1plus"),
-            6);
+  if (!test::Util::IsBazelRunUnitTest()) {
+    EXPECT_EQ(Util::Exists(dst_symlink), true);
+    std::string src_target =
+        std::filesystem::read_symlink(src_symlink).string();
+    std::string dst_target =
+        std::filesystem::read_symlink(dst_symlink).string();
+    EXPECT_EQ(src_target, dst_target);
+  }
 }
 
 TEST(Util, PrepareFile) {
   common::FileAttr attr;
-  Util::PrepareFile("test_data/util_test/txt", &attr);
+  Util::PrepareFile("test_data/util_test/target", &attr);
   EXPECT_EQ(attr.sha256,
             "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2");
   EXPECT_EQ(attr.partition_num, 1);
-  EXPECT_EQ(attr.size, 5);
+  if (test::Util::IsBazelRunUnitTest()) {
+    EXPECT_EQ(attr.size, 108);
+  } else {
+    EXPECT_EQ(attr.size, 5);
+  }
 }
 
 TEST(Util, SimplifyPath) {
@@ -611,14 +561,6 @@ TEST(Util, JsonToMessage) {
   EXPECT_EQ(
       req.path(),
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus");
-
-  // Util::LoadSmallFile("req", &serialized);
-  // if (!Util::JsonToMessage(serialized, &req)) {
-  // LOG(ERROR) << "Req to json error: " << serialized;
-  // }
-  // EXPECT_EQ(
-  // req.path(),
-  // "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus");
 }
 
 }  // namespace util

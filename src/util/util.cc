@@ -39,19 +39,15 @@
 #include "src/proto/service.pb.h"
 
 #if defined(_WIN32)
-#include "src/util/util_windows.h"
 #elif defined(__linux__)
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <utime.h>
 
-#include "src/util/util_linux.h"
 #elif defined(__APPLE__)
 #include <fcntl.h>
 #include <unistd.h>
-
-#include "src/util/util_osx.h"
 #endif
 
 #if defined(__linux__) || defined(__APPLE__)
@@ -74,13 +70,12 @@ int64_t Util::CurrentTimeMillis() {
 
 int64_t Util::CurrentTimeNanos() { return absl::GetCurrentTimeNanos(); }
 
-int64_t Util::StrToTimeStamp(string_view time) {
+int64_t Util::StrToTimeStampUTC(string_view time) {
   return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez");
 }
 
-int64_t Util::StrToTimeStamp(string_view time, string_view format) {
-  absl::TimeZone tz;
-  absl::LoadTimeZone("localtime", &tz);
+int64_t Util::StrToTimeStampUTC(string_view time, string_view format) {
+  absl::TimeZone tz = absl::UTCTimeZone();
   absl::Time t;
   string err;
   if (!absl::ParseTime(format, time, tz, &t, &err)) {
@@ -88,6 +83,47 @@ int64_t Util::StrToTimeStamp(string_view time, string_view format) {
     return -1;
   }
   return absl::ToUnixMillis(t);
+}
+
+int64_t Util::StrToTimeStamp(string_view time) {
+  return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez");
+}
+
+int64_t Util::StrToTimeStamp(string_view time, string_view format) {
+  absl::TimeZone tz = absl::LocalTimeZone();
+  absl::Time t;
+  string err;
+  if (!absl::ParseTime(format, time, tz, &t, &err)) {
+    LOG(ERROR) << err << " " << time << ", format: " << format;
+    return -1;
+  }
+  return absl::ToUnixMillis(t);
+}
+
+int64_t Util::StrToTimeStamp(string_view time, string_view format,
+                             string_view tz_str) {
+  absl::TimeZone tz;
+  if (!absl::LoadTimeZone(tz_str, &tz)) {
+    LOG(ERROR) << "Load time zone error: " << tz_str;
+  }
+  absl::Time t;
+  string err;
+  if (!absl::ParseTime(format, time, tz, &t, &err)) {
+    LOG(ERROR) << err << " " << time << ", format: " << format;
+    return -1;
+  }
+
+  return absl::ToUnixMillis(t);
+}
+
+string Util::ToTimeStrUTC() {
+  return Util::ToTimeStrUTC(Util::CurrentTimeMillis(),
+                            "%Y-%m-%d%ET%H:%M:%E3S%Ez");
+}
+
+string Util::ToTimeStrUTC(const int64_t ts, string_view format) {
+  absl::TimeZone tz = absl::UTCTimeZone();
+  return absl::FormatTime(format, absl::FromUnixMillis(ts), tz);
 }
 
 string Util::ToTimeStr() {
@@ -100,15 +136,17 @@ string Util::ToTimeStr(const int64_t ts) {
 }
 
 string Util::ToTimeStr(const int64_t ts, string_view format) {
-  absl::TimeZone time_zone;
-  absl::LoadTimeZone("localtime", &time_zone);
-  return absl::FormatTime(format, absl::FromUnixMillis(ts), time_zone);
+  absl::TimeZone tz = absl::LocalTimeZone();
+  return absl::FormatTime(format, absl::FromUnixMillis(ts), tz);
 }
 
-string Util::ToTimeStr(const int64_t ts, string_view format, string_view tz) {
-  absl::TimeZone time_zone;
-  absl::LoadTimeZone(tz, &time_zone);
-  return absl::FormatTime(format, absl::FromUnixMillis(ts), time_zone);
+string Util::ToTimeStr(const int64_t ts, string_view format,
+                       string_view tz_str) {
+  absl::TimeZone tz;
+  if (!absl::LoadTimeZone(tz_str, &tz)) {
+    LOG(ERROR) << "Load time zone error: " << tz_str;
+  }
+  return absl::FormatTime(format, absl::FromUnixMillis(ts), tz);
 }
 
 struct timespec Util::ToTimeSpec(const int64_t ts) {
@@ -146,26 +184,53 @@ bool Util::IsAbsolute(string_view src) {
   return s_src.is_absolute();
 }
 
-int64_t Util::CreateTime(const std::string &path) {
+bool Util::SetUpdateTime(const string &path, int64_t ts) {
 #if defined(_WIN32)
-  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
-    ULARGE_INTEGER ull;
-    ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
-    ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
-    return (ull.QuadPart / 10000ULL) - 11644473600000ULL;
+  HANDLE hFile = CreateFileA(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+                             FILE_ATTRIBUTE_NORMAL, NULL);
+
+  if (hFile == INVALID_HANDLE_VALUE) {
+    std::cerr << "Failed to open file.\n";
+    return false;
   }
+
+  if (!SetFileTime(hFile, NULL, NULL, &newTime)) {
+    std::cerr << "Failed to set file time.\n";
+    CloseHandle(hFile);
+    return false;
+  }
+
+  CloseHandle(hFile);
 #else
-  struct stat attr;
-  if (lstat(path.c_str(), &attr) == 0) {
-#ifdef __linux__
-    return attr.st_ctim.tv_sec * 1000 + attr.st_ctim.tv_nsec / 1000000;
-#elif __APPLE__
-    return attr.st_ctim.tv_sec * 1000 + attr.st_birthtimespec.tv_sec / 1000000;
-#endif
+  struct timespec times[2];
+  struct timespec time = ToTimeSpec(ts);
+  times[0] = time;
+  times[1] = time;
+
+  int dir_fd = -1;
+  std::filesystem::path s_path(path);
+  if (IsAbsolute(path)) {
+    dir_fd =
+        open(s_path.parent_path().string().c_str(), O_RDONLY | O_DIRECTORY);
+  } else {
+    dir_fd = AT_FDCWD;
   }
-  return -1;
+
+  if (dir_fd == -1) {
+    return false;
+  }
+  if (dir_fd == AT_FDCWD) {
+    if (utimensat(dir_fd, path.c_str(), times, AT_SYMLINK_NOFOLLOW) != 0) {
+      return false;
+    }
+  } else {
+    if (utimensat(dir_fd, s_path.filename().c_str(), times,
+                  AT_SYMLINK_NOFOLLOW) != 0) {
+      return false;
+    }
+  }
 #endif
+  return true;
 }
 
 int64_t Util::UpdateTime(const std::string &path) {
@@ -243,7 +308,11 @@ bool Util::FileInfo(const std::string &path, int64_t *update_time,
 }
 
 bool Util::Exists(string_view path) {
-  return std::filesystem::exists(std::filesystem::symlink_status(path));
+  try {
+    return std::filesystem::exists(std::filesystem::symlink_status(path));
+  } catch (const std::filesystem::filesystem_error &e) {
+  }
+  return false;
 }
 
 bool Util::TargetExists(string_view src, string_view dst) {
@@ -325,8 +394,7 @@ bool Util::Create(const string &path) {
     }
     CloseHandle(hFile);
 #else
-    // int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0640);
-    int fd = creat(path.c_str(), 0640);
+    int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
     if (fd == -1) {
       LOG(ERROR) << "Create file error: " << path;
       return false;
@@ -467,41 +535,6 @@ bool Util::CopyFile(string_view src, string_view dst,
   return false;
 }
 
-bool Util::SetUpdateTime(const string &path, int64_t ts) {
-  try {
-#if defined(_WIN32)
-    HANDLE hFile = CreateFileA(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
-                               FILE_ATTRIBUTE_NORMAL, NULL);
-
-    if (hFile == INVALID_HANDLE_VALUE) {
-      std::cerr << "Failed to open file.\n";
-      return false;
-    }
-
-    if (!SetFileTime(hFile, NULL, NULL, &newTime)) {
-      std::cerr << "Failed to set file time.\n";
-      CloseHandle(hFile);
-      return false;
-    }
-
-    CloseHandle(hFile);
-#else
-    struct timespec times[2];
-    struct timespec time = ToTimeSpec(ts);
-    times[0] = time;
-    times[1] = time;
-
-    if (utimensat(AT_FDCWD, path.c_str(), times, 0) != 0) {
-      return false;
-    }
-
-#endif
-  } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << "SetUpdateTime error: " << path << ", " << e.what();
-  }
-  return false;
-}
-
 bool Util::Copy(string_view src, string_view dst) {
   try {
     std::filesystem::copy(src, dst, std::filesystem::copy_options::recursive);
@@ -603,36 +636,6 @@ bool Util::LoadSmallFile(const std::string &path, string *content) {
   in.close();
   *content = buffer.str();
   return true;
-}
-
-std::string Util::PartitionUUID(string_view path) {
-#if defined(_WIN32)
-  return UtilWindows::PartitionUUID(path);
-#elif defined(__linux__)
-  return UtilLinux::PartitionUUID(path);
-#elif defined(__APPLE__)
-  return UtilOsx::PartitionUUID(path);
-#endif
-}
-
-std::string Util::Partition(string_view path) {
-#if defined(_WIN32)
-  return UtilWindows::Partition(path);
-#elif defined(__linux__)
-  return UtilLinux::Partition(path);
-#elif defined(__APPLE__)
-  return UtilOsx::Partition(path);
-#endif
-}
-
-bool Util::SetFileInvisible(string_view path) {
-#if defined(_WIN32)
-  return UtilWindows::SetFileInvisible(path);
-#elif defined(__linux__)
-  return UtilLinux::SetFileInvisible(path);
-#elif defined(__APPLE__)
-  return UtilOsx::SetFileInvisible(path);
-#endif
 }
 
 bool Util::SyncSymlink(const std::string &src, const std::string &dst,
