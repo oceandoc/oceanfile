@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <random>
 #include <stack>
 #include <string>
@@ -573,7 +574,8 @@ proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
       }
     }
 
-    std::ofstream ofs(path, append ? std::ios::app : std::ios::out);
+    std::ofstream ofs(path, (append ? std::ios::app : std::ios::trunc) |
+                                std::ios::out | std::ios::binary);
     if (ofs && ofs.is_open()) {
       ofs << content;
       ofs.close();
@@ -584,6 +586,7 @@ proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
       } else if (errno == ENOSPC) {
         return proto::ErrCode::File_disk_full;
       }
+      LOG(INFO) << std::strerror(errno);
       return proto::ErrCode::Fail;
     }
   } catch (const std::filesystem::filesystem_error &e) {
@@ -626,16 +629,20 @@ proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
 }
 
 bool Util::LoadSmallFile(const std::string &path, string *content) {
-  std::ifstream in(path);
+  std::ifstream in(path, std::ios::binary);
   if (!in || !in.is_open()) {
     LOG(ERROR) << "Fail to open " << path
                << ", please check file exists and file permission";
     return false;
   }
-  std::stringstream buffer;
-  buffer << in.rdbuf();
+
+  in.seekg(0, std::ios::end);
+  content->reserve(in.tellg());
+  in.seekg(0, std::ios::beg);
+
+  std::copy((std::istreambuf_iterator<char>(in)),
+            std::istreambuf_iterator<char>(), std::back_inserter(*content));
   in.close();
-  *content = buffer.str();
   return true;
 }
 
@@ -1152,6 +1159,15 @@ void Util::PrintProtoMessage(const google::protobuf::Message &msg) {
 
 bool Util::MessageToJson(const google::protobuf::Message &msg, string *json) {
   static PrintOptions option = {false, true, true, true, true};
+  if (!MessageToJsonString(msg, json, option).ok()) {
+    return false;
+  }
+  return true;
+}
+
+bool Util::MessageToPrettyJson(const google::protobuf::Message &msg,
+                               string *json) {
+  static PrintOptions option = {true, true, false, true, true};
   if (!MessageToJsonString(msg, json, option).ok()) {
     return false;
   }

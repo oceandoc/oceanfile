@@ -232,6 +232,8 @@ class Util final {
 
   static bool MessageToJson(const google::protobuf::Message &msg,
                             std::string *json);
+  static bool MessageToPrettyJson(const google::protobuf::Message &msg,
+                                  std::string *json);
   static bool JsonToMessage(const std::string &json,
                             google::protobuf::Message *msg);
   static void PrintFileReq(const proto::FileReq &req);

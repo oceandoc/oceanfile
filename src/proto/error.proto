@@ -31,4 +31,7 @@ enum ErrCode {
   // 13000
   Repo_not_exists = 13000;
   Repo_uuid_error = 13001;
+
+  // 14000
+  Serialize_error = 14000;
 }

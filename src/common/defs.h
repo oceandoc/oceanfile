@@ -8,7 +8,6 @@
 
 #include <fstream>
 #include <string>
-#include <string_view>
 
 namespace oceandoc {
 namespace common {
@@ -19,6 +18,18 @@ enum SendStatus {
   TOO_MANY_RETRY,
   FATAL,
   FAIL,
+};
+
+enum HashMethod {
+  Hash_NONE,
+  Hash_CRC32,
+  Hash_MD5,
+  Hash_SHA256,
+};
+
+enum SyncMethod {
+  Sync_SYNC,
+  Sync_ARCH,
 };
 
 const std::string CONFIG_DIR = ".Dr.Q.config";
