@@ -34,6 +34,7 @@ int main(int argc, char** argv) {
     json.append(std::to_string(p.second.update_time()));
     json.append("\n");
   }
+  oceandoc::util::Util::WriteToFile("./data/file_list", json, false);
 
   json.clear();
   for (const auto& p : scan_status.scanned_dirs()) {

@@ -255,47 +255,47 @@ TEST(Util, FindCommonRoot) {
   EXPECT_EQ(path.string(), "test_data/util_test/test1/test2/symlink_to_target");
 
   auto ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), base.string());
+  EXPECT_EQ(ret, base.string());
 
   path = "test_data/util_test/test1/test2/symlink_to_target";
   base = "test_data/util_test/test1/test2";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "test_data/util_test/test1/test2");
+  EXPECT_EQ(ret, "test_data/util_test/test1/test2");
 
   path = "test_data/util_test/test1/test2/symlink_to_target";
   base = "test1";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "");
+  EXPECT_EQ(ret, "");
 
   path = "test1";
   base = "test_data/util_test/test1/test2/symlink_to_target";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "");
+  EXPECT_EQ(ret, "");
 
   path = "/";
   base = "/";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "/");
+  EXPECT_EQ(ret, "/");
 
   path = "/";
   base = "/base";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "/");
+  EXPECT_EQ(ret, "/");
 
   path = "/test";
   base = "/base";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "/");
+  EXPECT_EQ(ret, "/");
 
   path = "/base/test";
   base = "/base";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "/base");
+  EXPECT_EQ(ret, "/base");
 
   path = "base/test";
   base = "/base";
   ret = Util::FindCommonRoot(path, base);
-  EXPECT_EQ(ret.string(), "");
+  EXPECT_EQ(ret, "");
 }
 
 TEST(Util, Relative) {
@@ -332,6 +332,14 @@ TEST(Util, Relative) {
                            "test_data/util_test/symlink_test", &relative),
             true);
   EXPECT_EQ(relative, "../test1/test2/symlink_to_target");
+}
+
+TEST(Util, ParentPath) {
+  std::string relative = "18";
+  EXPECT_EQ(Util::ParentPath(relative), ".");
+
+  relative = "18/test";
+  EXPECT_EQ(Util::ParentPath(relative), "18");
 }
 
 TEST(Util, TruncateFile) {

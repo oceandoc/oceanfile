@@ -78,7 +78,7 @@ class SyncManager {
     ctx.removed_files.reserve(10000);
     ctx.copy_failed_files.reserve(10000);
 
-    auto ret = ScanManager::Instance()->ParallelScan(unify_src, &ctx);
+    auto ret = ScanManager::Instance()->ParallelScan(&ctx);
     if (ret != proto::ErrCode::Success) {
       LOG(ERROR) << "Scan " << src << " error";
       return ret;

@@ -13,7 +13,6 @@
 #include <random>
 #include <stack>
 #include <string>
-#include <string_view>
 #include <system_error>
 #include <thread>
 #include <utility>
@@ -61,7 +60,6 @@
 using google::protobuf::json::ParseOptions;
 using google::protobuf::json::PrintOptions;
 using std::string;
-using std::string_view;
 
 namespace oceandoc {
 namespace util {
@@ -72,11 +70,11 @@ int64_t Util::CurrentTimeMillis() {
 
 int64_t Util::CurrentTimeNanos() { return absl::GetCurrentTimeNanos(); }
 
-int64_t Util::StrToTimeStampUTC(string_view time) {
+int64_t Util::StrToTimeStampUTC(const string &time) {
   return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez");
 }
 
-int64_t Util::StrToTimeStampUTC(string_view time, string_view format) {
+int64_t Util::StrToTimeStampUTC(const string &time, const string &format) {
   absl::TimeZone tz = absl::UTCTimeZone();
   absl::Time t;
   string err;
@@ -87,11 +85,11 @@ int64_t Util::StrToTimeStampUTC(string_view time, string_view format) {
   return absl::ToUnixMillis(t);
 }
 
-int64_t Util::StrToTimeStamp(string_view time) {
+int64_t Util::StrToTimeStamp(const string &time) {
   return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez");
 }
 
-int64_t Util::StrToTimeStamp(string_view time, string_view format) {
+int64_t Util::StrToTimeStamp(const string &time, const string &format) {
   absl::TimeZone tz = absl::LocalTimeZone();
   absl::Time t;
   string err;
@@ -102,8 +100,8 @@ int64_t Util::StrToTimeStamp(string_view time, string_view format) {
   return absl::ToUnixMillis(t);
 }
 
-int64_t Util::StrToTimeStamp(string_view time, string_view format,
-                             string_view tz_str) {
+int64_t Util::StrToTimeStamp(const string &time, const string &format,
+                             const string &tz_str) {
   absl::TimeZone tz;
   if (!absl::LoadTimeZone(tz_str, &tz)) {
     LOG(ERROR) << "Load time zone error: " << tz_str;
@@ -123,7 +121,7 @@ string Util::ToTimeStrUTC() {
                             "%Y-%m-%d%ET%H:%M:%E3S%Ez");
 }
 
-string Util::ToTimeStrUTC(const int64_t ts, string_view format) {
+string Util::ToTimeStrUTC(const int64_t ts, const string &format) {
   absl::TimeZone tz = absl::UTCTimeZone();
   return absl::FormatTime(format, absl::FromUnixMillis(ts), tz);
 }
@@ -137,13 +135,13 @@ string Util::ToTimeStr(const int64_t ts) {
   return Util::ToTimeStr(ts, "%Y-%m-%d%ET%H:%M:%E3S%Ez", "localtime");
 }
 
-string Util::ToTimeStr(const int64_t ts, string_view format) {
+string Util::ToTimeStr(const int64_t ts, const string &format) {
   absl::TimeZone tz = absl::LocalTimeZone();
   return absl::FormatTime(format, absl::FromUnixMillis(ts), tz);
 }
 
-string Util::ToTimeStr(const int64_t ts, string_view format,
-                       string_view tz_str) {
+string Util::ToTimeStr(const int64_t ts, const string &format,
+                       const string &tz_str) {
   absl::TimeZone tz;
   if (!absl::LoadTimeZone(tz_str, &tz)) {
     LOG(ERROR) << "Load time zone error: " << tz_str;
@@ -175,13 +173,13 @@ void Util::UnifyDir(string *path) {
   ReplaceAll(path, string("//"), string("/"));
 }
 
-string Util::UnifyDir(string_view path) {
+string Util::UnifyDir(const string &path) {
   string ret(path);
   UnifyDir(&ret);
   return ret;
 }
 
-bool Util::IsAbsolute(string_view src) {
+bool Util::IsAbsolute(const string &src) {
   std::filesystem::path s_src(src);
   return s_src.is_absolute();
 }
@@ -309,7 +307,7 @@ bool Util::FileInfo(const std::string &path, int64_t *update_time,
   return false;
 }
 
-bool Util::Exists(string_view path) {
+bool Util::Exists(const string &path) {
   try {
     return std::filesystem::exists(std::filesystem::symlink_status(path));
   } catch (const std::filesystem::filesystem_error &e) {
@@ -317,7 +315,7 @@ bool Util::Exists(string_view path) {
   return false;
 }
 
-bool Util::TargetExists(string_view src, string_view dst) {
+bool Util::TargetExists(const string &src, const string &dst) {
   if (!std::filesystem::exists(src)) {
     return true;
   }
@@ -327,7 +325,7 @@ bool Util::TargetExists(string_view src, string_view dst) {
   return true;
 }
 
-bool Util::Mkdir(string_view path) {
+bool Util::Mkdir(const string &path) {
   try {
     if (!Exists(path)) {
       return std::filesystem::create_directories(path);
@@ -352,7 +350,7 @@ bool Util::MkParentDir(const std::filesystem::path &path) {
   return true;
 }
 
-bool Util::Remove(string_view path) {
+bool Util::Remove(const string &path) {
   try {
     if (Exists(path)) {
       return std::filesystem::remove_all(path);
@@ -472,7 +470,7 @@ proto::ErrCode Util::CreateFileWithSize(const std::string &path,
   return proto::ErrCode::Success;
 }
 
-bool Util::CreateSymlink(std::string_view src, std::string_view target) {
+bool Util::CreateSymlink(const string &src, const string &target) {
   std::error_code ec;
   std::filesystem::create_symlink(target, src, ec);
   if (ec) {
@@ -482,12 +480,12 @@ bool Util::CreateSymlink(std::string_view src, std::string_view target) {
   return true;
 }
 
-std::filesystem::path Util::FindCommonRoot(const std::filesystem::path &path,
-                                           const std::filesystem::path &base) {
+string Util::FindCommonRoot(const std::filesystem::path &path,
+                            const std::filesystem::path &base) {
   std::filesystem::path t(base);
   do {
     if (Util::StartWith(path.string(), t.string())) {
-      return t;
+      return t.string();
     }
     if (t.string() == "/") {
       return "";
@@ -499,7 +497,7 @@ std::filesystem::path Util::FindCommonRoot(const std::filesystem::path &path,
   } while (true);
 }
 
-bool Util::Relative(string_view path, string_view base, string *relative) {
+bool Util::Relative(const string &path, const string &base, string *relative) {
   relative->clear();
   const string u_path = UnifyDir(path);
   const string u_base = UnifyDir(base);
@@ -507,26 +505,42 @@ bool Util::Relative(string_view path, string_view base, string *relative) {
   auto s_path = std::filesystem::path(u_path);
   auto s_base = std::filesystem::path(u_base);
 
-  auto common_parent = FindCommonRoot(s_path, s_base);
-  if (common_parent.string().empty()) {
+  std::string common_parent;
+  try {
+    common_parent = FindCommonRoot(s_path, s_base);
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << e.what();
+  }
+
+  if (common_parent.empty()) {
     LOG(ERROR) << "cannot calc relative between " << path << " and " << base;
     return false;
   }
 
   auto t = s_base;
-  while (common_parent.string() != t.string()) {
+  while (common_parent != t.string()) {
     relative->append("../");
     t = t.parent_path();
   }
 
-  if (u_path.size() > common_parent.string().size()) {
-    relative->append(u_path.substr(common_parent.string().size() + 1));
+  if (u_path.size() > common_parent.size()) {
+    relative->append(u_path.substr(common_parent.size() + 1));
   }
+  // LOG(INFO) << *relative;
   UnifyDir(relative);
   return true;
 }
 
-bool Util::CopyFile(string_view src, string_view dst,
+string Util::ParentPath(const std::string &path) {
+  std::string parent;
+  std::filesystem::path s_path(path);
+  if (s_path.has_parent_path()) {
+    return s_path.parent_path().string();
+  }
+  return "";
+}
+
+bool Util::CopyFile(const string &src, const string &dst,
                     const std::filesystem::copy_options opt) {
   try {
     return std::filesystem::copy_file(src, dst, opt);
@@ -537,7 +551,7 @@ bool Util::CopyFile(string_view src, string_view dst,
   return false;
 }
 
-bool Util::Copy(string_view src, string_view dst) {
+bool Util::Copy(const string &src, const string &dst) {
   try {
     std::filesystem::copy(src, dst, std::filesystem::copy_options::recursive);
   } catch (const std::filesystem::filesystem_error &e) {
@@ -851,7 +865,7 @@ string Util::ToHexStr(const uint64_t in, bool use_upper_case) {
   }
 }
 
-void Util::ToHexStr(string_view in, std::string *out, bool use_upper_case) {
+void Util::ToHexStr(const string &in, std::string *out, bool use_upper_case) {
   out->clear();
   out->reserve(in.size() * 2);
   for (std::size_t i = 0; i < in.size(); ++i) {
@@ -863,7 +877,7 @@ void Util::ToHexStr(string_view in, std::string *out, bool use_upper_case) {
   }
 }
 
-string Util::ToHexStr(string_view in, bool use_upper_case) {
+string Util::ToHexStr(const string &in, bool use_upper_case) {
   string out;
   out.reserve(in.size() * 2);
   for (std::size_t i = 0; i < in.size(); ++i) {
@@ -876,7 +890,7 @@ string Util::ToHexStr(string_view in, bool use_upper_case) {
   return out;
 }
 
-bool Util::HexStrToInt64(string_view in, int64_t *out) {
+bool Util::HexStrToInt64(const string &in, int64_t *out) {
   *out = 0;
   auto result = std::from_chars(in.data(), in.data() + in.size(), *out, 16);
   if (result.ec == std::errc()) {
@@ -885,22 +899,22 @@ bool Util::HexStrToInt64(string_view in, int64_t *out) {
   return true;
 }
 
-uint32_t Util::CRC32(string_view content) { return crc32c::Crc32c(content); }
+uint32_t Util::CRC32(const string &content) { return crc32c::Crc32c(content); }
 
-void Util::Base64Encode(string_view input, string *out) {
+void Util::Base64Encode(const string &input, string *out) {
   out->resize(boost::beast::detail::base64::encoded_size(input.size()));
   auto const ret = boost::beast::detail::base64::encode(
       out->data(), input.data(), input.size());
   out->resize(ret);
 }
 
-string Util::Base64Encode(string_view input) {
+string Util::Base64Encode(const string &input) {
   string out;
   Base64Encode(input, &out);
   return out;
 }
 
-void Util::Base64Decode(string_view input, string *out) {
+void Util::Base64Decode(const string &input, string *out) {
   out->resize(boost::beast::detail::base64::decoded_size(input.size()));
   auto const ret = boost::beast::detail::base64::decode(
       out->data(), input.data(), input.size());
@@ -908,13 +922,13 @@ void Util::Base64Decode(string_view input, string *out) {
   return;
 }
 
-string Util::Base64Decode(string_view input) {
+string Util::Base64Decode(const string &input) {
   string out;
   Base64Decode(input, &out);
   return out;
 }
 
-int64_t Util::MurmurHash64A(string_view str) {
+int64_t Util::MurmurHash64A(const string &str) {
   return ::MurmurHash64A(str.data(), str.size(), 42L);
 }
 
@@ -930,7 +944,7 @@ EVP_MD_CTX *Util::HashInit(const EVP_MD *type) {
   return context;
 }
 
-bool Util::HashUpdate(EVP_MD_CTX *context, string_view str) {
+bool Util::HashUpdate(EVP_MD_CTX *context, const string &str) {
   if (EVP_DigestUpdate(context, str.data(), str.size()) != 1) {
     EVP_MD_CTX_free(context);
     return false;
@@ -948,14 +962,14 @@ bool Util::HashFinal(EVP_MD_CTX *context, string *out, bool use_upper_case) {
 
   EVP_MD_CTX_free(context);
 
-  string_view sv(reinterpret_cast<const char *>(hash), length);
-  Util::ToHexStr(sv, out, use_upper_case);
+  string s(reinterpret_cast<const char *>(hash), length);
+  Util::ToHexStr(s, out, use_upper_case);
   return true;
 }
 
 EVP_MD_CTX *Util::SHA256Init() { return HashInit(EVP_sha256()); }
 
-bool Util::SHA256Update(EVP_MD_CTX *context, string_view str) {
+bool Util::SHA256Update(EVP_MD_CTX *context, const string &str) {
   return HashUpdate(context, str);
 }
 
@@ -963,7 +977,7 @@ bool Util::SHA256Final(EVP_MD_CTX *context, string *out, bool use_upper_case) {
   return HashFinal(context, out, use_upper_case);
 }
 
-bool Util::Hash(string_view str, const EVP_MD *type, string *out,
+bool Util::Hash(const string &str, const EVP_MD *type, string *out,
                 bool use_upper_case) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int length;
@@ -981,8 +995,8 @@ bool Util::Hash(string_view str, const EVP_MD *type, string *out,
 
   EVP_MD_CTX_free(context);
 
-  string_view sv(reinterpret_cast<const char *>(hash), length);
-  Util::ToHexStr(sv, out, use_upper_case);
+  string s(reinterpret_cast<const char *>(hash), length);
+  Util::ToHexStr(s, out, use_upper_case);
   return true;
 }
 
@@ -1024,8 +1038,8 @@ bool Util::FileHash(const std::string &path, const EVP_MD *type,
 
   EVP_MD_CTX_free(context);
 
-  string_view sv(reinterpret_cast<const char *>(hash), length);
-  Util::ToHexStr(sv, out, use_upper_case);
+  string s(reinterpret_cast<const char *>(hash), length);
+  Util::ToHexStr(s, out, use_upper_case);
   return true;
 }
 
@@ -1038,7 +1052,7 @@ bool Util::SmallFileHash(const std::string &path, const EVP_MD *type,
   return Hash(str, type, out, use_upper_case);
 }
 
-bool Util::MD5(string_view str, string *out, bool use_upper_case) {
+bool Util::MD5(const string &str, string *out, bool use_upper_case) {
   return Hash(str, EVP_md5(), out, use_upper_case);
 }
 
@@ -1050,24 +1064,24 @@ bool Util::FileMD5(const std::string &path, string *out, bool use_upper_case) {
   return Util::FileHash(path, EVP_md5(), out, use_upper_case);
 }
 
-bool Util::SHA256(string_view str, string *out, bool use_upper_case) {
+bool Util::SHA256(const string &str, string *out, bool use_upper_case) {
   return Hash(str, EVP_sha256(), out, use_upper_case);
 }
 
-string Util::SHA256(string_view str, bool use_upper_case) {
+string Util::SHA256(const string &str, bool use_upper_case) {
   string out;
   Hash(str, EVP_sha256(), &out, use_upper_case);
   return out;
 }
 
-bool Util::SHA256_libsodium(string_view str, string *out, bool use_upper_case) {
+bool Util::SHA256_libsodium(const string &str, string *out,
+                            bool use_upper_case) {
   unsigned char hash[crypto_hash_sha256_BYTES];
   crypto_hash_sha256(hash, reinterpret_cast<const unsigned char *>(str.data()),
                      str.size());
 
-  string_view sv(reinterpret_cast<const char *>(hash),
-                 crypto_hash_sha256_BYTES);
-  Util::ToHexStr(sv, out, use_upper_case);
+  string s(reinterpret_cast<const char *>(hash), crypto_hash_sha256_BYTES);
+  Util::ToHexStr(s, out, use_upper_case);
   return true;
 }
 
@@ -1081,7 +1095,7 @@ bool Util::FileSHA256(const std::string &path, string *out,
   return FileHash(path, EVP_sha256(), out, use_upper_case);
 }
 
-bool Util::LZMACompress(string_view data, string *out) {
+bool Util::LZMACompress(const string &data, string *out) {
   lzma_stream strm = LZMA_STREAM_INIT;
   lzma_ret ret =
       lzma_easy_encoder(&strm, LZMA_PRESET_DEFAULT, LZMA_CHECK_CRC64);
@@ -1110,7 +1124,7 @@ bool Util::LZMACompress(string_view data, string *out) {
   return true;
 }
 
-bool Util::LZMADecompress(string_view data, string *out) {
+bool Util::LZMADecompress(const string &data, string *out) {
   lzma_stream strm = LZMA_STREAM_INIT;
   lzma_ret ret = lzma_stream_decoder(&strm, UINT64_MAX, LZMA_CONCATENATED);
 

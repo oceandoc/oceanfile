@@ -16,12 +16,14 @@ TEST(ScanManager, ParallelScan) {
   ThreadPool::Instance()->Init();
   std::string path = "/usr/local/test_src";
   proto::ScanStatus scan_status;
+  scan_status.set_path(path);
   ScanContext ctx;
+  ctx.src = path;
   ctx.status = &scan_status;
   ctx.hash_method = common::HashMethod::Hash_NONE;
   ctx.sync_method = common::SyncMethod::Sync_SYNC;
   ctx.disable_scan_cache = false;
-  EXPECT_EQ(ScanManager::Instance()->ParallelScan(path, &ctx),
+  EXPECT_EQ(ScanManager::Instance()->ParallelScan(&ctx),
             proto::ErrCode::Success);
 }
 
