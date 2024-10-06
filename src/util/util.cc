@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -41,11 +42,12 @@
 
 #if defined(_WIN32)
 #elif defined(__linux__)
+#include <dirent.h>
 #include <fcntl.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <utime.h>
-
 #elif defined(__APPLE__)
 #include <fcntl.h>
 #include <unistd.h>
@@ -217,18 +219,22 @@ bool Util::SetUpdateTime(const string &path, int64_t ts) {
   }
 
   if (dir_fd == -1) {
+    close(dir_fd);
     return false;
   }
   if (dir_fd == AT_FDCWD) {
     if (utimensat(dir_fd, path.c_str(), times, AT_SYMLINK_NOFOLLOW) != 0) {
+      close(dir_fd);
       return false;
     }
   } else {
     if (utimensat(dir_fd, s_path.filename().c_str(), times,
                   AT_SYMLINK_NOFOLLOW) != 0) {
+      close(dir_fd);
       return false;
     }
   }
+  close(dir_fd);
 #endif
   return true;
 }
@@ -337,14 +343,15 @@ bool Util::Mkdir(const string &path) {
   return true;
 }
 
-bool Util::MkParentDir(const std::filesystem::path &path) {
+bool Util::MkParentDir(const string &path) {
   try {
-    if (!path.has_parent_path()) {
+    std::filesystem::path s_path(path);
+    if (!s_path.has_parent_path()) {
       return false;
     }
-    return Mkdir(path.parent_path().string());
+    return Mkdir(s_path.parent_path().string());
   } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << "Error: " << path.string() << ", e: " << e.what();
+    LOG(ERROR) << "Error: " << path << ", e: " << e.what();
     return false;
   }
   return true;
@@ -548,6 +555,8 @@ bool Util::CopyFile(const string &src, const string &dst,
     LOG(ERROR) << "CopyFile error: " << src << " to " << dst << ", "
                << e.what();
   }
+  FDCount();
+  std::exit(0);
   return false;
 }
 
@@ -561,7 +570,7 @@ bool Util::Copy(const string &src, const string &dst) {
   return true;
 }
 
-bool Util::TruncateFile(const std::filesystem::path &path) {
+bool Util::TruncateFile(const string &path) {
   try {
     if (!std::filesystem::exists(path)) {
       return true;
@@ -573,18 +582,19 @@ bool Util::TruncateFile(const std::filesystem::path &path) {
       return true;
     }
   } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << "TruncateFile error: " << path.string() << ", " << e.what();
+    LOG(ERROR) << "TruncateFile error: " << path << ", " << e.what();
     return false;
   }
   return true;
 }
 
-proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
-                                 const string &content, const bool append) {
+proto::ErrCode Util::WriteToFile(const string &path, const string &content,
+                                 const bool append) {
   try {
     if (!std::filesystem::exists(path)) {
-      if (path.has_parent_path()) {
-        std::filesystem::create_directories(path.parent_path());
+      std::filesystem::path s_path(path);
+      if (s_path.has_parent_path()) {
+        std::filesystem::create_directories(s_path.parent_path());
       }
     }
 
@@ -604,14 +614,14 @@ proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
       return proto::ErrCode::Fail;
     }
   } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << (!append ? "Write to " : "Append to ") << path.string()
+    LOG(ERROR) << (!append ? "Write to " : "Append to ") << path
                << ", error: " << e.what();
   }
   return proto::ErrCode::Fail;
 }
 
-proto::ErrCode Util::WriteToFile(const std::filesystem::path &path,
-                                 const string &content, const int64_t start) {
+proto::ErrCode Util::WriteToFile(const string &path, const string &content,
+                                 const int64_t start) {
   try {
     std::ofstream ofs(path, std::ios::binary | std::ios::out | std::ios::in);
     if (ofs && ofs.is_open()) {
@@ -691,9 +701,6 @@ bool Util::SyncSymlink(const std::string &src, const std::string &dst,
     Util::MkParentDir(dst_symlink);
     Util::Remove(dst_symlink);
     std::filesystem::create_symlink(target, dst_symlink);
-    if (!Util::TargetExists(src_symlink, dst_symlink)) {
-      LOG(INFO) << "dst_symlink target not exists";
-    }
     return true;
   } catch (std::filesystem::filesystem_error &e) {
     LOG(ERROR) << e.what();
@@ -1296,6 +1303,47 @@ bool Util::JsonToFileReq(const std::string &json, proto::FileReq *req) {
   // PrintFileReq(*req);
 
   return true;
+}
+
+int64_t Util::FDCount() {
+  int fd_count = 0;
+#if defined(__linux__)
+
+  struct rlimit limit;
+  getrlimit(RLIMIT_NOFILE, &limit);
+
+  const char *fd_dir = "/proc/self/fd";
+  DIR *dir = opendir(fd_dir);
+  if (dir == nullptr) {
+    limit.rlim_cur += 10000;
+    setrlimit(RLIMIT_NOFILE, &limit);
+
+    dir = opendir(fd_dir);
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != nullptr) {
+      if (entry->d_name[0] == '.') continue;
+      fd_count++;
+      std::string fd_path = std::string(fd_dir) + "/" + entry->d_name;
+      char link_target[256];
+      ssize_t len =
+          readlink(fd_path.c_str(), link_target, sizeof(link_target) - 1);
+      if (len != -1) {
+        link_target[len] = '\0';
+        LOG(INFO) << link_target;
+      } else {
+        perror("Failed to read link");
+      }
+    }
+    LOG(INFO) << fd_count << ", soft limit: " << limit.rlim_cur << ", "
+              << limit.rlim_max;
+
+    perror("Could not open /proc/self/fd");
+    return -1;
+  }
+
+  closedir(dir);
+#endif
+  return fd_count;
 }
 
 }  // namespace util

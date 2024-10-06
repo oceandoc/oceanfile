@@ -67,7 +67,7 @@ class Util final {
   static bool Exists(const std::string &path);
   static bool TargetExists(const std::string &src, const std::string &dst);
   static bool Mkdir(const std::string &path);
-  static bool MkParentDir(const std::filesystem::path &path);
+  static bool MkParentDir(const std::string &path);
   static bool Remove(const std::string &path);
   static bool Create(const std::string &path);
   static bool Rename(const std::string &src, const std::string &dst);
@@ -86,11 +86,11 @@ class Util final {
                        const std::filesystem::copy_options opt =
                            std::filesystem::copy_options::overwrite_existing);
   static bool Copy(const std::string &src, const std::string &dst);
-  static bool TruncateFile(const std::filesystem::path &path);
-  static proto::ErrCode WriteToFile(const std::filesystem::path &path,
+  static bool TruncateFile(const std::string &path);
+  static proto::ErrCode WriteToFile(const std::string &path,
                                     const std::string &content,
                                     const bool append = false);
-  static proto::ErrCode WriteToFile(const std::filesystem::path &path,
+  static proto::ErrCode WriteToFile(const std::string &path,
                                     const std::string &content,
                                     const int64_t start);
   static bool LoadSmallFile(const std::string &path, std::string *content);
@@ -254,6 +254,8 @@ class Util final {
       return std::nullopt;
     }
   }
+
+  static int64_t FDCount();
 };
 
 }  // namespace util

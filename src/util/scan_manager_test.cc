@@ -15,6 +15,7 @@ TEST(ScanManager, ParallelScan) {
   ConfigManager::Instance()->Init("./conf/base_config.json");
   ThreadPool::Instance()->Init();
   std::string path = "/usr/local/test_src";
+
   proto::ScanStatus scan_status;
   scan_status.set_path(path);
   ScanContext ctx;

@@ -119,8 +119,8 @@ class RepoManager {
 
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
-      repos_.mutable_repos()->insert({repo.path(), repo});
-      repos_.mutable_uuid_repos()->insert({repo.uuid(), repo});
+      (*repos_.mutable_repos())[repo.path()] = repo;
+      (*repos_.mutable_uuid_repos())[repo.uuid()] = repo;
     }
     return FlushReposConfig();
   }

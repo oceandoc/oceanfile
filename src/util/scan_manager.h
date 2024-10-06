@@ -25,6 +25,7 @@
 #include "src/util/thread_pool.h"
 #include "src/util/util.h"
 
+// TODO(xieyz) add full unit_test
 namespace oceandoc {
 namespace util {
 
@@ -35,7 +36,7 @@ class ScanContext {
         hash_method(common::HashMethod::Hash_NONE),
         sync_method(common::SyncMethod::Sync_SYNC),
         disable_scan_cache(false) {
-    removed_files.reserve(10000);
+    copy_failed_files.reserve(10000);
   }
   std::string src;
   std::string dst;
@@ -43,7 +44,7 @@ class ScanContext {
   common::HashMethod hash_method;
   common::SyncMethod sync_method;
   bool disable_scan_cache;
-  std::vector<std::string> removed_files;
+  std::set<std::string> removed_files;
   std::unordered_set<std::string> ignored_dirs;
   std::vector<std::string> copy_failed_files;
 };
@@ -58,12 +59,8 @@ class ScanManager {
 
   bool Init() { return true; }
 
-  std::string GenFileDir(const std::string& path) {
-    return path + "/" + common::CONFIG_DIR;
-  }
-
   std::string GenFileName(const std::string& path) {
-    return GenFileDir(path) + "/" + Util::SHA256(path);
+    return path + "/" + common::CONFIG_DIR + "/" + Util::SHA256(path);
   }
 
   bool LoadCachedScanStatus(const std::string& path, ScanContext* ctx) {
@@ -83,15 +80,76 @@ class ScanManager {
         return false;
       }
 
-      ctx->status->mutable_ignored_dirs()->clear();
       for (const auto& dir : ctx->ignored_dirs) {
         ctx->status->mutable_ignored_dirs()->insert({dir, true});
       }
 
-      LOG(INFO) << "Loaed cached status: " << Print(*ctx->status);
+      LOG(INFO) << "Load cache status success: " << Print(*ctx);
       return true;
     }
+    LOG(ERROR) << "Load cache status error";
     return false;
+  }
+
+  bool ValidateScanStatus(const std::string& path, ScanContext* ctx) {
+    if (!Util::Exists(path)) {
+      LOG(ERROR) << path << " not exists";
+      return false;
+    }
+
+    if (!LoadCachedScanStatus(path, ctx)) {
+      return false;
+    }
+    const auto& status = *ctx->status;
+
+    if (status.path() != path) {
+      LOG(ERROR) << "Does " << path << " moved from " << status.path();
+      return false;
+    }
+
+    for (const auto& p : status.scanned_files()) {
+      if (p.first != p.second.path()) {
+        LOG(ERROR) << "This should never happend";
+        return false;
+      }
+
+      if (Util::IsAbsolute(p.first)) {
+        LOG(ERROR) << "Path should be relative: " << p.first;
+        return false;
+      }
+
+      if (!Util::Exists(status.path() + "/" + p.first)) {
+        LOG(ERROR) << status.path() + "/" + p.first << " not exists";
+        return false;
+      }
+      // TODO(xieyz) check symlink target exists
+    }
+
+    for (const auto& p : status.scanned_dirs()) {
+      if (p.first != p.second.path()) {
+        LOG(ERROR) << "This should never happend";
+        return false;
+      }
+
+      if (Util::IsAbsolute(p.first)) {
+        LOG(ERROR) << "Path should be relative: " << p.first;
+        return false;
+      }
+
+      if (!Util::Exists(status.path() + "/" + p.first)) {
+        LOG(ERROR) << status.path() + "/" + p.first << " not exists";
+        return false;
+      }
+
+      const auto& file_items = p.second.files();
+      for (const auto& file : file_items) {
+        if (!Util::Exists(status.path() + "/" + file.first)) {
+          LOG(ERROR) << status.path() + "/" + file.first << " not exists";
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   proto::ErrCode Dump(const std::string& path, ScanContext* ctx) {
@@ -121,7 +179,7 @@ class ScanManager {
             proto::ErrCode::Success ||
         Util::WriteToFile(path, compressed_content, false) ==
             proto::ErrCode::Success) {
-      LOG(INFO) << "Dump success: " << Print(*ctx->status);
+      LOG(INFO) << "Dump success: " << Print(*ctx);
       return proto::ErrCode::Success;
     }
     LOG(ERROR) << "Dump failed";
@@ -149,7 +207,8 @@ class ScanManager {
       return false;
     }
     stop_ = false;
-    current_threads = 0;
+    current_threads_ = 0;
+    stop_dump_task_ = false;
     return true;
   }
 
@@ -160,10 +219,10 @@ class ScanManager {
     }
   }
 
-  std::string Print(const proto::ScanStatus& status) {
+  std::string Print(const ScanContext& ctx) {
     int64_t file_num = 0;
     int64_t symlink_file_num = 0;
-    for (const auto& p : status.scanned_files()) {
+    for (const auto& p : ctx.status->scanned_files()) {
       if (p.second.file_type() == proto::FileType::Regular) {
         ++file_num;
       } else if (p.second.file_type() == proto::FileType::Symlink) {
@@ -171,31 +230,17 @@ class ScanManager {
       }
     }
     std::stringstream sstream;
-    sstream << "scanned_dirs num: " << status.scanned_dirs().size()
-            << ", scanned_files num: " << status.scanned_files().size()
-            << ", ignored_dirs num: " << status.ignored_dirs().size()
+    sstream << "scanned_dirs num: " << ctx.status->scanned_dirs().size()
+            << ", scanned_files num: " << ctx.status->scanned_files().size()
+            << ", ignored_dirs num: " << ctx.status->ignored_dirs().size()
             << ", file_num: " << file_num
-            << ", symlink_file_num: " << symlink_file_num;
+            << ", symlink_file_num: " << symlink_file_num
+            << ", removed_files: ";
+
+    for (const auto& i : ctx.removed_files) {
+      sstream << i << "|";
+    }
     return sstream.str();
-  }
-
-  proto::ErrCode AddDirItem(const std::string& path, ScanContext* ctx) {
-    proto::DirItem dir_item;
-    std::string relative_path;
-    Util::Relative(path, ctx->src, &relative_path);
-    dir_item.set_path(relative_path);
-    LOG(INFO) << relative_path;
-    int64_t update_time = 0, size = 0;
-    if (!Util::FileInfo(path, &update_time, &size)) {
-      return proto::ErrCode::File_permission_or_not_exists;
-    }
-
-    dir_item.set_update_time(update_time);
-    {
-      absl::base_internal::SpinLockHolder locker(&lock_);
-      ctx->status->mutable_scanned_dirs()->insert({relative_path, dir_item});
-    }
-    return proto::ErrCode::Success;
   }
 
   proto::ErrCode CalcHash(const std::string& path, ScanContext* ctx,
@@ -216,11 +261,28 @@ class ScanManager {
     return proto::ErrCode::Success;
   }
 
+  proto::ErrCode AddDirItem(const std::string& path, ScanContext* ctx,
+                            const std::string& relative_path) {
+    proto::DirItem dir_item;
+    dir_item.set_path(relative_path);
+
+    int64_t update_time = 0, size = 0;
+    if (!Util::FileInfo(path, &update_time, &size)) {
+      return proto::ErrCode::File_permission_or_not_exists;
+    }
+
+    dir_item.set_update_time(update_time);
+    {
+      absl::base_internal::SpinLockHolder locker(&lock_);
+      (*ctx->status->mutable_scanned_dirs())[relative_path] = dir_item;
+    }
+    return proto::ErrCode::Success;
+  }
+
   proto::ErrCode AddFileItem(const std::string& path,
-                             const proto::FileType type, ScanContext* ctx) {
+                             const proto::FileType type, ScanContext* ctx,
+                             const std::string& relative_path) {
     proto::FileItem file_item;
-    std::string relative_path;
-    Util::Relative(path, ctx->src, &relative_path);
     file_item.set_path(relative_path);
     int64_t update_time = 0, size = 0;
     if (!Util::FileInfo(path, &update_time, &size)) {
@@ -230,35 +292,42 @@ class ScanManager {
     file_item.set_update_time(update_time);
     file_item.set_size(size);
     file_item.set_file_type(type);
+
     std::string hash;
     auto ret = CalcHash(path, ctx, &file_item);
     if (ret != proto::ErrCode::Success) {
+      LOG(INFO) << "CalcHash error";
       return ret;
     }
 
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
-      ctx->status->mutable_scanned_files()->insert({relative_path, file_item});
+      (*ctx->status->mutable_scanned_files())[relative_path] = file_item;
       auto parent_path = Util::ParentPath(relative_path);
       auto it = ctx->status->mutable_scanned_dirs()->find(parent_path);
       if (it == ctx->status->mutable_scanned_dirs()->end()) {
-        LOG(INFO) << parent_path;
+        LOG(ERROR) << "This should never happen, parent_path: " << parent_path;
+        return proto::ErrCode::Fail;
       }
-      // it->second.mutable_files()->insert({relative_path, update_time});
+      (*it->second.mutable_files())[relative_path] = update_time;
     }
     return proto::ErrCode::Success;
   }
 
-  proto::ErrCode RemoveDir(ScanContext* ctx, const std::string& dir) {
-    ctx->removed_files.push_back(dir);
-    LOG(INFO) << dir;
+  proto::ErrCode RemoveDir(ScanContext* ctx, const std::string& dir,
+                           const std::string& relative_path) {
+    ctx->removed_files.insert(relative_path);
     absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = ctx->status->mutable_scanned_dirs()->find(dir);
+    auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
+    if (it == ctx->status->mutable_scanned_dirs()->end()) {
+      LOG(ERROR) << "This should never happen: " << dir;
+      return proto::ErrCode::Fail;
+    }
     for (const auto& p : it->second.files()) {
       ctx->status->mutable_scanned_files()->erase(p.first);
-      ctx->removed_files.push_back(p.first);
+      ctx->removed_files.insert(p.first);
     }
-    ctx->status->mutable_scanned_dirs()->erase(dir);
+    ctx->status->mutable_scanned_dirs()->erase(relative_path);
     return proto::ErrCode::Success;
   }
 
@@ -278,7 +347,7 @@ class ScanManager {
          file_it != dir_item.mutable_files()->end();) {
       if (files.find(file_it->first) == files.end()) {
         ctx->status->mutable_scanned_files()->erase(file_it->first);
-        ctx->removed_files.push_back(file_it->first);
+        ctx->removed_files.insert(file_it->first);
         file_it = dir_item.mutable_files()->erase(file_it);
       } else {
         ++file_it;
@@ -313,9 +382,9 @@ class ScanManager {
       loaded_cached_status = LoadCachedScanStatus(ctx->src, ctx);
     }
 
-    bool stop_dump_task = false;
+    stop_dump_task_ = false;
     auto dump_task =
-        std::bind(&ScanManager::DumpTask, this, &stop_dump_task, ctx);
+        std::bind(&ScanManager::DumpTask, this, &stop_dump_task_, ctx);
     ThreadPool::Instance()->Post(dump_task);
 
     proto::ErrCode ret = proto::ErrCode::Success;
@@ -358,18 +427,15 @@ class ScanManager {
                     this, ctx->src, ctx));
 
       auto task_future = task.get_future();
-      ++current_threads;
+      ++current_threads_;
       ThreadPool::Instance()->Post(task);
       ret = task_future.get();
     }
 
-    LOG(INFO) << 1;
-    stop_dump_task = true;
+    stop_dump_task_ = true;
     cond_var_.notify_all();
-    current_threads = 0;
+    current_threads_ = 0;
     if (ret != proto::ErrCode::Success) {
-      // below sleep can avoid stop_dump_task destruct too fast caused coredump,
-      Util::Sleep(10);
       scanning_.store(false);
       return ret;
     }
@@ -392,17 +458,21 @@ class ScanManager {
 
       auto ret = proto::ErrCode::Success;
       const auto& dir = (dirs)[i];
+      std::string relative_path;
+      Util::Relative(dir, ctx->src, &relative_path);
+
       if (!Util::Exists(dir)) {
-        RemoveDir(ctx, dir);
+        RemoveDir(ctx, dir, relative_path);
         continue;
       }
-
       auto update_time = Util::UpdateTime(dir);
       {
-        std::string relative_path;
-        Util::Relative(dir, ctx->src, &relative_path);
         absl::base_internal::SpinLockHolder locker(&lock_);
         auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
+        if (it == ctx->status->mutable_scanned_dirs()->end()) {
+          LOG(ERROR) << "This should never happend";
+          return proto::ErrCode::Fail;
+        }
         if (it->second.update_time() == update_time) {
           continue;
         }
@@ -426,26 +496,29 @@ class ScanManager {
     std::set<std::string> files;
     try {
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        LOG(INFO) << entry.path().string();
-        files.insert(entry.path().string());
-        auto ret = proto::ErrCode::Success;
         const auto& entry_path = entry.path().string();
+
+        std::string relative_path;
+        Util::Relative(entry_path, ctx->src, &relative_path);
+        files.insert(relative_path);
+
+        auto ret = proto::ErrCode::Success;
         if (entry.is_symlink()) {
-          ret = AddFileItem(entry_path, proto::FileType::Symlink, ctx);
+          ret = AddFileItem(entry_path, proto::FileType::Symlink, ctx,
+                            relative_path);
         } else if (entry.is_regular_file()) {
-          ret = AddFileItem(entry_path, proto::FileType::Regular, ctx);
+          ret = AddFileItem(entry_path, proto::FileType::Regular, ctx,
+                            relative_path);
         } else if (entry.is_directory()) {
           {
-            std::string relative_path;
-            Util::Relative(entry_path, ctx->src, &relative_path);
             absl::base_internal::SpinLockHolder locker(&lock_);
             auto it = ctx->status->scanned_dirs().find(relative_path);
             if (it != ctx->status->scanned_dirs().end()) {
               continue;
             }
           }
-          ret = AddDirItem(entry.path().string(), ctx);
-          ret = Scan(entry.path().string(), ctx);
+          ret = AddDirItem(entry_path, ctx, relative_path);
+          ret = Scan(entry_path, ctx);
         } else {
           LOG(ERROR) << "Unknow file type: " << entry.path();
         }
@@ -458,8 +531,7 @@ class ScanManager {
       return proto::ErrCode::Fail;
     }
 
-    // if (RemoveFile(ctx, path, files) != proto::ErrCode::Success) {
-    if (!RemoveFile(ctx, path, files)) {
+    if (RemoveFile(ctx, path, files) != proto::ErrCode::Success) {
       return proto::ErrCode::Fail;
     }
     return proto::ErrCode::Success;
@@ -470,7 +542,10 @@ class ScanManager {
       return proto::ErrCode::Scan_interrupted;
     }
 
-    auto it = ctx->status->ignored_dirs().find(path);
+    std::string relative_path;
+    Util::Relative(path, ctx->src, &relative_path);
+
+    auto it = ctx->status->ignored_dirs().find(relative_path);
     if (it != ctx->status->ignored_dirs().end()) {
       return proto::ErrCode::Success;
     }
@@ -492,7 +567,7 @@ class ScanManager {
       std::vector<std::future<proto::ErrCode>> rets;
       {
         absl::base_internal::SpinLockHolder locker(&lock_);
-        while (current_threads <= max_threads &&
+        while (current_threads_ <= max_threads &&
                it != std::filesystem::directory_iterator()) {
           if (it->is_symlink() || !it->is_directory()) {
             ++it;
@@ -505,7 +580,7 @@ class ScanManager {
                         this, it->path().string(), ctx));
           rets.emplace_back(task.get_future());
           ThreadPool::Instance()->Post(task);
-          ++current_threads;
+          ++current_threads_;
           ++it;
         }
       }
@@ -515,7 +590,7 @@ class ScanManager {
           all_ret = f.get();
         }
         absl::base_internal::SpinLockHolder locker(&lock_);
-        --current_threads;
+        --current_threads_;
       }
 
       auto ret = ParallelFullScan(cur_thread_next_dir, ctx);
@@ -528,18 +603,26 @@ class ScanManager {
       return all_ret;
     }
 
-    AddDirItem(path, ctx);
+    auto ret = AddDirItem(path, ctx, relative_path);
+    if (ret != proto::ErrCode::Success) {
+      return ret;
+    }
 
     try {
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
         auto ret = proto::ErrCode::Success;
         const auto& entry_path = entry.path().string();
+
+        std::string relative_path;
+        Util::Relative(entry_path, ctx->src, &relative_path);
+
         if (entry.is_symlink()) {
-          ret = AddFileItem(entry_path, proto::FileType::Symlink, ctx);
+          ret = AddFileItem(entry_path, proto::FileType::Symlink, ctx,
+                            relative_path);
         } else if (entry.is_regular_file()) {
-          ret = AddFileItem(entry_path, proto::FileType::Regular, ctx);
+          ret = AddFileItem(entry_path, proto::FileType::Regular, ctx,
+                            relative_path);
         } else if (entry.is_directory()) {
-          ret = AddDirItem(entry_path, ctx);
         } else {
           LOG(ERROR) << "Unknow file type: " << entry.path();
         }
@@ -559,10 +642,11 @@ class ScanManager {
   mutable absl::base_internal::SpinLock lock_;
   std::atomic<bool> scanning_ = false;
   std::atomic<bool> stop_ = false;
-  int current_threads = 0;
-  const int max_threads = 1;
+  int current_threads_ = 0;
+  const int max_threads = 4;
   std::mutex mu_;
   std::condition_variable cond_var_;
+  bool stop_dump_task_ = false;
 };
 
 }  // namespace util

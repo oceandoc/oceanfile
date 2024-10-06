@@ -6,6 +6,7 @@
 #ifndef BAZEL_TEMPLATE_UTIL_SYNC_MANAGER_H
 #define BAZEL_TEMPLATE_UTIL_SYNC_MANAGER_H
 
+#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -75,8 +76,6 @@ class SyncManager {
     ctx.hash_method = hash_method;
     ctx.sync_method = sync_method;
     ctx.disable_scan_cache = disable_scan_cache;
-    ctx.removed_files.reserve(10000);
-    ctx.copy_failed_files.reserve(10000);
 
     auto ret = ScanManager::Instance()->ParallelScan(&ctx);
     if (ret != proto::ErrCode::Success) {
@@ -111,18 +110,27 @@ class SyncManager {
   }
 
  private:
-  bool SyncWorker(const int no, ScanContext* ctx) {
+  bool SyncWorker(const int thread_no, ScanContext* ctx) {
     bool success = true;
     for (const auto& p : ctx->status->scanned_files()) {
-      auto hash = Util::MurmurHash64A(p.first);
-      if ((hash % max_threads) != no) {
+      auto hash = std::abs(Util::MurmurHash64A(p.first));
+      if ((hash % max_threads) != thread_no) {
         continue;
       }
-      std::string relative_path;
-      Util::Relative(p.first, ctx->src, &relative_path);
-      auto dst_path = std::filesystem::path(ctx->dst + "/" + relative_path);
 
-      auto update_time = Util::UpdateTime(dst_path.string());
+      if (Util::IsAbsolute(p.first)) {
+        LOG(ERROR) << "Must be relative: " << p.first;
+        continue;
+      }
+
+      const auto& src_path = ctx->src + "/" + p.first;
+      const auto& dst_path = ctx->dst + "/" + p.first;
+      if (!Util::Exists(src_path)) {
+        LOG(ERROR) << src_path << " not exists";
+        continue;
+      }
+
+      auto update_time = Util::UpdateTime(dst_path);
       if (update_time == p.second.update_time()) {
         continue;
       }
@@ -130,9 +138,10 @@ class SyncManager {
       Util::MkParentDir(dst_path);
       bool ret = true;
       if (p.second.file_type() == proto::Symlink) {
-        ret = Util::SyncSymlink(ctx->src, ctx->dst, p.first);
+        ret = Util::SyncSymlink(ctx->src, ctx->dst, src_path);
+        continue;
       } else {
-        ret = Util::CopyFile(p.first, dst_path.string());
+        ret = Util::CopyFile(src_path, dst_path);
       }
 
       if (!ret) {
@@ -143,9 +152,9 @@ class SyncManager {
         continue;
       }
 
-      ret = Util::SetUpdateTime(dst_path.string(), p.second.update_time());
+      ret = Util::SetUpdateTime(dst_path, p.second.update_time());
       if (!ret) {
-        LOG(ERROR) << "Set update_time error: " << dst_path.string();
+        LOG(ERROR) << "Set update_time error: " << dst_path;
         absl::base_internal::SpinLockHolder locker(&lock_);
         ctx->copy_failed_files.push_back(p.first);
         success = false;
@@ -153,25 +162,61 @@ class SyncManager {
     }
 
     for (const auto& p : ctx->status->scanned_dirs()) {
-      std::filesystem::path dir(p.first);
-
-      if (!std::filesystem::is_directory(dir)) {
-        LOG(ERROR) << dir.string() << " not dir";
+      auto hash = std::abs(Util::MurmurHash64A(p.first));
+      if ((hash % max_threads) != thread_no) {
         continue;
       }
 
-      std::string relative_path;
-      Util::Relative(p.first, ctx->src, &relative_path);
-      auto dst_path = std::filesystem::path(ctx->dst + "/" + relative_path);
+      const auto& src_path = ctx->src + "/" + p.first;
+      const auto& dst_path = ctx->dst + "/" + p.first;
 
-      if (std::filesystem::is_symlink(dir)) {
-        LOG(ERROR) << dir.string() << " symlink";
-      }
-
-      if (Util::Exists(dst_path.string())) {
+      if (!Util::Exists(src_path)) {
+        LOG(ERROR) << src_path << " not exists";
+        success = false;
         continue;
       }
-      Util::Mkdir(dst_path.string());
+
+      if (!std::filesystem::is_directory(src_path)) {
+        LOG(ERROR) << src_path << " not dir";
+        success = false;
+        continue;
+      }
+
+      if (std::filesystem::is_symlink(src_path)) {
+        success = false;
+        LOG(ERROR) << src_path << " is symlink";
+      }
+
+      if (Util::Exists(dst_path)) {
+        continue;
+      }
+      Util::Mkdir(dst_path);
+    }
+
+    if (ctx->sync_method == common::SyncMethod::Sync_SYNC) {
+      for (const auto& p : ctx->removed_files) {
+        auto hash = std::abs(Util::MurmurHash64A(p));
+        if ((hash % max_threads) != thread_no) {
+          continue;
+        }
+
+        if (Util::IsAbsolute(p)) {
+          LOG(ERROR) << "Must be relative: " << p;
+          continue;
+        }
+
+        const auto& src_path = ctx->src + "/" + p;
+        const auto& dst_path = ctx->dst + "/" + p;
+        if (Util::Exists(src_path)) {
+          LOG(ERROR) << src_path << " exists";
+          continue;
+        }
+
+        if (!Util::Remove(dst_path)) {
+          LOG(ERROR) << "Delete " << src_path << " error";
+          continue;
+        }
+      }
     }
     return success;
   }
@@ -185,28 +230,11 @@ class SyncManager {
     dst_status->mutable_ignored_dirs()->insert(
         src_status.ignored_dirs().begin(), src_status.ignored_dirs().end());
 
-    for (const auto& p : src_status.scanned_dirs()) {
-      auto k = p.first;
-      Util::ReplaceAll(&k, ctx->src, ctx->dst);
-      auto dir_item = p.second;
-      dir_item.set_path(k);
-      dst_status->mutable_scanned_dirs()->insert({k, dir_item});
+    dst_status->mutable_scanned_dirs()->insert(
+        src_status.scanned_dirs().begin(), src_status.scanned_dirs().end());
 
-      auto it = dst_status->mutable_scanned_dirs()->find(k);
-      for (const auto& file : p.second.files()) {
-        auto k = file.first;
-        Util::ReplaceAll(&k, ctx->src, ctx->dst);
-        it->second.mutable_files()->insert({k, file.second});
-      }
-    }
-
-    for (const auto& p : src_status.scanned_files()) {
-      auto k = p.first;
-      Util::ReplaceAll(&k, ctx->src, ctx->dst);
-      auto file_item = p.second;
-      file_item.set_path(k);
-      dst_status->mutable_scanned_files()->insert({k, file_item});
-    }
+    dst_status->mutable_scanned_files()->insert(
+        src_status.scanned_files().begin(), src_status.scanned_files().end());
   }
 
   void SyncStatusDir(ScanContext* ctx) {
@@ -222,7 +250,11 @@ class SyncManager {
   std::atomic<bool> scanning_ = false;
   std::atomic<bool> stop_ = false;
   int current_threads = 0;
-  const int max_threads = 5;
+  const int max_threads = 4;
+
+  std::mutex mu_;
+  std::condition_variable cond_var_;
+  bool stop_fd_task_ = false;
 };
 
 }  // namespace util
