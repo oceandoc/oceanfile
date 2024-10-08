@@ -17,7 +17,6 @@
 #include "folly/Singleton.h"
 #include "src/common/defs.h"
 #include "src/proto/data.pb.h"
-#include "src/proto/error.pb.h"
 #include "src/util/scan_manager.h"
 #include "src/util/util.h"
 
@@ -36,13 +35,14 @@ class SyncManager {
 
   void Stop() { ScanManager::Instance()->Stop(); }
 
-  proto::ErrCode SyncLocal(const std::string& src, const std::string& dst,
-                           const common::HashMethod hash_method,
-                           const common::SyncMethod sync_method,
-                           const bool disable_scan_cache = false) {
+  int32_t SyncLocal(const std::string& src, const std::string& dst,
+                    const common::HashMethod hash_method,
+                    const common::SyncMethod sync_method,
+                    const bool disable_scan_cache = false,
+                    const bool skip_scan = false) {
     if (!Util::IsAbsolute(src) || !Util::IsAbsolute(dst)) {
       LOG(ERROR) << "Path must be absolute";
-      return proto::ErrCode::Path_not_absolute;
+      return Err_Path_not_absolute;
     }
 
     std::string unify_src(src);
@@ -53,18 +53,18 @@ class SyncManager {
     if (Util::StartWith(unify_dst, unify_src)) {
       LOG(ERROR) << "Cannot sync " << unify_src << " to " << unify_dst
                  << ", for cannot sync to subdir";
-      return proto::ErrCode::Path_dst_is_src_subdir;
+      return Err_Path_dst_is_src_subdir;
     }
 
     if (!Util::Exists(unify_src) || !Util::Exists(unify_dst)) {
       LOG(ERROR) << "Src or dst not exists";
-      return proto::ErrCode::Path_not_exists;
+      return Err_Path_not_exists;
     }
 
     if (!std::filesystem::is_directory(unify_src) ||
         !std::filesystem::is_directory(unify_dst)) {
       LOG(ERROR) << "Src or dst not dir";
-      return proto::ErrCode::Path_not_dir;
+      return Err_Path_not_dir;
     }
 
     proto::ScanStatus scan_status;
@@ -76,14 +76,27 @@ class SyncManager {
     ctx.hash_method = hash_method;
     ctx.sync_method = sync_method;
     ctx.disable_scan_cache = disable_scan_cache;
+    ctx.skip_scan = skip_scan;
 
     auto ret = ScanManager::Instance()->ParallelScan(&ctx);
-    if (ret != proto::ErrCode::Success) {
+    if (ret != Err_Success) {
       LOG(ERROR) << "Scan " << src << " error";
       return ret;
     }
 
     bool success = true;
+    syncd_total_cnt = 0;
+    syncd_success_cnt = 0;
+    syncd_fail_cnt = 0;
+    syncd_skipped_cnt = 0;
+    stop_progress_task_ = false;
+
+    auto progress_task =
+        std::bind(&SyncManager::ProgressTask, this, &stop_progress_task_, &ctx);
+    ThreadPool::Instance()->Post(progress_task);
+
+    LOG(INFO) << "Now sync " << ctx.src << " to " << ctx.dst;
+    LOG(INFO) << "Memory usage: " << Util::MemUsage() << "MB";
     std::unordered_set<std::string> copy_failed_files;
     std::vector<std::future<bool>> rets;
     for (int i = 0; i < max_threads; ++i) {
@@ -98,99 +111,125 @@ class SyncManager {
       }
     }
 
+    stop_progress_task_ = true;
+    cond_var_.notify_all();
+
     SyncStatusDir(&ctx);
 
     for (const auto& file : copy_failed_files) {
       LOG(ERROR) << file << " sync failed";
     }
     if (success) {
-      return proto::ErrCode::Success;
+      LOG(INFO) << "Sync success";
+      return Err_Success;
     }
-    return proto::ErrCode::Fail;
+    LOG(INFO) << "Sync failed";
+    return Err_Fail;
   }
 
  private:
   bool SyncWorker(const int thread_no, ScanContext* ctx) {
     bool success = true;
-    for (const auto& p : ctx->status->scanned_files()) {
-      auto hash = std::abs(Util::MurmurHash64A(p.first));
+    for (const auto& d : ctx->status->scanned_dirs()) {
+      auto hash = std::abs(Util::MurmurHash64A(d.first));
       if ((hash % max_threads) != thread_no) {
         continue;
       }
 
-      if (Util::IsAbsolute(p.first)) {
-        LOG(ERROR) << "Must be relative: " << p.first;
+      const auto& dir_src_path = ctx->src + "/" + d.first;
+      const auto& dir_dst_path = ctx->dst + "/" + d.first;
+
+      if (!Util::Exists(dir_src_path)) {
+        LOG(ERROR) << dir_src_path << " not exists";
+        success = false;
         continue;
       }
 
-      const auto& src_path = ctx->src + "/" + p.first;
-      const auto& dst_path = ctx->dst + "/" + p.first;
-      if (!Util::Exists(src_path)) {
-        LOG(ERROR) << src_path << " not exists";
+      if (!std::filesystem::is_directory(dir_src_path)) {
+        LOG(ERROR) << dir_src_path << " not dir";
+        success = false;
         continue;
       }
 
-      auto update_time = Util::UpdateTime(dst_path);
-      if (update_time == p.second.update_time()) {
-        continue;
+      if (std::filesystem::is_symlink(dir_src_path)) {
+        success = false;
+        LOG(ERROR) << dir_src_path << " is symlink";
       }
 
-      Util::MkParentDir(dst_path);
-      bool ret = true;
-      if (p.second.file_type() == proto::Symlink) {
-        ret = Util::SyncSymlink(ctx->src, ctx->dst, src_path);
-        continue;
-      } else {
-        ret = Util::CopyFile(src_path, dst_path);
+      if (!Util::Exists(dir_dst_path)) {
+        Util::Mkdir(dir_dst_path);
       }
 
-      if (!ret) {
-        LOG(ERROR) << "Sync error: " << p.first;
+      if (!Util::SetUpdateTime(dir_dst_path, d.second.update_time())) {
+        LOG(ERROR) << "Set update_time error: " << dir_dst_path;
         absl::base_internal::SpinLockHolder locker(&lock_);
-        ctx->copy_failed_files.push_back(p.first);
-        success = false;
-        continue;
-      }
-
-      ret = Util::SetUpdateTime(dst_path, p.second.update_time());
-      if (!ret) {
-        LOG(ERROR) << "Set update_time error: " << dst_path;
-        absl::base_internal::SpinLockHolder locker(&lock_);
-        ctx->copy_failed_files.push_back(p.first);
+        ctx->copy_failed_files.push_back(dir_src_path);
+        syncd_fail_cnt.fetch_add(1);
         success = false;
       }
-    }
 
-    for (const auto& p : ctx->status->scanned_dirs()) {
-      auto hash = std::abs(Util::MurmurHash64A(p.first));
-      if ((hash % max_threads) != thread_no) {
-        continue;
+      for (const auto& f : d.second.files()) {
+        auto hash = std::abs(Util::MurmurHash64A(f.first));
+        if ((hash % max_threads) != thread_no) {
+          continue;
+        }
+
+        syncd_total_cnt.fetch_add(1);
+
+        const auto& file_src_path = dir_src_path + "/" + f.first;
+        const auto& file_dst_path = dir_dst_path + "/" + f.first;
+
+        if (!Util::Exists(file_src_path)) {
+          LOG(ERROR) << file_src_path << " src file not exists when sync";
+          success = false;
+          syncd_fail_cnt.fetch_add(1);
+          continue;
+        }
+
+        if (-1 == f.second.update_time()) {
+          success = false;
+          LOG(ERROR) << file_src_path << " invalid update time";
+          syncd_fail_cnt.fetch_add(1);
+          continue;
+        }
+
+        int64_t update_time = 0, file_size = 0;
+        Util::FileInfo(file_dst_path, &update_time, &file_size);
+        if (update_time != -1 && update_time == f.second.update_time() &&
+            file_size == f.second.size()) {
+          syncd_success_cnt.fetch_add(1);
+          syncd_skipped_cnt.fetch_add(1);
+          continue;
+        }
+
+        bool ret = true;
+        if (f.second.file_type() == proto::Symlink) {
+          ret = Util::SyncSymlink(ctx->src, ctx->dst, file_src_path);
+        } else {
+          ret = Util::CopyFile(file_src_path, file_dst_path);
+        }
+
+        if (!ret) {
+          LOG(ERROR) << "Sync error: " << f.first;
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          ctx->copy_failed_files.push_back(file_src_path);
+          success = false;
+          syncd_fail_cnt.fetch_add(1);
+          continue;
+        }
+
+        ret = Util::SetUpdateTime(file_dst_path, f.second.update_time());
+        if (!ret) {
+          LOG(ERROR) << "Set update_time error: " << file_dst_path;
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          ctx->copy_failed_files.push_back(file_src_path);
+          success = false;
+          syncd_fail_cnt.fetch_add(1);
+          continue;
+        }
+
+        syncd_success_cnt.fetch_add(1);
       }
-
-      const auto& src_path = ctx->src + "/" + p.first;
-      const auto& dst_path = ctx->dst + "/" + p.first;
-
-      if (!Util::Exists(src_path)) {
-        LOG(ERROR) << src_path << " not exists";
-        success = false;
-        continue;
-      }
-
-      if (!std::filesystem::is_directory(src_path)) {
-        LOG(ERROR) << src_path << " not dir";
-        success = false;
-        continue;
-      }
-
-      if (std::filesystem::is_symlink(src_path)) {
-        success = false;
-        LOG(ERROR) << src_path << " is symlink";
-      }
-
-      if (Util::Exists(dst_path)) {
-        continue;
-      }
-      Util::Mkdir(dst_path);
     }
 
     if (ctx->sync_method == common::SyncMethod::Sync_SYNC) {
@@ -213,7 +252,7 @@ class SyncManager {
         }
 
         if (!Util::Remove(dst_path)) {
-          LOG(ERROR) << "Delete " << src_path << " error";
+          LOG(ERROR) << "Delete " << dst_path << " error";
           continue;
         }
       }
@@ -221,40 +260,42 @@ class SyncManager {
     return success;
   }
 
-  void SetDstScanStatus(ScanContext* ctx, proto::ScanStatus* dst_status) {
-    const auto& src_status = *(ctx->status);
-    dst_status->set_uuid(src_status.uuid());
-    dst_status->set_path(ctx->dst);
-    dst_status->set_update_time(src_status.update_time());
-    dst_status->set_complete_time(src_status.complete_time());
-    dst_status->mutable_ignored_dirs()->insert(
-        src_status.ignored_dirs().begin(), src_status.ignored_dirs().end());
-
-    dst_status->mutable_scanned_dirs()->insert(
-        src_status.scanned_dirs().begin(), src_status.scanned_dirs().end());
-
-    dst_status->mutable_scanned_files()->insert(
-        src_status.scanned_files().begin(), src_status.scanned_files().end());
-  }
-
   void SyncStatusDir(ScanContext* ctx) {
     const auto& dst_path = ScanManager::Instance()->GenFileName(ctx->dst);
-    proto::ScanStatus dst_status;
-    SetDstScanStatus(ctx, &dst_status);
-    ctx->status = &dst_status;
-    ScanManager::Instance()->Dump(dst_path, ctx);
+    ctx->status->set_path(ctx->dst);
+    ctx->src = ctx->dst;
+    ScanManager::Instance()->Dump(ctx);
+  }
+
+  void ProgressTask(bool* stop_progress_task, ScanContext* ctx) {
+    while (!(*stop_progress_task)) {
+      std::unique_lock<std::mutex> lock(mu_);
+      if (cond_var_.wait_for(
+              lock, std::chrono::seconds(10),
+              [stop_progress_task] { return *stop_progress_task; })) {
+        break;
+      }
+      LOG(INFO) << "Total: "
+                << ctx->status->file_num() + ctx->status->symlink_num()
+                << ", syncd count: " << syncd_total_cnt
+                << ", success count: " << syncd_success_cnt
+                << ", skipped count: " << syncd_skipped_cnt
+                << ", failed count: " << syncd_fail_cnt;
+    }
+    LOG(INFO) << "ProgressTask Exists";
   }
 
  private:
   mutable absl::base_internal::SpinLock lock_;
-  std::atomic<bool> scanning_ = false;
-  std::atomic<bool> stop_ = false;
-  int current_threads = 0;
   const int max_threads = 4;
 
   std::mutex mu_;
   std::condition_variable cond_var_;
-  bool stop_fd_task_ = false;
+  bool stop_progress_task_ = false;
+  std::atomic<int64_t> syncd_total_cnt = 0;
+  std::atomic<int64_t> syncd_success_cnt = 0;
+  std::atomic<int64_t> syncd_fail_cnt = 0;
+  std::atomic<int64_t> syncd_skipped_cnt = 0;
 };
 
 }  // namespace util

@@ -60,10 +60,9 @@ class FileClient {
       return false;
     }
 
-    std::vector<char> buffer(common::BUFFER_SIZE_BYTES);
-
+    std::vector<char> buffer(common::NET_BUFFER_SIZE_BYTES);
     proto::FileReq req;
-    req.mutable_content()->resize(common::BUFFER_SIZE_BYTES);
+    req.mutable_content()->resize(common::NET_BUFFER_SIZE_BYTES);
     req.set_op(proto::FileOp::FilePut);
     req.set_path(path);
     req.set_sha256(attr.sha256);
@@ -72,7 +71,7 @@ class FileClient {
     std::string serialized;
 
     int32_t partition_num = 0;
-    while (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
+    while (file.read(buffer.data(), common::NET_BUFFER_SIZE_BYTES) ||
            file.gcount() > 0) {
       if (curl_) {
         req.mutable_content()->resize(file.gcount());

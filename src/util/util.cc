@@ -26,6 +26,7 @@
 #include "boost/beast/core/detail/base64.hpp"
 #include "boost/uuid/random_generator.hpp"
 #include "boost/uuid/uuid_io.hpp"
+#include "c/blake3.h"
 #include "crc32c/crc32c.h"
 #include "fmt/core.h"
 #include "glog/logging.h"
@@ -38,6 +39,7 @@
 #include "sodium/crypto_hash_sha256.h"
 #include "src/MurmurHash2.h"
 #include "src/common/defs.h"
+#include "src/common/error.h"
 #include "src/proto/service.pb.h"
 
 #if defined(_WIN32)
@@ -427,10 +429,9 @@ bool Util::Rename(const std::string &src, const std::string &dst) {
   return false;
 }
 
-proto::ErrCode Util::CreateFileWithSize(const std::string &path,
-                                        const int64_t size) {
+int32_t Util::CreateFileWithSize(const std::string &path, const int64_t size) {
   if (std::filesystem::exists(std::filesystem::symlink_status(path))) {
-    return proto::ErrCode::Success;
+    return Err_Success;
   }
 
 #if defined(_WIN32)
@@ -440,11 +441,11 @@ proto::ErrCode Util::CreateFileWithSize(const std::string &path,
   if (hFile == INVALID_HANDLE_VALUE) {
     DWORD errorCode = GetLastError();
     if (errorCode == ERROR_ACCESS_DENIED) {
-      return proto::ErrCode::Permission;
+      return Err_Permission;
     } else if (errorCode == ERROR_DISK_FULL) {
-      return proto::ErrCode::Disk_full;
+      return Err_Disk_full;
     }
-    return proto::ErrCode::Fail;
+    return Err_Fail;
   }
 
   LARGE_INTEGER liSize;
@@ -453,7 +454,7 @@ proto::ErrCode Util::CreateFileWithSize(const std::string &path,
   if (!SetFilePointerEx(hFile, liSize, nullptr, FILE_BEGIN) ||
       !SetEndOfFile(hFile)) {
     CloseHandle(hFile);
-    return proto::ErrCode::Fail;
+    return Fail;
   }
 
   CloseHandle(hFile);
@@ -461,20 +462,20 @@ proto::ErrCode Util::CreateFileWithSize(const std::string &path,
   int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
   if (fd == -1) {
     if (errno == EACCES) {
-      return proto::ErrCode::File_permission;
+      return Err_File_permission;
     } else if (errno == ENOSPC) {
-      return proto::ErrCode::File_disk_full;
+      return Err_File_disk_full;
     }
-    return proto::ErrCode::Fail;
+    return Err_Fail;
   }
 
   if (ftruncate(fd, size) == -1) {
     close(fd);
-    return proto::ErrCode::File_size_set_error;
+    return Err_File_size_set_error;
   }
   close(fd);
 #endif
-  return proto::ErrCode::Success;
+  return Err_Success;
 }
 
 bool Util::CreateSymlink(const string &src, const string &target) {
@@ -552,11 +553,8 @@ bool Util::CopyFile(const string &src, const string &dst,
   try {
     return std::filesystem::copy_file(src, dst, opt);
   } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << "CopyFile error: " << src << " to " << dst << ", "
-               << e.what();
+    LOG(ERROR) << "CopyFile error: " << e.what();
   }
-  FDCount();
-  std::exit(0);
   return false;
 }
 
@@ -564,7 +562,7 @@ bool Util::Copy(const string &src, const string &dst) {
   try {
     std::filesystem::copy(src, dst, std::filesystem::copy_options::recursive);
   } catch (const std::filesystem::filesystem_error &e) {
-    LOG(ERROR) << "Copy error: " << src << " to " << dst << ", " << e.what();
+    LOG(ERROR) << "Copy error: " << e.what();
     return false;
   }
   return true;
@@ -588,8 +586,8 @@ bool Util::TruncateFile(const string &path) {
   return true;
 }
 
-proto::ErrCode Util::WriteToFile(const string &path, const string &content,
-                                 const bool append) {
+int32_t Util::WriteToFile(const string &path, const string &content,
+                          const bool append) {
   try {
     if (!std::filesystem::exists(path)) {
       std::filesystem::path s_path(path);
@@ -603,53 +601,53 @@ proto::ErrCode Util::WriteToFile(const string &path, const string &content,
     if (ofs && ofs.is_open()) {
       ofs << content;
       ofs.close();
-      return proto::ErrCode::Success;
+      return Err_Success;
     } else {
       if (errno == EACCES) {
-        return proto::ErrCode::File_permission;
+        return Err_File_permission;
       } else if (errno == ENOSPC) {
-        return proto::ErrCode::File_disk_full;
+        return Err_File_disk_full;
       }
       LOG(INFO) << std::strerror(errno);
-      return proto::ErrCode::Fail;
+      return Err_Fail;
     }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << (!append ? "Write to " : "Append to ") << path
                << ", error: " << e.what();
   }
-  return proto::ErrCode::Fail;
+  return Err_Fail;
 }
 
-proto::ErrCode Util::WriteToFile(const string &path, const string &content,
-                                 const int64_t start) {
+int32_t Util::WriteToFile(const string &path, const string &content,
+                          const int64_t start) {
   try {
     std::ofstream ofs(path, std::ios::binary | std::ios::out | std::ios::in);
     if (ofs && ofs.is_open()) {
       ofs.seekp(start);
       if (ofs.fail()) {
         if (errno == EACCES) {
-          return proto::ErrCode::File_permission;
+          return Err_File_permission;
         } else if (errno == ENOSPC) {
-          return proto::ErrCode::File_disk_full;
+          return Err_File_disk_full;
         }
-        return proto::ErrCode::Fail;
+        return Err_Fail;
       }
       ofs.write(content.data(), content.size());
       if (ofs.fail()) {
         if (errno == EACCES) {
-          return proto::ErrCode::File_permission;
+          return Err_File_permission;
         } else if (errno == ENOSPC) {
-          return proto::ErrCode::File_disk_full;
+          return Err_File_disk_full;
         }
-        return proto::ErrCode::Fail;
+        return Err_Fail;
       }
       ofs.close();
-      return proto::ErrCode::Success;
+      return Err_Success;
     }
   } catch (const std::filesystem::filesystem_error &e) {
     LOG(ERROR) << "Write to " << path << ", error: " << e.what();
   }
-  return proto::ErrCode::Fail;
+  return Err_Fail;
 }
 
 bool Util::LoadSmallFile(const std::string &path, string *content) {
@@ -718,8 +716,8 @@ int32_t Util::FilePartitionNum(const std::string &path) {
 
 int32_t Util::FilePartitionNum(const int64_t size) {
   // file size unit is Bytes
-  return size / common::BUFFER_SIZE_BYTES +
-         ((size % common::BUFFER_SIZE_BYTES) > 0 ? 1 : 0);
+  return size / common::NET_BUFFER_SIZE_BYTES +
+         ((size % common::NET_BUFFER_SIZE_BYTES) > 0 ? 1 : 0);
 }
 
 int32_t Util::FilePartitionNum(const std::string &path,
@@ -864,7 +862,7 @@ std::string Util::UUID() {
   return boost::uuids::to_string(generator());
 }
 
-string Util::ToHexStr(const uint64_t in, bool use_upper_case) {
+string Util::ToHexStr(const uint64_t in, const bool use_upper_case) {
   if (use_upper_case) {
     return fmt::format("{:016X}", in);
   } else {
@@ -872,7 +870,7 @@ string Util::ToHexStr(const uint64_t in, bool use_upper_case) {
   }
 }
 
-void Util::ToHexStr(const string &in, std::string *out, bool use_upper_case) {
+void Util::ToHexStr(const string &in, string *out, const bool use_upper_case) {
   out->clear();
   out->reserve(in.size() * 2);
   for (std::size_t i = 0; i < in.size(); ++i) {
@@ -884,7 +882,7 @@ void Util::ToHexStr(const string &in, std::string *out, bool use_upper_case) {
   }
 }
 
-string Util::ToHexStr(const string &in, bool use_upper_case) {
+string Util::ToHexStr(const string &in, const bool use_upper_case) {
   string out;
   out.reserve(in.size() * 2);
   for (std::size_t i = 0; i < in.size(); ++i) {
@@ -907,6 +905,48 @@ bool Util::HexStrToInt64(const string &in, int64_t *out) {
 }
 
 uint32_t Util::CRC32(const string &content) { return crc32c::Crc32c(content); }
+
+bool Util::Blake3(const string &content, string *out,
+                  const bool use_upper_case) {
+  uint8_t hash[BLAKE3_OUT_LEN];
+
+  blake3_hasher hasher;
+  blake3_hasher_init(&hasher);
+  blake3_hasher_update(&hasher, content.data(), content.size());
+  blake3_hasher_finalize(&hasher, hash, BLAKE3_OUT_LEN);
+
+  string s(reinterpret_cast<const char *>(hash), BLAKE3_OUT_LEN);
+  Util::ToHexStr(s, out, use_upper_case);
+  return true;
+}
+
+bool Util::FileBlake3(const string &path, string *out,
+                      const bool use_upper_case) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file || !file.is_open()) {
+    return false;
+  }
+
+  uint8_t hash[BLAKE3_OUT_LEN];
+
+  blake3_hasher hasher;
+  blake3_hasher_init(&hasher);
+
+  std::vector<char> buffer(common::CALC_BUFFER_SIZE_BYTES);  // 16KB buffer
+  while (file.read(buffer.data(), buffer.size()) || file.gcount() > 0) {
+    blake3_hasher_update(&hasher, buffer.data(), file.gcount());
+  }
+
+  blake3_hasher_finalize(&hasher, hash, BLAKE3_OUT_LEN);
+
+  if (file.bad()) {
+    return false;
+  }
+
+  string s(reinterpret_cast<const char *>(hash), BLAKE3_OUT_LEN);
+  Util::ToHexStr(s, out, use_upper_case);
+  return true;
+}
 
 void Util::Base64Encode(const string &input, string *out) {
   out->resize(boost::beast::detail::base64::encoded_size(input.size()));
@@ -959,7 +999,8 @@ bool Util::HashUpdate(EVP_MD_CTX *context, const string &str) {
   return true;
 }
 
-bool Util::HashFinal(EVP_MD_CTX *context, string *out, bool use_upper_case) {
+bool Util::HashFinal(EVP_MD_CTX *context, string *out,
+                     const bool use_upper_case) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int length;
   if (EVP_DigestFinal_ex(context, hash, &length) != 1) {
@@ -980,12 +1021,13 @@ bool Util::SHA256Update(EVP_MD_CTX *context, const string &str) {
   return HashUpdate(context, str);
 }
 
-bool Util::SHA256Final(EVP_MD_CTX *context, string *out, bool use_upper_case) {
+bool Util::SHA256Final(EVP_MD_CTX *context, string *out,
+                       const bool use_upper_case) {
   return HashFinal(context, out, use_upper_case);
 }
 
 bool Util::Hash(const string &str, const EVP_MD *type, string *out,
-                bool use_upper_case) {
+                const bool use_upper_case) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int length;
 
@@ -1007,8 +1049,8 @@ bool Util::Hash(const string &str, const EVP_MD *type, string *out,
   return true;
 }
 
-bool Util::FileHash(const std::string &path, const EVP_MD *type,
-                    std::string *out, bool use_upper_case) {
+bool Util::FileHash(const string &path, const EVP_MD *type, string *out,
+                    const bool use_upper_case) {
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int length;
 
@@ -1028,9 +1070,8 @@ bool Util::FileHash(const std::string &path, const EVP_MD *type,
     return false;
   }
 
-  std::vector<char> buffer(common::BUFFER_SIZE_BYTES);
-
-  while (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
+  std::vector<char> buffer(common::CALC_BUFFER_SIZE_BYTES);
+  while (file.read(buffer.data(), common::CALC_BUFFER_SIZE_BYTES) ||
          file.gcount() > 0) {
     if (EVP_DigestUpdate(context, buffer.data(), file.gcount()) != 1) {
       EVP_MD_CTX_free(context);
@@ -1050,8 +1091,8 @@ bool Util::FileHash(const std::string &path, const EVP_MD *type,
   return true;
 }
 
-bool Util::SmallFileHash(const std::string &path, const EVP_MD *type,
-                         std::string *out, bool use_upper_case) {
+bool Util::SmallFileHash(const string &path, const EVP_MD *type, string *out,
+                         const bool use_upper_case) {
   string str;
   if (!Util::LoadSmallFile(path, &str)) {
     return false;
@@ -1059,30 +1100,31 @@ bool Util::SmallFileHash(const std::string &path, const EVP_MD *type,
   return Hash(str, type, out, use_upper_case);
 }
 
-bool Util::MD5(const string &str, string *out, bool use_upper_case) {
+bool Util::MD5(const string &str, string *out, const bool use_upper_case) {
   return Hash(str, EVP_md5(), out, use_upper_case);
 }
 
-bool Util::SmallFileMD5(const string &path, string *out, bool use_upper_case) {
+bool Util::SmallFileMD5(const string &path, string *out,
+                        const bool use_upper_case) {
   return SmallFileHash(path, EVP_md5(), out, use_upper_case);
 }
 
-bool Util::FileMD5(const std::string &path, string *out, bool use_upper_case) {
+bool Util::FileMD5(const string &path, string *out, const bool use_upper_case) {
   return Util::FileHash(path, EVP_md5(), out, use_upper_case);
 }
 
-bool Util::SHA256(const string &str, string *out, bool use_upper_case) {
+bool Util::SHA256(const string &str, string *out, const bool use_upper_case) {
   return Hash(str, EVP_sha256(), out, use_upper_case);
 }
 
-string Util::SHA256(const string &str, bool use_upper_case) {
+string Util::SHA256(const string &str, const bool use_upper_case) {
   string out;
   Hash(str, EVP_sha256(), &out, use_upper_case);
   return out;
 }
 
 bool Util::SHA256_libsodium(const string &str, string *out,
-                            bool use_upper_case) {
+                            const bool use_upper_case) {
   unsigned char hash[crypto_hash_sha256_BYTES];
   crypto_hash_sha256(hash, reinterpret_cast<const unsigned char *>(str.data()),
                      str.size());
@@ -1093,12 +1135,12 @@ bool Util::SHA256_libsodium(const string &str, string *out,
 }
 
 bool Util::SmallFileSHA256(const string &path, string *out,
-                           bool use_upper_case) {
+                           const bool use_upper_case) {
   return SmallFileHash(path, EVP_sha256(), out, use_upper_case);
 }
 
-bool Util::FileSHA256(const std::string &path, string *out,
-                      bool use_upper_case) {
+bool Util::FileSHA256(const string &path, string *out,
+                      const bool use_upper_case) {
   return FileHash(path, EVP_sha256(), out, use_upper_case);
 }
 
@@ -1139,7 +1181,7 @@ bool Util::LZMADecompress(const string &data, string *out) {
     return false;
   }
 
-  std::vector<uint8_t> decompressed_data(common::BUFFER_SIZE_BYTES);
+  std::vector<uint8_t> decompressed_data(common::CALC_BUFFER_SIZE_BYTES);
 
   strm.next_in = reinterpret_cast<const uint8_t *>(data.data());
   strm.avail_in = data.size();
@@ -1150,9 +1192,9 @@ bool Util::LZMADecompress(const string &data, string *out) {
     ret = lzma_code(&strm, LZMA_FINISH);
     if (strm.avail_out == 0 || ret == LZMA_STREAM_END) {
       out->append(reinterpret_cast<const char *>(decompressed_data.data()),
-                  common::BUFFER_SIZE_BYTES - strm.avail_out);
+                  common::CALC_BUFFER_SIZE_BYTES - strm.avail_out);
       strm.next_out = decompressed_data.data();
-      strm.avail_out = common::BUFFER_SIZE_BYTES;
+      strm.avail_out = common::CALC_BUFFER_SIZE_BYTES;
     }
 
     if (ret != LZMA_OK) {
@@ -1195,8 +1237,7 @@ bool Util::MessageToPrettyJson(const google::protobuf::Message &msg,
   return true;
 }
 
-bool Util::JsonToMessage(const std::string &json,
-                         google::protobuf::Message *msg) {
+bool Util::JsonToMessage(const string &json, google::protobuf::Message *msg) {
   static ParseOptions option = {true, false};
   if (!JsonStringToMessage(json, msg, option).ok()) {
     return false;
@@ -1214,7 +1255,7 @@ void Util::PrintFileReq(const proto::FileReq &req) {
             << ", content size: " << req.content().size();
 }
 
-bool Util::FileReqToJson(const proto::FileReq &req, std::string *json) {
+bool Util::FileReqToJson(const proto::FileReq &req, string *json) {
   // PrintFileReq(req);
   rapidjson::Document document;
   document.SetObject();
@@ -1232,7 +1273,7 @@ bool Util::FileReqToJson(const proto::FileReq &req, std::string *json) {
       "sha256", rapidjson::Value().SetString(req.sha256().c_str(), allocator),
       allocator);
 
-  std::string base64_content;
+  string base64_content;
   Base64Encode(req.content(), &base64_content);
   document.AddMember(
       "content",
@@ -1256,7 +1297,7 @@ bool Util::FileReqToJson(const proto::FileReq &req, std::string *json) {
   return true;
 }
 
-bool Util::JsonToFileReq(const std::string &json, proto::FileReq *req) {
+bool Util::JsonToFileReq(const string &json, proto::FileReq *req) {
   rapidjson::Document doc;
   if (doc.Parse(json).HasParseError()) {
     LOG(ERROR) << "Parse error";
@@ -1284,7 +1325,7 @@ bool Util::JsonToFileReq(const std::string &json, proto::FileReq *req) {
   }
 
   if (doc.HasMember("content") && doc["content"].IsString()) {
-    std::string base64_content;
+    string base64_content;
     Base64Decode(doc["content"].GetString(), &base64_content);
     req->set_content(std::move(base64_content));
   }
@@ -1323,7 +1364,7 @@ int64_t Util::FDCount() {
     while ((entry = readdir(dir)) != nullptr) {
       if (entry->d_name[0] == '.') continue;
       fd_count++;
-      std::string fd_path = std::string(fd_dir) + "/" + entry->d_name;
+      string fd_path = string(fd_dir) + "/" + entry->d_name;
       char link_target[256];
       ssize_t len =
           readlink(fd_path.c_str(), link_target, sizeof(link_target) - 1);
@@ -1344,6 +1385,21 @@ int64_t Util::FDCount() {
   closedir(dir);
 #endif
   return fd_count;
+}
+
+int64_t Util::MemUsage() {
+#if defined(__linux__)
+  std::ifstream statm("/proc/self/statm");
+  if (!statm) {
+    return -1;
+  }
+
+  long size, resident, share, text, lib, data, dt;
+  statm >> size >> resident >> share >> text >> lib >> data >> dt;
+
+  long pageSize = sysconf(_SC_PAGESIZE);  // in bytes
+  return resident * pageSize / 1024 / 1024;
+#endif
 }
 
 }  // namespace util

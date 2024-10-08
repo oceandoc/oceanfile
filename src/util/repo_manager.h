@@ -14,8 +14,8 @@
 #include "folly/Singleton.h"
 #include "glog/logging.h"
 #include "src/common/defs.h"
+#include "src/common/error.h"
 #include "src/proto/data.pb.h"
-#include "src/util/scan_manager.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -215,29 +215,28 @@ class RepoManager {
     return "";
   }
 
-  proto::ErrCode WriteToFile(const std::string& repo_uuid,
-                             const std::string& sha256,
-                             const std::string& content, const int64_t size,
-                             const int32_t partition_num,
-                             const int64_t partition_size) {
+  int32_t WriteToFile(const std::string& repo_uuid, const std::string& sha256,
+                      const std::string& content, const int64_t size,
+                      const int32_t partition_num,
+                      const int64_t partition_size) {
     static thread_local std::shared_mutex mu;
     const auto& repo_path = RepoPathByUUID(repo_uuid);
     if (repo_path.empty()) {
       LOG(ERROR) << "Invalid repo path";
-      return proto::ErrCode::Repo_not_exists;
+      return Err_Repo_not_exists;
     }
 
     const auto& repo_file_path = Util::RepoFilePath(repo_path, sha256);
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
-      return proto::ErrCode::Repo_uuid_error;
+      return Err_Repo_uuid_error;
     }
 
     Util::MkParentDir(repo_file_path);
 
-    auto err_code = proto::ErrCode::Success;
+    auto err_code = Err_Success;
     err_code = Util::CreateFileWithSize(repo_file_path, size);
-    if (err_code != proto::ErrCode::Success) {
+    if (err_code != Err_Success) {
       LOG(ERROR) << "Create file error: " << repo_file_path;
       return err_code;
     }
@@ -248,7 +247,7 @@ class RepoManager {
       LOG(ERROR) << "Calc size error, partition_num: " << partition_num
                  << ", start: " << start << ", end: " << end
                  << ", content size: " << content.size();
-      return proto::ErrCode::File_partition_size_error;
+      return Err_File_partition_size_error;
     }
     LOG(INFO) << "Now store file " << repo_file_path
               << ", part: " << partition_num;

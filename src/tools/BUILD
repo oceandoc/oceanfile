@@ -6,8 +6,26 @@ package(default_visibility = ["//visibility:public"])
 cpplint()
 
 cc_binary(
-    name = "pretty_scan_status",
-    srcs = ["pretty_scan_status.cc"],
+    name = "scan_status_prettier",
+    srcs = ["scan_status_prettier.cc"],
+    deps = [
+        "//src/util",
+        "//src/util:scan_manager",
+    ],
+)
+
+cc_binary(
+    name = "scan_status_validator",
+    srcs = ["scan_status_validator.cc"],
+    deps = [
+        "//src/util",
+        "//src/util:scan_manager",
+    ],
+)
+
+cc_binary(
+    name = "scan",
+    srcs = ["scan.cc"],
     deps = [
         "//src/util",
         "//src/util:scan_manager",

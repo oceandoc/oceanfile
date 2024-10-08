@@ -20,7 +20,7 @@ namespace http_handler {
 // https://tonybai.com/2021/01/16/upload-and-download-file-using-multipart-form-over-http/
 class FileHandler : public proxygen::RequestHandler {
  public:
-  FileHandler() { body_.reserve(common::BUFFER_SIZE_BYTES + 100); }
+  FileHandler() { body_.reserve(common::NET_BUFFER_SIZE_BYTES + 100); }
 
   void onUpgrade(proxygen::UpgradeProtocol) noexcept override {}
   void onRequest(

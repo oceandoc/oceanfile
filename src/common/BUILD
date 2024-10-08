@@ -7,5 +7,13 @@ cpplint()
 
 cc_library(
     name = "defs",
-    hdrs = ["defs.h"],
+    hdrs = [
+        "defs.h",
+        "error.h",
+    ],
+)
+
+cc_library(
+    name = "blocking_queue",
+    hdrs = ["blocking_queue.h"],
 )

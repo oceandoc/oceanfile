@@ -116,8 +116,8 @@ class FileClient
     LOG(INFO) << attr.ToString();
     mark_.resize(attr.partition_num, 0);
 
-    std::vector<char> buffer(common::BUFFER_SIZE_BYTES);
-    req_.mutable_content()->resize(common::BUFFER_SIZE_BYTES);
+    std::vector<char> buffer(common::NET_BUFFER_SIZE_BYTES);
+    req_.mutable_content()->resize(common::NET_BUFFER_SIZE_BYTES);
     req_.set_op(proto::FileOp::FilePut);
     req_.set_path(path);
     req_.set_sha256(attr.sha256);
@@ -136,7 +136,7 @@ class FileClient
       write_cv_.wait(l);
     };
 
-    while (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
+    while (file.read(buffer.data(), common::NET_BUFFER_SIZE_BYTES) ||
            file.gcount()) {
       LOG(INFO) << "Now send " << req_.sha256() << ", part: " << partition_num;
       BatchSend(partition_num);
@@ -146,8 +146,8 @@ class FileClient
     while (GetStatus() == common::SendStatus::RETRING) {
       for (size_t i = 0; i < mark_.size(); ++i) {
         if (mark_[i] == 1) {
-          file.seekg(i * common::BUFFER_SIZE_BYTES);
-          if (file.read(buffer.data(), common::BUFFER_SIZE_BYTES) ||
+          file.seekg(i * common::NET_BUFFER_SIZE_BYTES);
+          if (file.read(buffer.data(), common::NET_BUFFER_SIZE_BYTES) ||
               file.gcount()) {
             BatchSend(i);
           }

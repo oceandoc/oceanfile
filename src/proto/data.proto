@@ -9,7 +9,7 @@ enum FileType {
 }
 
 message FileItem {
-  string path = 1;
+  string filename = 1;
   uint64 size = 2;
   uint64 update_time = 4;  // local update time
   FileType file_type = 5;
@@ -20,21 +20,23 @@ message FileItem {
 }
 
 message DirItem {
-  string path = 1;
-  uint64 update_time = 2;  // local update time
-  string owner = 3;
-  uint32 permission = 4;  // 1bit: need auth, 2bit: group, 3bit: all
-  map<string, int64> files = 5;
+  string path = 1;                  // relateive to ScanStatus'path
+  uint64 update_time = 2;           // local update time
+  string owner = 3;                 // user:group
+  uint32 permission = 4;            // 1bit: need auth, 2bit: group, 3bit: all
+  map<string, FileItem> files = 5;  // key is filename relative to path
 }
 
 message ScanStatus {
   string path = 1;
-  map<string, DirItem> scanned_dirs = 2;    // relative path
-  map<string, FileItem> scanned_files = 3;  // relative path
-  int64 update_time = 4;
-  int64 complete_time = 5;
-  map<string, bool> ignored_dirs = 6;  // relative path
-  string uuid = 7;
+  map<string, DirItem> scanned_dirs = 2;  // relative path
+  int64 update_time = 3;
+  int64 complete_time = 4;
+  map<string, bool> ignored_dirs = 5;  // relative to path
+  string uuid = 6;
+  int64 file_num = 7;  // not include symlink file
+  int64 symlink_num = 8;
+  int32 hash_method = 9;  // see common/defs.h
 }
 
 message RepoMeta {

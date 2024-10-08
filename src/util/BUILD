@@ -110,6 +110,7 @@ cc_library(
         ":double_buffer",
         ":thread_pool",
         ":util",
+        "//src/common:blocking_queue",
         "//src/common:defs",
         "//src/proto:cc_data",
         "@folly",
@@ -182,6 +183,7 @@ cc_library(
     deps = [
         "//src/common:defs",
         "//src/proto:cc_service",
+        "@blake3",
         "@boost//:algorithm",
         "@boost//:beast",
         "@boost//:iostreams",

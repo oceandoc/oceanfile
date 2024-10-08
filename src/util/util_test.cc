@@ -336,7 +336,7 @@ TEST(Util, Relative) {
 
 TEST(Util, ParentPath) {
   std::string relative = "18";
-  EXPECT_EQ(Util::ParentPath(relative), ".");
+  EXPECT_EQ(Util::ParentPath(relative), "");
 
   relative = "18/test";
   EXPECT_EQ(Util::ParentPath(relative), "18");
@@ -448,20 +448,20 @@ TEST(Util, RepoFilePath) {
 
 TEST(Util, CalcPartitionStart) {
   int64_t start = 0, end = 0;
-  Util::CalcPartitionStart(359621552, 0, common::BUFFER_SIZE_BYTES, &start,
+  Util::CalcPartitionStart(359621552, 0, common::NET_BUFFER_SIZE_BYTES, &start,
                            &end);
   EXPECT_EQ(start, 0);
-  EXPECT_EQ(end, common::BUFFER_SIZE_BYTES - 1);
+  EXPECT_EQ(end, common::NET_BUFFER_SIZE_BYTES - 1);
 
-  Util::CalcPartitionStart(359621552, 1, common::BUFFER_SIZE_BYTES, &start,
+  Util::CalcPartitionStart(359621552, 1, common::NET_BUFFER_SIZE_BYTES, &start,
                            &end);
-  EXPECT_EQ(start, common::BUFFER_SIZE_BYTES);
-  EXPECT_EQ(end, common::BUFFER_SIZE_BYTES * 2 - 1);
+  EXPECT_EQ(start, common::NET_BUFFER_SIZE_BYTES);
+  EXPECT_EQ(end, common::NET_BUFFER_SIZE_BYTES * 2 - 1);
 
-  Util::CalcPartitionStart(359621552, 6, common::BUFFER_SIZE_BYTES, &start,
+  Util::CalcPartitionStart(359621552, 6, common::NET_BUFFER_SIZE_BYTES, &start,
                            &end);
-  EXPECT_EQ(start, common::BUFFER_SIZE_BYTES * 6);
-  EXPECT_EQ(end, 359621552 - 1);
+  EXPECT_EQ(start, common::NET_BUFFER_SIZE_BYTES * 6);
+  EXPECT_EQ(end, common::NET_BUFFER_SIZE_BYTES * 7 - 1);
 }
 
 ///////////////////////////////////////////////////
@@ -491,20 +491,54 @@ TEST(Util, CRC32) {
 TEST(Util, SHA256) {
   std::string content;
   std::string out;
-  auto start = Util::CurrentTimeMillis();
   content =
-      "A cyclic redundancy check (CRC) is an error-detecting code used to "
-      "detect data corruption. When sending data, short checksum is generated "
-      "based on data content and sent along with data. When receiving data, "
-      "checksum is generated again and compared with sent checksum. If the two "
-      "are equal, then there is no data corruption. The CRC-32 algorithm "
-      "itself converts a variable-length string into an 8-character string.";
+      R"(A cyclic redundancy check (CRC) is an error-detecting code used to detect data corruption. When sending data, short checksum is generated based on data content and sent along with data. When receiving data, checksum is generated again and compared with sent checksum. If the two are equal, then there is no data corruption. The CRC-32 algorithm itself converts a variable-length string into an 8-character string.)";
   Util::SHA256(content, &out);
-  LOG(INFO) << "file size: " << content.size() / 1024 / 1024
-            << "M, sha256:" << out
-            << ", cost: " << Util::CurrentTimeMillis() - start;
   EXPECT_EQ(out,
             "3f5d419c0386a26df1c75d0d1c488506fb641b33cebaa2a4917127ae33030b31");
+}
+
+TEST(Util, Blake3) {
+  std::string content;
+  std::string out;
+  content =
+      R"(A cyclic redundancy check (CRC) is an error-detecting code used to detect data corruption. When sending data, short checksum is generated based on data content and sent along with data. When receiving data, checksum is generated again and compared with sent checksum. If the two are equal, then there is no data corruption. The CRC-32 algorithm itself converts a variable-length string into an 8-character string.)";
+  Util::Blake3(content, &out);
+  EXPECT_EQ(out,
+            "9b12d05351596e6851917bc73dcaf39eb12a27a196e56d38492ed730a60edf8e");
+}
+
+TEST(Util, FileHashCompare) {
+  const auto& path =
+      "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus";
+  std::string out;
+  auto start = Util::CurrentTimeMillis();
+  Util::FileBlake3(path, &out);
+  auto now = Util::CurrentTimeMillis();
+  LOG(INFO) << "Cost: " << now - start;
+  EXPECT_EQ(out,
+            "4195ca072574b8da14152cbd76b3de16dd5e290d5dbb3582a047ee17bb1b6fd4");
+  start = now;
+
+  Util::FileSHA256(path, &out);
+  now = Util::CurrentTimeMillis();
+  LOG(INFO) << "Cost: " << now - start;
+  EXPECT_EQ(out,
+            "4084ec48f2affbd501c02a942b674abcfdbbc6475070049de2c89fb6aa25a3f0");
+  start = now;
+
+  Util::FileBlake3(path, &out);
+  now = Util::CurrentTimeMillis();
+  LOG(INFO) << "Cost: " << now - start;
+  EXPECT_EQ(out,
+            "4195ca072574b8da14152cbd76b3de16dd5e290d5dbb3582a047ee17bb1b6fd4");
+  start = now;
+
+  Util::FileSHA256(path, &out);
+  now = Util::CurrentTimeMillis();
+  LOG(INFO) << "Cost: " << now - start;
+  EXPECT_EQ(out,
+            "4084ec48f2affbd501c02a942b674abcfdbbc6475070049de2c89fb6aa25a3f0");
 }
 
 TEST(Util, LZMA) {

@@ -19,7 +19,10 @@ enum ErrCode {
   File_disk_full = 11002;
   File_partition_size_error = 11003;
   File_permission_or_not_exists = 11004;
-  File_sha256_calc_error = 11005;
+  File_hash_calc_error = 11005;
+  File_sha256_calc_error = 11006;
+  File_md5_calc_error = 11007;
+  File_crc32_calc_error = 11008;
 
   // 12000
   Scan_error = 12001;

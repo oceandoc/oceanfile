@@ -71,8 +71,8 @@ class Util final {
   static bool Remove(const std::string &path);
   static bool Create(const std::string &path);
   static bool Rename(const std::string &src, const std::string &dst);
-  static proto::ErrCode CreateFileWithSize(const std::string &path,
-                                           const int64_t size);
+  static int32_t CreateFileWithSize(const std::string &path,
+                                    const int64_t size);
   static bool CreateSymlink(const std::string &src, const std::string &target);
 
   static std::string FindCommonRoot(const std::filesystem::path &path,
@@ -87,12 +87,11 @@ class Util final {
                            std::filesystem::copy_options::overwrite_existing);
   static bool Copy(const std::string &src, const std::string &dst);
   static bool TruncateFile(const std::string &path);
-  static proto::ErrCode WriteToFile(const std::string &path,
-                                    const std::string &content,
-                                    const bool append = false);
-  static proto::ErrCode WriteToFile(const std::string &path,
-                                    const std::string &content,
-                                    const int64_t start);
+  static int32_t WriteToFile(const std::string &path,
+                             const std::string &content,
+                             const bool append = false);
+  static int32_t WriteToFile(const std::string &path,
+                             const std::string &content, const int64_t start);
   static bool LoadSmallFile(const std::string &path, std::string *content);
 
   static bool SyncSymlink(const std::string &src, const std::string &dst,
@@ -176,58 +175,65 @@ class Util final {
 
   static uint32_t CRC32(const std::string &content);
 
+  static bool Blake3(const std::string &content, std::string *out,
+                     const bool use_upper_case = false);
+  static bool FileBlake3(const std::string &path, std::string *out,
+                         const bool use_upper_case = false);
+
   static EVP_MD_CTX *HashInit(const EVP_MD *type);
   static bool HashUpdate(EVP_MD_CTX *context, const std::string &str);
   static bool HashFinal(EVP_MD_CTX *context, std::string *out,
-                        bool use_upper_case = false);
+                        const bool use_upper_case = false);
 
   static EVP_MD_CTX *SHA256Init();
   static bool SHA256Update(EVP_MD_CTX *context, const std::string &str);
   static bool SHA256Final(EVP_MD_CTX *context, std::string *out,
-                          bool use_upper_case = false);
+                          const bool use_upper_case = false);
 
   static bool Hash(const std::string &str, const EVP_MD *type, std::string *out,
-                   bool use_upper_case = false);
+                   const bool use_upper_case = false);
 
   static bool FileHash(const std::string &path, const EVP_MD *type,
-                       std::string *out, bool use_upper_case = false);
+                       std::string *out, const bool use_upper_case = false);
 
   static bool SmallFileHash(const std::string &path, const EVP_MD *type,
-                            std::string *out, bool use_upper_case = false);
+                            std::string *out,
+                            const bool use_upper_case = false);
 
   static bool SHA256(const std::string &str, std::string *out,
-                     bool use_upper_case = false);
+                     const bool use_upper_case = false);
 
   static std::string SHA256(const std::string &str,
-                            bool use_upper_case = false);
+                            const bool use_upper_case = false);
 
   static bool SHA256_libsodium(const std::string &str, std::string *out,
-                               bool use_upper_case = false);
+                               const bool use_upper_case = false);
 
   static bool SmallFileSHA256(const std::string &path, std::string *out,
-                              bool use_upper_case = false);
+                              const bool use_upper_case = false);
 
   static bool FileSHA256(const std::string &path, std::string *out,
-                         bool use_upper_case = false);
+                         const bool use_upper_case = false);
 
   static bool MD5(const std::string &str, std::string *out,
-                  bool use_upper_case = false);
+                  const bool use_upper_case = false);
 
   static bool SmallFileMD5(const std::string &path, std::string *out,
-                           bool use_upper_case = false);
+                           const bool use_upper_case = false);
 
   static bool FileMD5(const std::string &path, std::string *out,
-                      bool use_upper_case = false);
+                      const bool use_upper_case = false);
 
   static bool HexStrToInt64(const std::string &in, int64_t *out);
 
-  static std::string ToHexStr(const uint64_t in, bool use_upper_case = false);
+  static std::string ToHexStr(const uint64_t in,
+                              const bool use_upper_case = false);
 
   static void ToHexStr(const std::string &in, std::string *out,
-                       bool use_upper_case = false);
+                       const bool use_upper_case = false);
 
   static std::string ToHexStr(const std::string &in,
-                              bool use_upper_case = false);
+                              const bool use_upper_case = false);
 
   static int64_t MurmurHash64A(const std::string &str);
 
@@ -256,6 +262,7 @@ class Util final {
   }
 
   static int64_t FDCount();
+  static int64_t MemUsage();
 };
 
 }  // namespace util

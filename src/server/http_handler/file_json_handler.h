@@ -11,7 +11,6 @@
 #include "src/common/defs.h"
 #include "src/server/handler_proxy/handler_proxy.h"
 #include "src/server/http_handler/util.h"
-#include "src/util/timer.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -20,7 +19,7 @@ namespace http_handler {
 
 class FileJsonHandler : public proxygen::RequestHandler {
  public:
-  FileJsonHandler() { body_.reserve(common::BUFFER_SIZE_BYTES + 100); }
+  FileJsonHandler() { body_.reserve(common::NET_BUFFER_SIZE_BYTES + 100); }
 
   void onUpgrade(proxygen::UpgradeProtocol) noexcept override {}
   void onRequest(std::unique_ptr<proxygen::HTTPMessage>) noexcept override {}

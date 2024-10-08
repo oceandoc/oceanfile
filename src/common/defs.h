@@ -13,7 +13,7 @@ namespace oceandoc {
 namespace common {
 
 enum SendStatus {
-  SUCCESS,
+  SUCCESS = 0,
   RETRING,
   TOO_MANY_RETRY,
   FATAL,
@@ -21,21 +21,22 @@ enum SendStatus {
 };
 
 enum HashMethod {
-  Hash_NONE,
+  Hash_NONE = 0,
   Hash_CRC32,
   Hash_MD5,
   Hash_SHA256,
+  Hash_BLAKE3,
 };
 
 enum SyncMethod {
-  Sync_SYNC,
+  Sync_SYNC = 1,
   Sync_ARCH,
 };
 
 const std::string CONFIG_DIR = ".Dr.Q.config";
 const std::string REPOS_CONFIG_FILE = "./data/repos.json";
-constexpr int64_t BUFFER_SIZE = 64 * 1024 * 1024 * 8;    // 64MB, unit:byte
-constexpr int64_t BUFFER_SIZE_BYTES = 64 * 1024 * 1024;  // 64MB unit:Bytes
+constexpr int64_t NET_BUFFER_SIZE_BYTES = 4 * 1024 * 1024;  // 8MB
+constexpr int64_t CALC_BUFFER_SIZE_BYTES = 64 * 1024;       // 64KB
 
 constexpr int64_t MAX_GRPC_MSG_SIZE = 2 * 64 * 1024 * 1024 * 8;  // 128MB
 constexpr double TRACING_SAMPLER_PROBALITITY = 0.01;             // 1 Percent
