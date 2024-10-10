@@ -117,6 +117,7 @@ class FileClient
         LOG(ERROR) << "Empty repo_uuid";
         return false;
       }
+      req_.set_repo_type(proto::RepoType::RT_Ocean);
       req_.set_path(ctx.src);
       req_.set_repo_uuid(ctx.repo_uuid);
       if (ctx.type == proto::FileType::Dir) {
@@ -127,6 +128,7 @@ class FileClient
         LOG(ERROR) << "Empty dst";
         return false;
       }
+      req_.set_repo_type(proto::RepoType::RT_Remote);
       req_.set_path(ctx.dst);
     }
 

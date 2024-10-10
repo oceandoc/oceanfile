@@ -215,18 +215,15 @@ class RepoManager {
     return "";
   }
 
-  int32_t WriteToFile(const std::string& repo_uuid, const std::string& sha256,
-                      const std::string& content, const int64_t size,
-                      const int32_t partition_num,
-                      const int64_t partition_size) {
+  int32_t WriteToFile(const proto::FileReq& req) {
     static thread_local std::shared_mutex mu;
-    const auto& repo_path = RepoPathByUUID(repo_uuid);
+    const auto& repo_path = RepoPathByUUID(req.repo_uuid());
     if (repo_path.empty()) {
       LOG(ERROR) << "Invalid repo path";
       return Err_Repo_not_exists;
     }
 
-    const auto& repo_file_path = Util::RepoFilePath(repo_path, sha256);
+    const auto& repo_file_path = Util::RepoFilePath(repo_path, req.hash());
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
       return Err_Repo_uuid_error;
@@ -235,24 +232,25 @@ class RepoManager {
     Util::MkParentDir(repo_file_path);
 
     auto err_code = Err_Success;
-    err_code = Util::CreateFileWithSize(repo_file_path, size);
+    err_code = Util::CreateFileWithSize(repo_file_path, req.size());
     if (err_code != Err_Success) {
       LOG(ERROR) << "Create file error: " << repo_file_path;
       return err_code;
     }
 
     int64_t start = 0, end = 0;
-    Util::CalcPartitionStart(size, partition_num, partition_size, &start, &end);
-    if (end - start + 1 != static_cast<int64_t>(content.size())) {
-      LOG(ERROR) << "Calc size error, partition_num: " << partition_num
+    Util::CalcPartitionStart(req.size(), req.partition_num(),
+                             req.partition_size(), &start, &end);
+    if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
+      LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
                  << ", start: " << start << ", end: " << end
-                 << ", content size: " << content.size();
+                 << ", content size: " << req.content().size();
       return Err_File_partition_size_error;
     }
     LOG(INFO) << "Now store file " << repo_file_path
-              << ", part: " << partition_num;
+              << ", part: " << req.partition_num();
     std::unique_lock<std::shared_mutex> locker(mu);
-    return Util::WriteToFile(repo_file_path, content, start);
+    return Util::WriteToFile(repo_file_path, req.content(), start);
   }
 
   void Stop() { stop_.store(true); }

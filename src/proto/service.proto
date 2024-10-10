@@ -84,6 +84,7 @@ enum FileOp {
 
 message FileReq {
   string request_id = 1;
+  RepoType repo_type = 2;
   FileOp op = 3;
   string path = 4;
   string hash = 5;

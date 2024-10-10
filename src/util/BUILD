@@ -50,32 +50,6 @@ cc_library(
 )
 
 cc_library(
-    name = "double_buffer",
-    hdrs = ["double_buffer.h"],
-    copts = COPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        "@com_github_glog_glog//:glog",
-        "@com_google_absl//absl/synchronization",
-    ],
-)
-
-cc_library(
-    name = "periodic_task",
-    srcs = ["periodic_task.cc"],
-    hdrs = ["periodic_task.h"],
-    copts = COPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        ":scan_manager",
-        ":util",
-        "//src/proto:cc_config",
-        "//src/proto:cc_data",
-        "@folly",
-    ],
-)
-
-cc_library(
     name = "repo_manager",
     srcs = ["repo_manager.cc"],
     hdrs = ["repo_manager.h"],
@@ -107,7 +81,6 @@ cc_library(
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
-        ":double_buffer",
         ":thread_pool",
         ":util",
         "//src/common:blocking_queue",
@@ -124,10 +97,10 @@ cc_library(
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
-        ":double_buffer",
         ":scan_manager",
         ":thread_pool",
         ":util",
+        "//src/client/grpc_client:grpc_clients",
         "//src/common:defs",
         "//src/proto:cc_data",
         "//src/proto:cc_grpc_service",

@@ -8,6 +8,7 @@
 
 #include "src/proto/service.pb.h"
 #include "src/util/repo_manager.h"
+#include "src/util/sync_manager.h"
 
 namespace oceandoc {
 namespace server {
@@ -19,28 +20,34 @@ class HandlerProxy {
     res->set_err_code(proto::ErrCode::Fail);
   }
 
+  static bool SaveFile(const proto::FileReq& req, proto::FileRes* res) {
+    bool ret = true;
+    if (req.repo_type() == proto::RepoType::RT_Ocean) {
+      if (req.repo_uuid().empty()) {
+        ret = false;
+        LOG(ERROR) << "Repo uuid empty";
+      } else {
+        ret = util::RepoManager::Instance()->WriteToFile(req);
+      }
+    } else if (req.repo_type() == proto::RepoType::RT_Remote) {
+      ret = util::SyncManager::Instance()->WriteToFile(req);
+    }
+    return ret;
+  }
+
   static void FileOpHandle(const proto::FileReq& req, proto::FileRes* res) {
     bool ret = true;
     switch (req.op()) {
       case proto::FileOp::FilePut:
-        if (req.repo_uuid().empty()) {
-          ret = false;
-          LOG(ERROR) << "Repo uuid empty";
-        } else {
-          ret = util::RepoManager::Instance()->WriteToFile(
-              req.repo_uuid(), req.hash(), req.content(), req.size(),
-              req.partition_num(),
-              req.partition_size() > 0 ? req.partition_size()
-                                       : common::NET_BUFFER_SIZE_BYTES);
-        }
+        ret = SaveFile(req, res);
         break;
       default:
         LOG(ERROR) << "Unsupported operation";
     }
 
     if (!ret) {
-      LOG(INFO) << "Store file error: " << req.hash()
-                << ", part: " << req.partition_num();
+      LOG(ERROR) << "Store file error: " << req.hash()
+                 << ", part: " << req.partition_num();
       res->set_err_code(proto::ErrCode::Fail);
     } else {
       res->set_err_code(proto::ErrCode::Success);

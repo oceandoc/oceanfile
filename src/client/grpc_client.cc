@@ -47,7 +47,9 @@ int main(int argc, char** argv) {
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus";
   oceandoc::client::FileClient file_client("localhost", "10001",
                                            oceandoc::proto::RepoType::RT_Ocean);
-  auto ret = file_client.Send();
+  oceandoc::client::SendContext send_ctx;
+  send_ctx.src = path;
+  auto ret = file_client.Send(send_ctx);
   grpc::Status status = file_client.Await();
   if (!status.ok() || !ret) {
     LOG(ERROR) << "Store " << path << " failed.";

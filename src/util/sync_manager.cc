@@ -89,6 +89,32 @@ int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
   return Err_Fail;
 }
 
+bool SyncManager::WriteToFile(const proto::FileReq& req) {
+  static thread_local std::shared_mutex mu;
+  Util::MkParentDir(req.path());
+
+  auto err_code = Err_Success;
+  err_code = Util::CreateFileWithSize(req.path(), req.size());
+  if (err_code != Err_Success) {
+    LOG(ERROR) << "Create file error: " << req.path();
+    return err_code;
+  }
+
+  int64_t start = 0, end = 0;
+  Util::CalcPartitionStart(req.size(), req.partition_num(),
+                           req.partition_size(), &start, &end);
+  if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
+    LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
+               << ", start: " << start << ", end: " << end
+               << ", content size: " << req.content().size();
+    return Err_File_partition_size_error;
+  }
+  LOG(INFO) << "Now store file " << req.path()
+            << ", part: " << req.partition_num();
+  std::unique_lock<std::shared_mutex> locker(mu);
+  return Util::WriteToFile(req.path(), req.content(), start);
+}
+
 bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
                                    SyncContext* sync_ctx) {
   client::FileClient file_client(sync_ctx->remote_addr, sync_ctx->remote_port,

@@ -1,9 +1,8 @@
 # TODO
-* hash_map with disk
+* recursive scan and send
 * repo ctl interface
-* check scan status
 * log client failed part and retry use queue
-* authentic
+* authentic, sqlite
 * session cookie
 * public and private ip address, mac address, system info
 * fix self defined toolchain compitible problem with refresh_compile_commands

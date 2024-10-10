@@ -110,6 +110,8 @@ class SyncManager {
     return Err_Success;
   }
 
+  bool WriteToFile(const proto::FileReq& req);
+
   int32_t SyncRemote(SyncContext* sync_ctx);
 
   int32_t SyncLocal(SyncContext* sync_ctx) {
