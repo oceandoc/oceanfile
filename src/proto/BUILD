@@ -45,7 +45,10 @@ cc_proto_library(
 proto_library(
     name = "service_proto",
     srcs = ["service.proto"],
-    deps = [":error_proto"],
+    deps = [
+        ":data_proto",
+        ":error_proto",
+    ],
 )
 
 proto_library(

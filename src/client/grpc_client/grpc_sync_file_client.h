@@ -24,28 +24,13 @@
 namespace oceandoc {
 namespace client {
 
-class SendContext {
- public:
-  std::string repo_uuid;
-  std::string src;
-  std::string dst;
-  proto::FileType type;
-};
-
 class FileClient
     : public grpc::ClientBidiReactor<proto::FileReq, proto::FileRes> {
  public:
-  explicit FileClient(
-      const std::string& addr, const std::string& port,
-      const proto::RepoType repo_type,
-      const int64_t partition_size = common::NET_BUFFER_SIZE_BYTES,
-      const bool calc_hash = false)
+  explicit FileClient(const std::string& addr, const std::string& port)
       : channel_(grpc::CreateChannel(addr + ":" + port,
                                      grpc::InsecureChannelCredentials())),
-        stub_(oceandoc::proto::OceanFile::NewStub(channel_)),
-        repo_type(repo_type),
-        partition_size(partition_size),
-        calc_hash(calc_hash) {}
+        stub_(oceandoc::proto::OceanFile::NewStub(channel_)) {}
 
   void OnWriteDone(bool ok) override {
     if (!ok) {
@@ -98,71 +83,48 @@ class FileClient
     return success ? common::SendStatus::SUCCESS : common::SendStatus::RETRING;
   }
 
-  void Reset() {
-    req_.Clear();
-    res_.Clear();
-    mark_.clear();
-    done_ = false;
-    send_status_ = common::SendStatus::SUCCESS;
-  }
-
-  bool Send(const SendContext& ctx) {
-    if (ctx.src.empty()) {
-      LOG(ERROR) << "Empty src";
+  bool Send(const std::string& repo_uuid, const std::string& path) {
+    if (repo_uuid.empty()) {
+      LOG(ERROR) << "Empty repo_uuid";
       return false;
     }
 
-    if (repo_type == proto::RepoType::RT_Ocean) {
-      if (ctx.repo_uuid.empty()) {
-        LOG(ERROR) << "Empty repo_uuid";
-        return false;
-      }
-      req_.set_path(ctx.src);
-      req_.set_repo_uuid(ctx.repo_uuid);
-      if (ctx.type == proto::FileType::Dir) {
-        return true;
-      }
-    } else {
-      if (ctx.dst.empty()) {
-        LOG(ERROR) << "Empty dst";
-        return false;
-      }
-      req_.set_path(ctx.dst);
-    }
+    send_status_ = common::SendStatus::SUCCESS;
+    done_ = false;
+    req_.Clear();
+    mark_.clear();
 
-    Reset();
+    req_.set_repo_uuid(repo_uuid);
     grpc::ClientContext context;
     stub_->async()->FileOp(&context, this);
 
     StartRead(&res_);
     StartCall();
 
-    req_.set_op(proto::FileOp::FilePut);
-
     common::FileAttr attr;
-
-    if (!util::Util::PrepareFile(ctx.src, calc_hash, partition_size, &attr)) {
-      LOG(ERROR) << "Prepare error: " << ctx.src;
+    if (!util::Util::PrepareFile(path, &attr)) {
+      LOG(ERROR) << "Prepare error: " << path;
       return false;
     }
-    if (calc_hash) {
-      req_.set_hash(attr.hash);
-    }
-    req_.set_size(attr.size);
-    mark_.resize(attr.partition_num, 0);
 
-    std::ifstream file(ctx.src, std::ios::binary);
+    std::ifstream file(path, std::ios::binary);
     if (!file || !file.is_open()) {
-      LOG(ERROR) << "Check file exists or file permissions: " << ctx.src;
+      LOG(ERROR) << "Check file exists or file permissions: " << path;
       return false;
     }
 
+    LOG(INFO) << attr.ToString();
     mark_.resize(attr.partition_num, 0);
 
-    std::vector<char> buffer(partition_size);
-    req_.mutable_content()->resize(partition_size);
+    std::vector<char> buffer(common::NET_BUFFER_SIZE_BYTES);
+    req_.mutable_content()->resize(common::NET_BUFFER_SIZE_BYTES);
+    req_.set_op(proto::FileOp::FilePut);
+    req_.set_path(path);
+    req_.set_hash(attr.hash);
+    req_.set_size(attr.size);
 
     int32_t partition_num = 0;
+
     auto BatchSend = [this, &buffer, &file](const int32_t partition_num) {
       req_.mutable_content()->resize(file.gcount());
       req_.set_partition_num(partition_num);
@@ -174,8 +136,9 @@ class FileClient
       write_cv_.wait(l);
     };
 
-    while (file.read(buffer.data(), partition_size) || file.gcount()) {
-      LOG(INFO) << "Now send " << ctx.src << ", part: " << partition_num;
+    while (file.read(buffer.data(), common::NET_BUFFER_SIZE_BYTES) ||
+           file.gcount()) {
+      LOG(INFO) << "Now send " << req_.hash() << ", part: " << partition_num;
       BatchSend(partition_num);
       ++partition_num;
     }
@@ -190,13 +153,12 @@ class FileClient
           }
         }
       }
-      util::Util::Sleep(100);
+      util::Util::Sleep(10);
     }
 
     bool success = true;
     for (size_t i = 0; i < mark_.size(); ++i) {
       if (mark_[i] != -1) {
-        // TODO(xieyz) log failed part
         success = false;
       }
     }
@@ -209,24 +171,20 @@ class FileClient
   std::shared_ptr<grpc::Channel> channel_;
   std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
 
- public:
-  const proto::RepoType repo_type;
-  const int64_t partition_size;
-  const bool calc_hash;
+  grpc::Status status_;
 
-  proto::FileReq req_;
-  proto::FileRes res_;
-  std::vector<int32_t> mark_;
-  bool done_ = false;
   std::atomic<common::SendStatus> send_status_ = common::SendStatus::SUCCESS;
 
- private:
-  mutable absl::base_internal::SpinLock lock_;
-  grpc::Status status_;
   std::mutex mu_;
   std::condition_variable cv_;
+
   std::mutex write_mu_;
   std::condition_variable write_cv_;
+  bool done_ = false;
+  proto::FileReq req_;
+  proto::FileRes res_;
+  mutable absl::base_internal::SpinLock lock_;
+  std::vector<int32_t> mark_;
 };
 
 }  // namespace client

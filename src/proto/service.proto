@@ -3,6 +3,7 @@ syntax = "proto3";
 package oceandoc.proto;
 
 import "src/proto/error.proto";
+import "src/proto/data.proto";
 
 message Context {
   repeated string private_ipv4 = 1;
@@ -20,30 +21,6 @@ enum UserOp {
   UserDelGroup = 4;
 }
 
-enum ServerOp {
-  ServerUnused = 0;
-  ServerStatus = 1;
-  ServerRestart = 2;
-  ServerShutdown = 3;
-  ServerFullScan = 4;
-}
-
-enum FileOp {
-  FileUnused = 0;
-  FilePut = 1;
-  FileDelete = 2;
-  FileChmod = 3;
-  FileChowner = 4;
-}
-
-enum RepoOp {
-  RepoUnused = 0;
-  RepoCreate = 1;
-  RepoDelete = 2;
-  RepoChmod = 3;
-  RepoChowner = 4;
-}
-
 message UserReq {
   string request_id = 1;
   UserOp op = 2;
@@ -54,6 +31,14 @@ message UserReq {
 message UserRes {
   ErrCode err_code = 1;
   string repo_uuid = 2;
+}
+
+enum ServerOp {
+  ServerUnused = 0;
+  ServerStatus = 1;
+  ServerRestart = 2;
+  ServerShutdown = 3;
+  ServerFullScan = 4;
 }
 
 message ServerReq {
@@ -68,30 +53,20 @@ message ServerRes {
   string status = 2;
 }
 
-message FileReq {
-  string request_id = 1;
-  FileOp op = 3;
-  string path = 4;
-  string sha256 = 5;
-  int64 size = 6;
-  bytes content = 7;
-  int32 partition_num = 8;
-  string repo_uuid = 9;
-  int64 partition_size = 10;
-}
-
-message FileRes {
-  ErrCode err_code = 1;
-  string path = 2;
-  string sha256 = 3;
-  int32 partition_num = 4;
+enum RepoOp {
+  RepoUnused = 0;
+  RepoCreate = 1;
+  RepoDelete = 2;
+  RepoChmod = 3;
+  RepoChowner = 4;
 }
 
 message RepoReq {
   string request_id = 1;
   RepoOp op = 2;
-  string path = 3;
-  string repo_uuid = 4;
+  RepoType type = 3;
+  string path = 4;
+  string repo_uuid = 5;
 }
 
 message RepoRes {
@@ -99,9 +74,39 @@ message RepoRes {
   string repo_uuid = 2;
 }
 
+enum FileOp {
+  FileUnused = 0;
+  FilePut = 1;
+  FileDelete = 2;
+  FileChmod = 3;
+  FileChowner = 4;
+}
+
+message FileReq {
+  string request_id = 1;
+  FileOp op = 3;
+  string path = 4;
+  string hash = 5;
+  int64 size = 6;
+  bytes content = 7;
+  int32 partition_num = 8;
+  string repo_uuid = 9;
+  int64 partition_size = 10;
+  FileType file_type = 11;
+  string user = 12;
+  string group = 13;
+}
+
+message FileRes {
+  ErrCode err_code = 1;
+  string path = 2;
+  string hash = 3;
+  int32 partition_num = 4;
+}
+
 service OceanFile {
   rpc UserOp(UserReq) returns (UserRes);
   rpc ServerOp(ServerReq) returns (ServerRes);
-  rpc FileOp(stream FileReq) returns (stream FileRes);
   rpc RepoOp(RepoReq) returns (RepoRes);
+  rpc FileOp(stream FileReq) returns (stream FileRes);
 }

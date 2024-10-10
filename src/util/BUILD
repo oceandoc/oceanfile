@@ -130,6 +130,8 @@ cc_library(
         ":util",
         "//src/common:defs",
         "//src/proto:cc_data",
+        "//src/proto:cc_grpc_service",
+        "@com_github_grpc_grpc//:grpc++",
         "@folly",
     ],
 )

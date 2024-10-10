@@ -28,7 +28,7 @@ class HandlerProxy {
           LOG(ERROR) << "Repo uuid empty";
         } else {
           ret = util::RepoManager::Instance()->WriteToFile(
-              req.repo_uuid(), req.sha256(), req.content(), req.size(),
+              req.repo_uuid(), req.hash(), req.content(), req.size(),
               req.partition_num(),
               req.partition_size() > 0 ? req.partition_size()
                                        : common::NET_BUFFER_SIZE_BYTES);
@@ -39,14 +39,14 @@ class HandlerProxy {
     }
 
     if (!ret) {
-      LOG(INFO) << "Store file error: " << req.sha256()
+      LOG(INFO) << "Store file error: " << req.hash()
                 << ", part: " << req.partition_num();
       res->set_err_code(proto::ErrCode::Fail);
     } else {
       res->set_err_code(proto::ErrCode::Success);
     }
     res->set_path(req.path());
-    res->set_sha256(req.sha256());
+    res->set_hash(req.hash());
     res->set_partition_num(req.partition_num());
   }
 };

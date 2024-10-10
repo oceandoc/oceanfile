@@ -56,7 +56,10 @@
 #endif
 
 #if defined(__linux__) || defined(__APPLE__)
+#include <grp.h>
+#include <pwd.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #elif defined(_WIN32)
 #include <windows.h>
 #endif
@@ -241,7 +244,7 @@ bool Util::SetUpdateTime(const string &path, int64_t ts) {
   return true;
 }
 
-int64_t Util::UpdateTime(const std::string &path) {
+int64_t Util::UpdateTime(const string &path) {
 #if defined(_WIN32)
   WIN32_FILE_ATTRIBUTE_DATA fileInfo;
   if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
@@ -263,7 +266,7 @@ int64_t Util::UpdateTime(const std::string &path) {
   return -1;
 }
 
-int64_t Util::FileSize(const std::string &path) {
+int64_t Util::FileSize(const string &path) {
 #if defined(_WIN32)
   WIN32_FILE_ATTRIBUTE_DATA fileInfo;
   if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
@@ -281,8 +284,26 @@ int64_t Util::FileSize(const std::string &path) {
   return -1;
 }
 
-bool Util::FileInfo(const std::string &path, int64_t *update_time,
-                    int64_t *size) {
+void Username(int64_t uid, int64_t gid, string *user, string *group) {
+  struct passwd *pw = getpwuid(uid);
+  if (pw == nullptr) {
+    pw = getpwuid(getuid());
+  }
+  if (pw != nullptr) {
+    *user = string(pw->pw_name);
+  }
+
+  struct group *gr = getgrgid(gid);
+  if (gr == nullptr) {
+    gr = getgrgid(getgid());
+  }
+  if (gr != nullptr) {
+    *group = string(gr->gr_name);
+  }
+}
+
+bool Util::FileInfo(const string &path, int64_t *update_time, int64_t *size,
+                    string *user, string *group) {
 #if defined(_WIN32)
   WIN32_FILE_ATTRIBUTE_DATA fileInfo;
   if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
@@ -309,6 +330,9 @@ bool Util::FileInfo(const std::string &path, int64_t *update_time,
 #elif __APPLE__
     *update_time = attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
 #endif
+    if (user && group) {
+      Username(attr.st_uid, attr.st_gid, user, group);
+    }
     return true;
   }
 #endif
@@ -418,7 +442,7 @@ bool Util::Create(const string &path) {
   return true;
 }
 
-bool Util::Rename(const std::string &src, const std::string &dst) {
+bool Util::Rename(const string &src, const string &dst) {
   if (!std::filesystem::exists(src)) {
     return false;
   }
@@ -429,7 +453,7 @@ bool Util::Rename(const std::string &src, const std::string &dst) {
   return false;
 }
 
-int32_t Util::CreateFileWithSize(const std::string &path, const int64_t size) {
+int32_t Util::CreateFileWithSize(const string &path, const int64_t size) {
   if (std::filesystem::exists(std::filesystem::symlink_status(path))) {
     return Err_Success;
   }
@@ -513,7 +537,7 @@ bool Util::Relative(const string &path, const string &base, string *relative) {
   auto s_path = std::filesystem::path(u_path);
   auto s_base = std::filesystem::path(u_base);
 
-  std::string common_parent;
+  string common_parent;
   try {
     common_parent = FindCommonRoot(s_path, s_base);
   } catch (const std::filesystem::filesystem_error &e) {
@@ -539,8 +563,8 @@ bool Util::Relative(const string &path, const string &base, string *relative) {
   return true;
 }
 
-string Util::ParentPath(const std::string &path) {
-  std::string parent;
+string Util::ParentPath(const string &path) {
+  string parent;
   std::filesystem::path s_path(path);
   if (s_path.has_parent_path()) {
     return s_path.parent_path().string();
@@ -650,7 +674,7 @@ int32_t Util::WriteToFile(const string &path, const string &content,
   return Err_Fail;
 }
 
-bool Util::LoadSmallFile(const std::string &path, string *content) {
+bool Util::LoadSmallFile(const string &path, string *content) {
   std::ifstream in(path, std::ios::binary);
   if (!in || !in.is_open()) {
     LOG(ERROR) << "Fail to open " << path
@@ -668,8 +692,8 @@ bool Util::LoadSmallFile(const std::string &path, string *content) {
   return true;
 }
 
-bool Util::SyncSymlink(const std::string &src, const std::string &dst,
-                       const std::string &src_symlink) {
+bool Util::SyncSymlink(const string &src, const string &dst,
+                       const string &src_symlink) {
   try {
     if (!Util::StartWith(src_symlink, src)) {
       LOG(ERROR) << src_symlink << " must start with " << src;
@@ -688,7 +712,7 @@ bool Util::SyncSymlink(const std::string &src, const std::string &dst,
 
     auto target = std::filesystem::read_symlink(src_symlink);
 
-    std::string src_symlink_relative_path;
+    string src_symlink_relative_path;
     Util::Relative(src_symlink, src, &src_symlink_relative_path);
 
     auto dst_symlink = dst;
@@ -706,7 +730,7 @@ bool Util::SyncSymlink(const std::string &src, const std::string &dst,
   return true;
 }
 
-int32_t Util::FilePartitionNum(const std::string &path) {
+int32_t Util::FilePartitionNum(const string &path) {
   auto ret = FileSize(path);
   if (ret == -1) {
     return -1;
@@ -720,7 +744,7 @@ int32_t Util::FilePartitionNum(const int64_t size) {
          ((size % common::NET_BUFFER_SIZE_BYTES) > 0 ? 1 : 0);
 }
 
-int32_t Util::FilePartitionNum(const std::string &path,
+int32_t Util::FilePartitionNum(const string &path,
                                const int64_t partition_size) {
   auto ret = FileSize(path);
   if (ret == -1) {
@@ -736,27 +760,31 @@ int32_t Util::FilePartitionNum(const int64_t total_size,
          ((total_size % partition_size) > 0 ? 1 : 0);
 }
 
-bool Util::PrepareFile(const string &path, common::FileAttr *attr) {
+bool Util::PrepareFile(const string &path, const bool calc_hash,
+                       const int64_t partition_size, common::FileAttr *attr) {
   attr->path = path;
-  if (!FileSHA256(path, &attr->sha256)) {
-    LOG(ERROR) << "Calc " << path << " sha256 error";
-    return false;
+
+  if (calc_hash) {
+    if (!FileBlake3(path, &attr->hash)) {
+      LOG(ERROR) << "Calc " << path << " hash error";
+      return false;
+    }
   }
 
-  attr->size = FileSize(path);
+  FileInfo(path, &attr->update_time, &attr->size, &attr->user, &attr->group);
   if (attr->size == -1) {
     LOG(ERROR) << "Get " << path << " size error";
     return false;
   }
 
-  attr->partition_num = FilePartitionNum(attr->size);
+  attr->partition_num = FilePartitionNum(attr->size, partition_size);
   return true;
 }
 
 bool Util::SimplifyPath(const string &path, string *out) {
-  std::stack<std::string> dirs;
+  std::stack<string> dirs;
   std::stringstream ss(path);
-  std::string token;
+  string token;
   while (std::getline(ss, token, '/')) {
     if (token == "..") {
       if (!dirs.empty()) {
@@ -782,9 +810,8 @@ bool Util::SimplifyPath(const string &path, string *out) {
   return true;
 }
 
-std::string Util::RepoFilePath(const std::string &repo_path,
-                               const std::string &sha256) {
-  std::string repo_file_path(UnifyDir(repo_path));
+string Util::RepoFilePath(const string &repo_path, const string &sha256) {
+  string repo_file_path(UnifyDir(repo_path));
   repo_file_path.append("/");
   repo_file_path.append(sha256.substr(0, 2));
   repo_file_path.append("/");
@@ -857,7 +884,7 @@ void Util::Split(const string &str, const string &delim,
   boost::split(*result, str, boost::is_any_of(delim));
 }
 
-std::string Util::UUID() {
+string Util::UUID() {
   boost::uuids::random_generator generator;
   return boost::uuids::to_string(generator());
 }
@@ -1247,7 +1274,7 @@ bool Util::JsonToMessage(const string &json, google::protobuf::Message *msg) {
 
 void Util::PrintFileReq(const proto::FileReq &req) {
   LOG(INFO) << "request_id: " << req.request_id() << ", op: " << req.op()
-            << ", path: " << req.path() << ", sha256: " << req.sha256()
+            << ", path: " << req.path() << ", hash: " << req.hash()
             << ", size: " << req.size()
             << ", partition_num: " << req.partition_num()
             << ", repo_uuid: " << req.repo_uuid()
@@ -1270,7 +1297,7 @@ bool Util::FileReqToJson(const proto::FileReq &req, string *json) {
       "path", rapidjson::Value().SetString(req.path().c_str(), allocator),
       allocator);
   document.AddMember(
-      "sha256", rapidjson::Value().SetString(req.sha256().c_str(), allocator),
+      "hash", rapidjson::Value().SetString(req.hash().c_str(), allocator),
       allocator);
 
   string base64_content;
@@ -1316,8 +1343,8 @@ bool Util::JsonToFileReq(const string &json, proto::FileReq *req) {
     req->set_path(doc["path"].GetString());
   }
 
-  if (doc.HasMember("sha256") && doc["sha256"].IsString()) {
-    req->set_sha256(doc["sha256"].GetString());
+  if (doc.HasMember("hash") && doc["hash"].IsString()) {
+    req->set_hash(doc["hash"].GetString());
   }
 
   if (doc.HasMember("size") && doc["size"].IsInt64()) {
@@ -1400,6 +1427,14 @@ int64_t Util::MemUsage() {
   long pageSize = sysconf(_SC_PAGESIZE);  // in bytes
   return resident * pageSize / 1024 / 1024;
 #endif
+}
+
+// TODO(xieyz) detect mount point
+bool IsMountPoint(const string &path) {
+  if (path == "/data") {
+    return true;
+  }
+  return false;
 }
 
 }  // namespace util

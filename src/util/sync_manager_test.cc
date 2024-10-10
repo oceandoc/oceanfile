@@ -17,9 +17,13 @@ TEST(SyncManager, SyncLocal) {
   std::string src("/zfs");
   std::string dst("/data");
   Util::Mkdir(dst);
-  SyncManager::Instance()->SyncLocal(src, dst, common::HashMethod::Hash_NONE,
-                                     common::SyncMethod::Sync_SYNC, false,
-                                     true);
+  SyncContext ctx;
+  ctx.src = src;
+  ctx.dst = dst;
+  ctx.hash_method = common::HashMethod::Hash_NONE;
+  ctx.sync_method = common::SyncMethod::Sync_SYNC;
+  ctx.skip_scan = true;
+  SyncManager::Instance()->SyncLocal(&ctx);
 }
 
 }  // namespace util

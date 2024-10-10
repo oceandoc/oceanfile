@@ -48,22 +48,26 @@ struct UploadContext {
 
 struct FileAttr {
   std::string path;
-  std::string sha256;
-  std::string enc_sha256;
+  std::string hash;
+  std::string enc_hash;
   int64_t size;
   int32_t partition_num;
+  int64_t update_time;
+  std::string user;
+  std::string group;
+
   std::string ToString() {
     std::string content;
     content.append("path: ");
     content.append(path);
     content.append(", ");
 
-    content.append("sha256: ");
-    content.append(sha256);
+    content.append("hash: ");
+    content.append(hash);
     content.append(", ");
 
-    content.append("enc_sha256: ");
-    content.append(enc_sha256);
+    content.append("enc_hash: ");
+    content.append(enc_hash);
     content.append(", ");
 
     content.append("size: ");
@@ -72,6 +76,15 @@ struct FileAttr {
 
     content.append("partition_num: ");
     content.append(std::to_string(partition_num));
+
+    content.append("update_time: ");
+    content.append(std::to_string(update_time));
+
+    content.append("user: ");
+    content.append(user);
+
+    content.append("group: ");
+    content.append(group);
     return content;
   }
 };

@@ -55,7 +55,8 @@ class FileClient {
     file.seekg(0);
 
     common::FileAttr attr;
-    if (!util::Util::PrepareFile(path, &attr)) {
+    if (!util::Util::PrepareFile(path, true, common::NET_BUFFER_SIZE_BYTES,
+                                 &attr)) {
       LOG(ERROR) << "Prepare error: " << path;
       return false;
     }
@@ -65,7 +66,7 @@ class FileClient {
     req.mutable_content()->resize(common::NET_BUFFER_SIZE_BYTES);
     req.set_op(proto::FileOp::FilePut);
     req.set_path(path);
-    req.set_sha256(attr.sha256);
+    req.set_hash(attr.hash);
     req.set_size(attr.size);
     req.set_repo_uuid(repo_uuid);
     std::string serialized;
@@ -98,7 +99,7 @@ class FileClient {
         curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response_string);
 
-        LOG(INFO) << "Now send " << req.sha256() << ", part: " << partition_num;
+        LOG(INFO) << "Now send " << req.hash() << ", part: " << partition_num;
         CURLcode ret = curl_easy_perform(curl_);
         curl_slist_free_all(headers);
         if (ret != CURLE_OK) {

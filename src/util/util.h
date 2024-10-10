@@ -63,7 +63,7 @@ class Util final {
   static int64_t UpdateTime(const std::string &path);
   static int64_t FileSize(const std::string &path);
   static bool FileInfo(const std::string &path, int64_t *update_time,
-                       int64_t *size);
+                       int64_t *size, std::string *user, std::string *group);
   static bool Exists(const std::string &path);
   static bool TargetExists(const std::string &src, const std::string &dst);
   static bool Mkdir(const std::string &path);
@@ -107,7 +107,8 @@ class Util final {
   static int32_t FilePartitionNum(const int64_t total_size,
                                   int64_t partition_size);
 
-  static bool PrepareFile(const std::string &path, common::FileAttr *attr);
+  static bool PrepareFile(const std::string &path, const bool calc_hash,
+                          const int64_t partition_size, common::FileAttr *attr);
 
   static bool SimplifyPath(const std::string &path, std::string *out);
   static std::string RepoFilePath(const std::string &repo_path,
@@ -263,6 +264,7 @@ class Util final {
 
   static int64_t FDCount();
   static int64_t MemUsage();
+  static bool IsMountPoint(const std::string &path);
 };
 
 }  // namespace util

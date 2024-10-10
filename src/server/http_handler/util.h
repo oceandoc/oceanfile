@@ -19,7 +19,7 @@ enum MultiPartField {
   MP_unknown = 0,
   MP_op,
   MP_path,
-  MP_sha256,
+  MP_hash,
   MP_size,
   MP_content,
   MP_partition_num,
@@ -76,8 +76,8 @@ class Util {
       case MP_path:
         context.req->set_path(context.data);
         break;
-      case MP_sha256:
-        context.req->set_sha256(context.data);
+      case MP_hash:
+        context.req->set_hash(context.data);
         break;
       case MP_size:
         context.req->set_size(util::Util::ToInt<int64_t>(context.data));
@@ -130,8 +130,8 @@ class Util {
         context->field = MultiPartField::MP_op;
       } else if (name == "path") {
         context->field = MultiPartField::MP_path;
-      } else if (name == "sha256") {
-        context->field = MultiPartField::MP_sha256;
+      } else if (name == "hash") {
+        context->field = MultiPartField::MP_hash;
       } else if (name == "size") {
         context->field = MultiPartField::MP_size;
       } else if (name == "content") {

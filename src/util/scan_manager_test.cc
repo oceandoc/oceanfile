@@ -74,16 +74,17 @@ TEST(ScanManager, ParallelScan) {
   scan_status.set_path(path);
   ScanContext ctx;
   ctx.src = final_path;
-
   ctx.status = &scan_status;
   ctx.hash_method = common::HashMethod::Hash_NONE;
   ctx.sync_method = common::SyncMethod::Sync_SYNC;
   ctx.disable_scan_cache = false;
+
   EXPECT_EQ(ScanManager::Instance()->ParallelScan(&ctx), Err_Success);
   EXPECT_EQ(scan_status.scanned_dirs().size(), 1);
   EXPECT_EQ(scan_status.file_num(), 1);
   EXPECT_EQ(scan_status.symlink_num(), 0);
 
+  ctx.Reset();
   scan_status.Clear();
   scan_status.set_path(path);
   ctx.src = final_path;
@@ -96,6 +97,7 @@ TEST(ScanManager, ParallelScan) {
   EXPECT_EQ(scan_status.file_num(), 3);             // add .Dr.Q.config/xxxhash
   EXPECT_EQ(scan_status.symlink_num(), 0);
 
+  ctx.Reset();
   scan_status.Clear();
   scan_status.set_path(path);
   ctx.src = final_path;

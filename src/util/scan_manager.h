@@ -14,7 +14,6 @@
 #include <sstream>
 #include <string>
 #include <unordered_set>
-#include <vector>
 
 #include "absl/base/internal/spinlock.h"
 #include "folly/Singleton.h"
@@ -28,34 +27,56 @@
 
 // TODO(xieyz) add full unit_test
 // TODO(xieyz) dump to disk only file or dir change count over 10 thousand
+// TODO(xieyz) use multiple cache bucket
+
 namespace oceandoc {
 namespace util {
 
 class ScanContext {
  public:
-  ScanContext()
+  ScanContext(const uint32_t max_threads = 4)
       : status(nullptr),
         hash_method(common::HashMethod::Hash_NONE),
         sync_method(common::SyncMethod::Sync_SYNC),
         disable_scan_cache(false),
-        skip_scan(false) {
-    copy_failed_files.reserve(10000);
+        skip_scan(false),
+        max_threads(max_threads) {}
+
+  void Reset() {
+    scanned_dir_num = 0;
+    skip_dir_num = 0;
+    stop_dump_task = false;
+    removed_files.clear();
+    added_files.clear();
+    err_code = Err_Success;
+    running_mark = 0;
+    running_threads = 0;
+    dir_queue.Clear();
   }
+
   std::string src;
   std::string dst;
   proto::ScanStatus* status;
   common::HashMethod hash_method;
   common::SyncMethod sync_method;
-  bool disable_scan_cache;
+  bool disable_scan_cache = false;
+  bool skip_scan = false;
+  std::unordered_set<std::string> ignored_dirs;  // relative to src
+
+  mutable absl::base_internal::SpinLock lock;
+  std::mutex mu;
+  std::condition_variable cond_var;
+  const int max_threads;
+
   std::atomic<int32_t> scanned_dir_num = 0;
   std::atomic<int32_t> skip_dir_num = 0;
-  bool skip_scan;
-
-  std::set<std::string> removed_files;           // full path
-  std::set<std::string> added_files;             // full path
-  std::unordered_set<std::string> ignored_dirs;  // relative to src
-  std::vector<std::string> copy_failed_files;    // full path
+  bool stop_dump_task = false;
+  std::set<std::string> removed_files;  // full path
+  std::set<std::string> added_files;    // full path
   int32_t err_code = Err_Success;
+  std::atomic<uint64_t> running_mark = 0;
+  std::atomic<int32_t> running_threads = 0;
+  common::BlockingQueue<std::string> dir_queue;
 };
 
 class ScanManager {
@@ -97,7 +118,7 @@ class ScanManager {
       LOG(INFO) << "Load cache status success: " << Print(*ctx);
       return true;
     }
-    LOG(ERROR) << "Load cache status error";
+    LOG(ERROR) << "Load cache status error: " << cached_status_path;
     return false;
   }
 
@@ -172,7 +193,7 @@ class ScanManager {
   int32_t Dump(ScanContext* ctx) {
     std::string path = GenFileName(ctx->src);
     {
-      absl::base_internal::SpinLockHolder locker(&lock_);
+      absl::base_internal::SpinLockHolder locker(&ctx->lock);
       if (ctx->status->uuid().empty()) {
         ctx->status->set_uuid(Util::UUID());
       }
@@ -185,7 +206,7 @@ class ScanManager {
 
     std::string content, compressed_content;
     {
-      absl::base_internal::SpinLockHolder locker(&lock_);
+      absl::base_internal::SpinLockHolder locker(&ctx->lock);
       SumStatus(ctx);
       if (!ctx->status->SerializeToString(&content)) {
         LOG(ERROR) << "Serialize error";
@@ -205,12 +226,12 @@ class ScanManager {
     return Err_Scan_dump_error;
   }
 
-  void DumpTask(bool* stop_dump_task, ScanContext* ctx) {
+  void DumpTask(ScanContext* ctx) {
     int64_t last_time = Util::CurrentTimeMillis();
-    while (!(*stop_dump_task)) {
-      std::unique_lock<std::mutex> lock(mu_);
-      if (cond_var_.wait_for(lock, std::chrono::seconds(10),
-                             [stop_dump_task] { return *stop_dump_task; })) {
+    while (!(ctx->stop_dump_task)) {
+      std::unique_lock<std::mutex> lock(ctx->mu);
+      if (ctx->cond_var.wait_for(lock, std::chrono::seconds(10),
+                                 [ctx] { return ctx->stop_dump_task; })) {
         break;
       }
       int64_t cur_time = Util::CurrentTimeMillis();
@@ -222,38 +243,25 @@ class ScanManager {
                 << "MB, scanned dir num: " << ctx->scanned_dir_num
                 << ", skip dir num: " << ctx->skip_dir_num;
     }
-    LOG(INFO) << "DumpTask Exists";
-  }
-
-  bool SetScanning() {
-    bool expected = false;
-    if (!scanning_.compare_exchange_strong(expected, true)) {
-      return false;
-    }
-    running_mark_ = 0;
-    stop_ = false;
-    running_threads_ = 0;
-    stop_dump_task_ = false;
-    dir_queue_.Clear();
-    return true;
+    LOG(INFO) << "DumpTask for " << ctx->src << " exists";
   }
 
   void Stop() {
     stop_.store(true);
-    while (scanning_.load()) {
+    while (scanning_.load() > 0) {
       Util::Sleep(1000);
     }
   }
 
   std::string Print(const ScanContext& ctx) {
     std::stringstream sstream;
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    sstream << "scanned_dirs num: " << ctx.status->scanned_dirs().size()
-            << ", file_num: " << ctx.status->file_num()
-            << ", symlink_file_num: " << ctx.status->symlink_num()
-            << ", ignored_dirs num: " << ctx.status->ignored_dirs().size()
-            << ", added_files num: " << ctx.added_files.size()
-            << ", removed_files num: " << ctx.removed_files.size();
+    absl::base_internal::SpinLockHolder locker(&ctx.lock);
+    sstream << ctx.src << ", dir num: " << ctx.status->scanned_dirs().size()
+            << ", file num: " << ctx.status->file_num()
+            << ", symlink file num: " << ctx.status->symlink_num()
+            << ", ignored dir num: " << ctx.status->ignored_dirs().size()
+            << ", added file num: " << ctx.added_files.size()
+            << ", removed file num: " << ctx.removed_files.size();
     return sstream.str();
   }
 
@@ -263,14 +271,14 @@ class ScanManager {
     dir_item.set_path(relative_path);
 
     int64_t update_time = 0, size = 0;
-    if (!Util::FileInfo(path, &update_time, &size)) {
+    if (!Util::FileInfo(path, &update_time, &size, dir_item.mutable_user(),
+                        dir_item.mutable_group())) {
       LOG(ERROR) << "FileInfo error: " << path;
       return Err_File_permission_or_not_exists;
     }
     dir_item.set_update_time(update_time);
-
     {
-      absl::base_internal::SpinLockHolder locker(&lock_);
+      absl::base_internal::SpinLockHolder locker(&ctx->lock);
       auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
       if (it != ctx->status->mutable_scanned_dirs()->end()) {
         it->second.Swap(&dir_item);
@@ -285,15 +293,15 @@ class ScanManager {
   int32_t CalcHash(const std::string& path, ScanContext* ctx,
                    proto::FileItem* file_item) {
     if (ctx->hash_method == common::HashMethod::Hash_SHA256) {
-      if (!Util::FileSHA256(path, file_item->mutable_sha256())) {
+      if (!Util::FileSHA256(path, file_item->mutable_hash())) {
         return Err_File_hash_calc_error;
       }
     } else if (ctx->hash_method == common::HashMethod::Hash_MD5) {
-      if (!Util::FileMD5(path, file_item->mutable_sha256())) {
+      if (!Util::FileMD5(path, file_item->mutable_hash())) {
         return Err_File_hash_calc_error;
       }
     } else if (ctx->hash_method == common::HashMethod::Hash_CRC32) {
-      if (!Util::FileMD5(path, file_item->mutable_sha256())) {
+      if (!Util::FileMD5(path, file_item->mutable_hash())) {
         return Err_File_hash_calc_error;
       }
     }
@@ -307,7 +315,8 @@ class ScanManager {
     proto::FileItem file_item;
     file_item.set_filename(filename);
     int64_t update_time = 0, size = 0;
-    if (!Util::FileInfo(path, &update_time, &size)) {
+    if (!Util::FileInfo(path, &update_time, &size, file_item.mutable_user(),
+                        file_item.mutable_group())) {
       LOG(ERROR) << "FileInfo error: " << path;
       return Err_File_permission_or_not_exists;
     }
@@ -323,7 +332,7 @@ class ScanManager {
     }
 
     {
-      absl::base_internal::SpinLockHolder locker(&lock_);
+      absl::base_internal::SpinLockHolder locker(&ctx->lock);
       auto dir_it =
           ctx->status->mutable_scanned_dirs()->find(parent_relative_path);
       if (dir_it == ctx->status->mutable_scanned_dirs()->end()) {
@@ -346,7 +355,7 @@ class ScanManager {
                     const std::string& relative_path) {
     ctx->removed_files.insert(cur_dir);
 
-    absl::base_internal::SpinLockHolder locker(&lock_);
+    absl::base_internal::SpinLockHolder locker(&ctx->lock);
     auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
     if (it == ctx->status->mutable_scanned_dirs()->end()) {
       return Err_Success;
@@ -363,7 +372,7 @@ class ScanManager {
   int32_t RemoveFile(ScanContext* ctx, const std::string& cur_dir,
                      const std::set<std::string>& files,
                      const std::string& relative_path) {
-    absl::base_internal::SpinLockHolder locker(&lock_);
+    absl::base_internal::SpinLockHolder locker(&ctx->lock);
     auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
     if (it == ctx->status->mutable_scanned_dirs()->end()) {
       LOG(ERROR) << "This should never happen: " << cur_dir;
@@ -393,17 +402,14 @@ class ScanManager {
       return Err_Path_not_dir;
     }
 
-    if (scanning_.load()) {
-      LOG(ERROR) << "Another scan is running ...";
+    if (scanning_.load() > 0) {
+      LOG(ERROR) << "Another scan is running...";
       return Err_Scan_busy;
     }
 
-    if (!SetScanning()) {
-      LOG(ERROR) << "Set scanning status error";
-      return Err_Scan_set_running_error;
-    }
-
+    scanning_.fetch_add(1);
     LOG(INFO) << "Now scan " << ctx->src;
+
     bool load_cache_success = true;
     if (!ctx->disable_scan_cache) {
       load_cache_success = LoadCachedScanStatus(ctx);
@@ -413,65 +419,59 @@ class ScanManager {
       return Err_Success;
     }
 
-    dir_queue_.PushBack(ctx->src);  // all elements is absolute path
+    ctx->dir_queue.PushBack(ctx->src);  // all elements is absolute path
     for (const auto& p : ctx->status->scanned_dirs()) {
       if (p.first.empty()) {
         continue;
       }
-      dir_queue_.PushBack(ctx->src + "/" + p.first);
+      ctx->dir_queue.PushBack(ctx->src + "/" + p.first);
     }
 
-    auto dump_task =
-        std::bind(&ScanManager::DumpTask, this, &stop_dump_task_, ctx);
+    auto dump_task = std::bind(&ScanManager::DumpTask, this, ctx);
     ThreadPool::Instance()->Post(dump_task);
 
-    for (int32_t i = 0; i < max_threads; ++i) {
-      running_mark_.fetch_or(1ULL << i);
-      ++running_threads_;
-      LOG(INFO) << "Thread " << i << " running";
+    for (int32_t i = 0; i < ctx->max_threads; ++i) {
+      ctx->running_mark.fetch_or(1ULL << i);
+      ++ctx->running_threads;
       auto task = std::bind(&ScanManager::ParallelFullScan, this, i, ctx);
       ThreadPool::Instance()->Post(task);
     }
-    LOG(INFO) << "Scan begin, current_threads: " << max_threads;
 
-    while (running_mark_) {
-      for (int32_t i = 0; i < max_threads; ++i) {
-        if (running_mark_ & (1ULL << i)) {
+    while (ctx->running_mark) {
+      for (int32_t i = 0; i < ctx->max_threads; ++i) {
+        if (ctx->running_mark & (1ULL << i)) {
           continue;
         }
-        ++running_threads_;
-        running_mark_.fetch_or(1ULL << i);
-        LOG(INFO) << "Thread " << i << " running";
+        ++ctx->running_threads;
+        ctx->running_mark.fetch_or(1ULL << i);
         auto task = std::bind(&ScanManager::ParallelFullScan, this, i, ctx);
         ThreadPool::Instance()->Post(task);
       }
       Util::Sleep(1000);
     }
 
-    stop_dump_task_ = true;
-    cond_var_.notify_all();
+    ctx->stop_dump_task = true;
+    ctx->cond_var.notify_all();
 
     if (ctx->err_code != Err_Success) {
-      LOG(ERROR) << "Scan has error: " << ctx->err_code;
+      LOG(ERROR) << "Scan " << ctx->src << " has error: " << ctx->err_code;
     }
 
     if (ctx->err_code == Err_Success) {
       ctx->status->set_complete_time(Util::CurrentTimeMillis());
       ctx->status->set_hash_method((int32_t)ctx->hash_method);
     }
-    LOG(INFO) << "Scan finished, current_threads: " << running_threads_;
-    running_threads_ = 0;
-    running_mark_ = 0;
 
     if (Dump(ctx) != Err_Success) {
       ctx->err_code = Err_Scan_dump_error;
     }
 
-    scanning_.store(false);
+    scanning_.fetch_sub(1);
     return ctx->err_code;
   }
 
   void ParallelFullScan(const int32_t thread_no, ScanContext* ctx) {
+    LOG(INFO) << "Thread " << thread_no << " for " << ctx->src << " running";
     static thread_local std::atomic<int32_t> count = 0;
     while (true) {
       if (stop_.load()) {
@@ -481,7 +481,7 @@ class ScanManager {
 
       std::string cur_dir;
       int try_times = 0;
-      while (!dir_queue_.PopBack(&cur_dir) && try_times < 5) {
+      while (!ctx->dir_queue.PopBack(&cur_dir) && try_times < 5) {
         Util::Sleep(100);
         ++try_times;
       }
@@ -511,7 +511,7 @@ class ScanManager {
       }
 
       {
-        absl::base_internal::SpinLockHolder locker(&lock_);
+        absl::base_internal::SpinLockHolder locker(&ctx->lock);
         auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
         if (it != ctx->status->mutable_scanned_dirs()->end()) {
           if (it->second.update_time() == update_time &&
@@ -542,7 +542,7 @@ class ScanManager {
             ret |= AddFileItem(filename, proto::FileType::Regular, ctx,
                                relative_path);
           } else if (entry.is_directory()) {
-            dir_queue_.PushBack(entry.path().string());
+            ctx->dir_queue.PushBack(entry.path().string());
           } else {
             LOG(ERROR) << "Unknow file type: " << entry.path();
           }
@@ -556,7 +556,7 @@ class ScanManager {
         RemoveFile(ctx, cur_dir, files, relative_path);
 
         {
-          absl::base_internal::SpinLockHolder locker(&lock_);
+          absl::base_internal::SpinLockHolder locker(&ctx->lock);
           auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
           if (it != ctx->status->mutable_scanned_dirs()->end()) {
             it->second.set_update_time(update_time);
@@ -572,24 +572,14 @@ class ScanManager {
       }
       ++count;
     }
-    running_mark_.fetch_and(~(1ULL << thread_no));
-    --running_threads_;
-    LOG(INFO) << "Thread " << thread_no << " exist";
+    ctx->running_mark.fetch_and(~(1ULL << thread_no));
+    --ctx->running_threads;
+    LOG(INFO) << "Thread " << thread_no << " for " << ctx->src << " exist";
   }
 
  private:
-  mutable absl::base_internal::SpinLock lock_;
-
-  std::atomic<bool> scanning_ = false;
+  std::atomic<uint32_t> scanning_ = 0;
   std::atomic<bool> stop_ = false;
-  std::atomic<uint64_t> running_mark_ = 0;
-  std::atomic<int32_t> running_threads_ = 0;
-  bool stop_dump_task_ = false;
-
-  const int max_threads = 4;
-  std::mutex mu_;
-  std::condition_variable cond_var_;
-  common::BlockingQueue<std::string> dir_queue_;
 };
 
 }  // namespace util

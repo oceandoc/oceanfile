@@ -11,19 +11,18 @@ enum FileType {
 message FileItem {
   string filename = 1;
   uint64 size = 2;
-  uint64 update_time = 4;  // local update time
-  FileType file_type = 5;
-  string owner = 6;
-  string sha256 = 7;
-  string encrypted_sha256 = 8;
-  uint32 permission = 9;  // 1bit: need auth, 2bit: group, 3bit: all
+  uint64 update_time = 3;  // local update time
+  FileType file_type = 4;
+  string user = 5;
+  string group = 6;
+  string hash = 7;
 }
 
 message DirItem {
-  string path = 1;                  // relateive to ScanStatus'path
-  uint64 update_time = 2;           // local update time
-  string owner = 3;                 // user:group
-  uint32 permission = 4;            // 1bit: need auth, 2bit: group, 3bit: all
+  string path = 1;         // relateive to ScanStatus'path
+  uint64 update_time = 2;  // local update time
+  string user = 3;
+  string group = 4;
   map<string, FileItem> files = 5;  // key is filename relative to path
 }
 
@@ -37,6 +36,13 @@ message ScanStatus {
   int64 file_num = 7;  // not include symlink file
   int64 symlink_num = 8;
   int32 hash_method = 9;  // see common/defs.h
+}
+
+enum RepoType {
+  RT_Unused = 0;
+  RT_Local = 1;
+  RT_Remote = 2;
+  RT_Ocean = 3;
 }
 
 message RepoMeta {

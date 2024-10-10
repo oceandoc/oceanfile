@@ -32,5 +32,18 @@ int main(int argc, char** argv) {
 
   oceandoc::util::ScanManager::Instance()->ValidateScanStatus(&ctx);
 
+  const int32_t max_threads = 4;
+  for (const auto& d : ctx.status->scanned_dirs()) {
+    auto hash = std::abs(oceandoc::util::Util::MurmurHash64A(d.first));
+    if ((hash % max_threads) < 0 || (hash % max_threads) > 4) {
+      LOG(ERROR) << d.first << ", " << (hash % max_threads);
+    }
+    for (const auto& f : d.second.files()) {
+      auto hash = std::abs(oceandoc::util::Util::MurmurHash64A(f.first));
+      if ((hash % max_threads) < 0 || (hash % max_threads) > 4) {
+        LOG(ERROR) << d.first + "/" + f.first << ", " << (hash % max_threads);
+      }
+    }
+  }
   return 0;
 }
