@@ -32,6 +32,8 @@ class HandlerProxy {
     } else if (req.repo_type() == proto::RepoType::RT_Remote) {
       LOG(INFO) << "repo";
       ret = util::SyncManager::Instance()->WriteToFile(req);
+    } else {
+      LOG(ERROR) << "Unsupported repo type";
     }
     return ret;
   }
