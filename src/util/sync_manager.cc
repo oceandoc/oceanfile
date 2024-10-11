@@ -5,6 +5,8 @@
 
 #include "src/util/sync_manager.h"
 
+#include <filesystem>
+
 #include "grpcpp/client_context.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/support/client_callback.h"
@@ -19,12 +21,73 @@ std::shared_ptr<SyncManager> SyncManager::Instance() {
   return sync_manager.try_get();
 }
 
-int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
-  auto ret = ValidateParameters(sync_ctx);
-  if (ret) {
-    return ret;
+int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
+  static thread_local std::shared_mutex mu;
+
+  if (req.file_type() == proto::FileType::Dir) {
+    if (!Util::Mkdir(req.path())) {
+      return Err_Path_mkdir_error;
+    }
+    return Err_Success;
+  } else if (req.file_type() == proto::FileType::Regular) {
+    try {
+      std::filesystem::create_symlink(req.content(), req.path());
+    } catch (const std::filesystem::filesystem_error& e) {
+      LOG(ERROR) << e.what();
+      return Err_Path_create_symlink_error;
+    }
+    return Err_Success;
   }
 
+  Util::MkParentDir(req.path());
+
+  auto err_code = Err_Success;
+  err_code = Util::CreateFileWithSize(req.path(), req.size());
+  if (err_code != Err_Success) {
+    LOG(ERROR) << "Create file error: " << req.path();
+    return err_code;
+  }
+
+  int64_t start = 0, end = 0;
+  Util::CalcPartitionStart(req.size(), req.partition_num(),
+                           req.partition_size(), &start, &end);
+  if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
+    LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
+               << ", start: " << start << ", end: " << end
+               << ", content size: " << req.content().size();
+    return Err_File_partition_size_error;
+  }
+  LOG(INFO) << "Now store file " << req.path()
+            << ", part: " << req.partition_num();
+  std::unique_lock<std::shared_mutex> locker(mu);
+  return Util::WriteToFile(req.path(), req.content(), start);
+}
+
+int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
+  if (!Util::IsAbsolute(sync_ctx->src) || !Util::IsAbsolute(sync_ctx->dst)) {
+    LOG(ERROR) << "Path must be absolute";
+    return Err_Path_not_absolute;
+  }
+
+  Util::UnifyDir(&sync_ctx->src);
+  Util::UnifyDir(&sync_ctx->dst);
+
+  if (Util::StartWith(sync_ctx->src, sync_ctx->dst)) {
+    LOG(ERROR) << "Cannot sync " << sync_ctx->src << " to " << sync_ctx->dst
+               << ", for cannot sync to subdir";
+    return Err_Path_dst_is_src_subdir;
+  }
+
+  if (!Util::Exists(sync_ctx->src) || !Util::Exists(sync_ctx->dst)) {
+    LOG(ERROR) << "Src or dst not exists";
+    return Err_Path_not_exists;
+  }
+
+  if (!std::filesystem::is_directory(sync_ctx->src) ||
+      !std::filesystem::is_directory(sync_ctx->dst)) {
+    LOG(ERROR) << "Src or dst not dir";
+    return Err_Path_not_dir;
+  }
   sync_ctx->Reset();
 
   std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
@@ -45,7 +108,7 @@ int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
 
   sync_ctx->scan_ctx = &scan_ctx;
 
-  ret = ScanManager::Instance()->ParallelScan(&scan_ctx);
+  auto ret = ScanManager::Instance()->ParallelScan(&scan_ctx);
   if (ret) {
     LOG(ERROR) << "Scan " << sync_ctx->src << " error";
     return ret;
@@ -87,32 +150,6 @@ int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
   }
   LOG(INFO) << "Sync failed";
   return Err_Fail;
-}
-
-bool SyncManager::WriteToFile(const proto::FileReq& req) {
-  static thread_local std::shared_mutex mu;
-  Util::MkParentDir(req.path());
-
-  auto err_code = Err_Success;
-  err_code = Util::CreateFileWithSize(req.path(), req.size());
-  if (err_code != Err_Success) {
-    LOG(ERROR) << "Create file error: " << req.path();
-    return err_code;
-  }
-
-  int64_t start = 0, end = 0;
-  Util::CalcPartitionStart(req.size(), req.partition_num(),
-                           req.partition_size(), &start, &end);
-  if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
-    LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
-               << ", start: " << start << ", end: " << end
-               << ", content size: " << req.content().size();
-    return Err_File_partition_size_error;
-  }
-  LOG(INFO) << "Now store file " << req.path()
-            << ", part: " << req.partition_num();
-  std::unique_lock<std::shared_mutex> locker(mu);
-  return Util::WriteToFile(req.path(), req.content(), start);
 }
 
 bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
@@ -163,11 +200,19 @@ bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
       }
 
       send_ctx.src = file_src_path;
-      send_ctx.dst = file_src_path;
+      send_ctx.dst = file_dst_path;
       send_ctx.type = f.second.file_type();
 
-      if (!file_client.Send(send_ctx)) {
-        LOG(ERROR) << "Send " << send_ctx.src << " error";
+      if (f.second.file_type() == proto::FileType::Symlink) {
+        if (!Util::SyncRemoteSymlink(dir_src_path, file_src_path,
+                                     &send_ctx.content)) {
+          LOG(ERROR) << "Get " << file_dst_path << " target error";
+          continue;
+        }
+      } else {
+        if (!file_client.Send(send_ctx)) {
+          LOG(ERROR) << "Send " << send_ctx.src << " error";
+        }
       }
     }
   }

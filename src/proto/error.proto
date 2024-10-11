@@ -12,6 +12,8 @@ enum ErrCode {
   Path_not_exists = 10002;
   Path_exists = 10003;
   Path_not_dir = 10004;
+  Path_mkdir_error = 10005;
+  Path_create_symlink_error = 10006;
 
   // 11000
   File_size_set_error = 11000;

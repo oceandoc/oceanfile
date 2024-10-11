@@ -30,6 +30,7 @@ class SendContext {
   std::string src;
   std::string dst;
   proto::FileType type;
+  std::string content;
 };
 
 class FileClient
@@ -57,16 +58,18 @@ class FileClient
 
   void OnReadDone(bool ok) override {
     if (ok) {
-      if (res_.err_code() != proto::ErrCode::Success) {
-        absl::base_internal::SpinLockHolder locker(&lock_);
-        ++mark_[res_.partition_num()];
-      } else {
-        absl::base_internal::SpinLockHolder locker(&lock_);
-        mark_[res_.partition_num()] = -1;
+      if (res_.file_type() == proto::FileType::Regular) {
+        if (res_.err_code() != proto::ErrCode::Success) {
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          ++mark_[res_.partition_num()];
+        } else {
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          mark_[res_.partition_num()] = -1;
+        }
+        StartRead(&res_);
+        LOG(ERROR) << "Store success: " << res_.hash()
+                   << ", part: " << res_.partition_num();
       }
-      StartRead(&res_);
-      LOG(ERROR) << "Store success: " << res_.hash()
-                 << ", part: " << res_.partition_num();
     }
   }
 
@@ -141,6 +144,22 @@ class FileClient
     StartCall();
 
     req_.set_op(proto::FileOp::FilePut);
+    req_.set_file_type(ctx.type);
+
+    if (ctx.type == proto::FileType::Dir ||
+        ctx.type == proto::FileType::Symlink) {
+      if (ctx.type == proto::FileType::Symlink) {
+        req_.set_content(ctx.content);
+        LOG(INFO) << ctx.src << ", dst: " << req_.path()
+                  << ", target: " << req_.content();
+      }
+      StartWrite(&req_);
+
+      std::unique_lock<std::mutex> l(write_mu_);
+      write_cv_.wait(l);
+      StartWritesDone();
+      return true;
+    }
 
     common::FileAttr attr;
     if (!util::Util::PrepareFile(ctx.src, calc_hash, partition_size, &attr)) {

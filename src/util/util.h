@@ -96,6 +96,9 @@ class Util final {
 
   static bool SyncSymlink(const std::string &src, const std::string &dst,
                           const std::string &src_symlink);
+  static bool SyncRemoteSymlink(const std::string &src,
+                                const std::string &src_symlink,
+                                std::string *target);
 
   static int32_t FilePartitionNum(const std::string &path);
 

@@ -103,6 +103,7 @@ message FileRes {
   string path = 2;
   string hash = 3;
   int32 partition_num = 4;
+  FileType file_type = 5;
 }
 
 service OceanFile {

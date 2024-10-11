@@ -727,7 +727,33 @@ bool Util::SyncSymlink(const string &src, const string &dst,
   } catch (std::filesystem::filesystem_error &e) {
     LOG(ERROR) << e.what();
   }
-  return true;
+  return false;
+}
+
+bool Util::SyncRemoteSymlink(const string &src, const string &src_symlink,
+                             std::string *target) {
+  try {
+    if (!Util::StartWith(src_symlink, src)) {
+      LOG(ERROR) << src_symlink << " must start with " << src;
+      return false;
+    }
+
+    if (std::filesystem::is_symlink(src)) {
+      LOG(ERROR) << "src cannot be symlink";
+      return false;
+    }
+
+    if (!std::filesystem::is_symlink(src_symlink)) {
+      LOG(ERROR) << "src_symlink must be symlink";
+      return false;
+    }
+
+    *target = std::filesystem::read_symlink(src_symlink);
+    return true;
+  } catch (std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << e.what();
+  }
+  return false;
 }
 
 int32_t Util::FilePartitionNum(const string &path) {
