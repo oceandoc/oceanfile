@@ -58,6 +58,7 @@ class FileClient
 
   void OnReadDone(bool ok) override {
     if (ok) {
+      LOG(INFO) << res_.file_type();
       if (res_.file_type() == proto::FileType::Regular) {
         if (res_.err_code() != proto::ErrCode::Success) {
           absl::base_internal::SpinLockHolder locker(&lock_);
@@ -189,6 +190,7 @@ class FileClient
 
       std::copy(buffer.data(), buffer.data() + file.gcount(),
                 req_.mutable_content()->begin());
+      LOG(INFO) << "file_type: " << req_.file_type();
       StartWrite(&req_);
       std::unique_lock<std::mutex> l(write_mu_);
       write_cv_.wait(l);

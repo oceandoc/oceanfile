@@ -58,6 +58,7 @@ class HandlerProxy {
     res->set_path(req.path());
     res->set_hash(req.hash());
     res->set_partition_num(req.partition_num());
+    res->set_file_type(req.file_type());
   }
 };
 
