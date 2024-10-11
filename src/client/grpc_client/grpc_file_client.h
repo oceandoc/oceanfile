@@ -142,7 +142,6 @@ class FileClient
     req_.set_op(proto::FileOp::FilePut);
 
     common::FileAttr attr;
-
     if (!util::Util::PrepareFile(ctx.src, calc_hash, partition_size, &attr)) {
       LOG(ERROR) << "Prepare error: " << ctx.src;
       return false;
@@ -158,8 +157,6 @@ class FileClient
       LOG(ERROR) << "Check file exists or file permissions: " << ctx.src;
       return false;
     }
-
-    mark_.resize(attr.partition_num, 0);
 
     std::vector<char> buffer(partition_size);
     req_.mutable_content()->resize(partition_size);
