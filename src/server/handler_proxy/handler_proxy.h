@@ -20,17 +20,16 @@ class HandlerProxy {
     res->set_err_code(proto::ErrCode::Fail);
   }
 
-  static bool SaveFile(const proto::FileReq& req, proto::FileRes* res) {
-    bool ret = true;
+  static int32_t SaveFile(const proto::FileReq& req, proto::FileRes* res) {
+    int32_t ret = Err_Success;
     if (req.repo_type() == proto::RepoType::RT_Ocean) {
       if (req.repo_uuid().empty()) {
-        ret = false;
+        ret = Err_Repo_uuid_error;
         LOG(ERROR) << "Repo uuid empty";
       } else {
         ret = util::RepoManager::Instance()->WriteToFile(req);
       }
     } else if (req.repo_type() == proto::RepoType::RT_Remote) {
-      LOG(INFO) << "repo";
       ret = util::SyncManager::Instance()->WriteToFile(req);
     } else {
       LOG(ERROR) << "Unsupported repo type";
@@ -39,7 +38,7 @@ class HandlerProxy {
   }
 
   static void FileOpHandle(const proto::FileReq& req, proto::FileRes* res) {
-    bool ret = true;
+    int32_t ret = true;
     switch (req.op()) {
       case proto::FileOp::FilePut:
         ret = SaveFile(req, res);
@@ -48,13 +47,14 @@ class HandlerProxy {
         LOG(ERROR) << "Unsupported operation";
     }
 
-    if (!ret) {
+    if (ret) {
       LOG(ERROR) << "Store file error: " << req.hash()
                  << ", part: " << req.partition_num();
-      res->set_err_code(proto::ErrCode::Fail);
+      res->set_err_code(proto::ErrCode(ret));
     } else {
       res->set_err_code(proto::ErrCode::Success);
     }
+
     res->set_path(req.path());
     res->set_hash(req.hash());
     res->set_partition_num(req.partition_num());

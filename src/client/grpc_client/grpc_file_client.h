@@ -107,6 +107,8 @@ class FileClient
   }
 
   bool Send(const SendContext& ctx) {
+    Reset();
+
     if (ctx.src.empty()) {
       LOG(ERROR) << "Empty src";
       return false;
@@ -132,7 +134,6 @@ class FileClient
       req_.set_path(ctx.dst);
     }
 
-    Reset();
     grpc::ClientContext context;
     stub_->async()->FileOp(&context, this);
 
@@ -150,6 +151,7 @@ class FileClient
       req_.set_hash(attr.hash);
     }
     req_.set_size(attr.size);
+    req_.set_partition_size(partition_size);
     mark_.resize(attr.partition_num, 0);
 
     std::ifstream file(ctx.src, std::ios::binary);

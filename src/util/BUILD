@@ -157,6 +157,7 @@ cc_library(
     local_defines = LOCAL_DEFINES,
     deps = [
         "//src/common:defs",
+        "//src/common:error_code",
         "//src/proto:cc_service",
         "@blake3",
         "@boost//:algorithm",
