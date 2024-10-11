@@ -57,5 +57,6 @@ cc_library(
 cc_test(
     name = "util_test",
     srcs = ["util_test.cc"],
+    copts = COPTS,
     deps = [":http_handler"],
 )
