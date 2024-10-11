@@ -59,18 +59,3 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
     "@platforms//os:windows": [],
     "//conditions:default": [],
 })
-
-cc_binary(
-    name = "grpc_client",
-    srcs = ["grpc_client.cc"],
-    copts = COPTS,
-    linkopts = LINKOPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        "//src/async_grpc",
-        "//src/client/grpc_client:grpc_clients",
-        "//src/proto:cc_grpc_service",
-        "//src/util",
-        "@openssl//:ssl",
-    ],
-)

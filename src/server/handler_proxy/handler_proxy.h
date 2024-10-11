@@ -30,6 +30,7 @@ class HandlerProxy {
         ret = util::RepoManager::Instance()->WriteToFile(req);
       }
     } else if (req.repo_type() == proto::RepoType::RT_Remote) {
+      LOG(INFO) << "repo";
       ret = util::SyncManager::Instance()->WriteToFile(req);
     }
     return ret;
