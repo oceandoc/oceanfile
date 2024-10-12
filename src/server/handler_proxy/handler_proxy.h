@@ -6,9 +6,13 @@
 #ifndef BAZEL_TEMPLATE_SERVER_HANDLER_PROXY_H
 #define BAZEL_TEMPLATE_SERVER_HANDLER_PROXY_H
 
+#include <filesystem>
+
 #include "src/proto/service.pb.h"
+#include "src/util/receive_queue_manager.h"
 #include "src/util/repo_manager.h"
 #include "src/util/sync_manager.h"
+#include "src/util/util.h"
 
 namespace oceandoc {
 namespace server {
@@ -28,11 +32,35 @@ class HandlerProxy {
         LOG(ERROR) << "Repo uuid empty";
       } else {
         ret = util::RepoManager::Instance()->WriteToFile(req);
+        util::ReceiveQueueManager::Instance()->Put(req);
       }
     } else if (req.repo_type() == proto::RepoType::RT_Remote) {
       ret = util::SyncManager::Instance()->WriteToFile(req);
+      util::ReceiveQueueManager::Instance()->Put(req);
     } else {
       LOG(ERROR) << "Unsupported repo type";
+    }
+    return ret;
+  }
+
+  static int32_t Exists(const proto::FileReq& req, proto::FileRes* res) {
+    int32_t ret = Err_Success;
+    if (!util::Util::Exists(req.path())) {
+    }
+    if (req.file_type() == proto::FileType::Regular) {
+      if (!std::filesystem::is_regular_file(req.path())) {
+        ret = Err_File_type_mismatch;
+      }
+    } else if (req.file_type() == proto::FileType::Dir) {
+      if (!std::filesystem::is_directory(req.path())) {
+        ret = Err_File_type_mismatch;
+      }
+    } else if (req.file_type() == proto::FileType::Symlink) {
+      if (!std::filesystem::is_symlink(req.path())) {
+        ret = Err_File_type_mismatch;
+      }
+    } else {
+      LOG(ERROR) << "Unsupported file type";
     }
     return ret;
   }
@@ -43,12 +71,16 @@ class HandlerProxy {
       case proto::FileOp::FilePut:
         ret = SaveFile(req, res);
         break;
+      case proto::FileOp::FileExists:
+        ret = Exists(req, res);
+        break;
       default:
         LOG(ERROR) << "Unsupported operation";
     }
 
     if (ret) {
-      LOG(ERROR) << "Store file error: " << req.hash()
+      LOG(ERROR) << "Store file error, hash: " << req.hash()
+                 << ", path: " << req.path()
                  << ", part: " << req.partition_num();
       res->set_err_code(proto::ErrCode(ret));
     } else {

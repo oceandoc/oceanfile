@@ -45,6 +45,7 @@ class ConfigManager {
   uint32_t DiscardRatio() { return base_config_.discard_ratio(); }
   uint32_t GrpcThreads() { return base_config_.grpc_threads(); }
   uint32_t EventThreads() { return base_config_.event_threads(); }
+  uint32_t ReceiveQueueTimeout() { return 5 * 60 * 1000; }
   std::string SslCa() { return base_config_.server_ssl_ca(); }
   std::string SslCert() { return base_config_.server_ssl_cert(); }
   std::string SslKey() { return base_config_.server_ssl_key(); }

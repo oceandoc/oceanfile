@@ -1299,7 +1299,7 @@ bool Util::JsonToMessage(const string &json, google::protobuf::Message *msg) {
 }
 
 void Util::PrintFileReq(const proto::FileReq &req) {
-  LOG(INFO) << "request_id: " << req.request_id() << ", op: " << req.op()
+  LOG(INFO) << "uuid: " << req.uuid() << ", op: " << req.op()
             << ", path: " << req.path() << ", hash: " << req.hash()
             << ", size: " << req.size()
             << ", partition_num: " << req.partition_num()
@@ -1316,8 +1316,7 @@ bool Util::FileReqToJson(const proto::FileReq &req, string *json) {
 
   // Add Protobuf fields to the JSON document
   document.AddMember(
-      "request_id",
-      rapidjson::Value().SetString(req.request_id().c_str(), allocator),
+      "uuid", rapidjson::Value().SetString(req.uuid().c_str(), allocator),
       allocator);
   document.AddMember(
       "path", rapidjson::Value().SetString(req.path().c_str(), allocator),
@@ -1357,8 +1356,8 @@ bool Util::JsonToFileReq(const string &json, proto::FileReq *req) {
     return 1;
   }
 
-  if (doc.HasMember("request_id") && doc["request_id"].IsString()) {
-    req->set_request_id(doc["request_id"].GetString());
+  if (doc.HasMember("uuid") && doc["uuid"].IsString()) {
+    req->set_uuid(doc["uuid"].GetString());
   }
 
   if (doc.HasMember("op") && doc["op"].IsInt()) {

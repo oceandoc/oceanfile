@@ -109,6 +109,24 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "receive_queue_manager",
+    srcs = ["receive_queue_manager.cc"],
+    hdrs = ["receive_queue_manager.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        ":thread_pool",
+        ":util",
+        "//src/client/grpc_client:grpc_clients",
+        "//src/common:defs",
+        "//src/proto:cc_data",
+        "//src/proto:cc_grpc_service",
+        "@com_github_grpc_grpc//:grpc++",
+        "@folly",
+    ],
+)
+
 cc_test(
     name = "sync_manager_test",
     srcs = ["sync_manager_test.cc"],

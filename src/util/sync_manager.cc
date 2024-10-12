@@ -164,6 +164,10 @@ bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
       continue;
     }
 
+    while (file_client.Size() > 1000) {
+      Util::Sleep(1000);
+    }
+
     const std::string& dir_src_path = sync_ctx->src + "/" + d.first;
     const std::string& dir_dst_path = sync_ctx->dst + "/" + d.first;
 
@@ -181,20 +185,11 @@ bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
       LOG(ERROR) << dir_src_path << " is symlink";
     }
 
-    client::SendContext send_ctx;
-    send_ctx.src = dir_src_path;
-    send_ctx.dst = dir_dst_path;
-    send_ctx.type = proto::FileType::Dir;
-
-    if (!file_client.Send(send_ctx)) {
-      LOG(ERROR) << "Send dir: " << send_ctx.src << " error";
-    }
-
-    if (!file_client.Await().ok()) {
-      LOG(ERROR) << "Send dir: " << send_ctx.src << " failed";
-    } else {
-      LOG(INFO) << "Send dir: " << send_ctx.src << " success";
-    }
+    client::SendContext dir_send_ctx;
+    dir_send_ctx.src = dir_src_path;
+    dir_send_ctx.dst = dir_dst_path;
+    dir_send_ctx.type = proto::FileType::Dir;
+    file_client.Put(dir_send_ctx);
 
     for (const auto& f : d.second.files()) {
       const auto& file_src_path = dir_src_path + "/" + f.first;
@@ -205,27 +200,21 @@ bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
         continue;
       }
 
-      send_ctx.src = file_src_path;
-      send_ctx.dst = file_dst_path;
-      send_ctx.type = f.second.file_type();
-      LOG(INFO) << "f.second.file_type: " << f.second.file_type();
+      client::SendContext file_send_ctx;
+      file_send_ctx.src = file_src_path;
+      file_send_ctx.dst = file_dst_path;
+      file_send_ctx.type = f.second.file_type();
+      file_client.Put(dir_send_ctx);
+
       if (f.second.file_type() == proto::FileType::Symlink) {
         if (!Util::SyncRemoteSymlink(dir_src_path, file_src_path,
-                                     &send_ctx.content)) {
+                                     &file_send_ctx.content)) {
           LOG(ERROR) << "Get " << file_dst_path << " target error";
           continue;
         }
       }
 
-      if (!file_client.Send(send_ctx)) {
-        LOG(ERROR) << "Send file: " << send_ctx.src << " error";
-      }
-
-      if (!file_client.Await().ok()) {
-        LOG(ERROR) << "Send dir: " << send_ctx.src << " failed";
-      } else {
-        LOG(INFO) << "Send dir: " << send_ctx.src << " success";
-      }
+      file_client.Put(file_send_ctx);
     }
   }
   return true;

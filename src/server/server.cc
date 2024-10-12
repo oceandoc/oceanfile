@@ -17,6 +17,7 @@
 #include "src/server/http_server_impl.h"
 #include "src/server/server_context.h"
 #include "src/util/config_manager.h"
+#include "src/util/receive_queue_manager.h"
 #include "src/util/repo_manager.h"
 #include "src/util/scan_manager.h"
 #include "src/util/thread_pool.h"
@@ -65,6 +66,7 @@ int main(int argc, char **argv) {
   oceandoc::util::ThreadPool::Instance()->Init();
   oceandoc::util::ScanManager::Instance()->Init();
   oceandoc::util::RepoManager::Instance()->Init();
+  oceandoc::util::ReceiveQueueManager::Instance()->Init();
 
 #if !defined(_WIN32)
   RegisterSignalHandler();
@@ -93,8 +95,9 @@ int main(int argc, char **argv) {
     shutdown_thread.join();
   }
 #endif
-  oceandoc::util::ThreadPool::Instance()->Stop();
+  oceandoc::util::ReceiveQueueManager::Instance()->Stop();
   oceandoc::util::RepoManager::Instance()->Stop();
+  oceandoc::util::ThreadPool::Instance()->Stop();
 
   // ProfilerStop();
   return 0;

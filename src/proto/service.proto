@@ -76,14 +76,15 @@ message RepoRes {
 
 enum FileOp {
   FileUnused = 0;
-  FilePut = 1;
-  FileDelete = 2;
-  FileChmod = 3;
-  FileChowner = 4;
+  FileExists = 1;
+  FilePut = 2;
+  FileDelete = 3;
+  FileChmod = 4;
+  FileChowner = 5;
 }
 
 message FileReq {
-  string request_id = 1;
+  string uuid = 1;
   RepoType repo_type = 2;
   FileOp op = 3;
   string path = 4;
@@ -104,6 +105,8 @@ message FileRes {
   string hash = 3;
   int32 partition_num = 4;
   FileType file_type = 5;
+  string uuid = 6;
+  FileOp op = 7;
 }
 
 service OceanFile {

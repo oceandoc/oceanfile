@@ -26,6 +26,7 @@ enum ErrCode {
   File_md5_calc_error = 11007;
   File_crc32_calc_error = 11008;
   File_blake3_calc_error = 11009;
+  File_type_mismatch = 11010;
 
   // 12000
   Scan_error = 12001;
