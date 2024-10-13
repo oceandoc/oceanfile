@@ -11,10 +11,12 @@
 #include <condition_variable>
 #include <fstream>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
 #include "glog/logging.h"
+#include "grpcpp/alarm.h"
 #include "grpcpp/client_context.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/support/client_callback.h"
@@ -72,24 +74,36 @@ class FileClient
     req_.mutable_content()->resize(partition_size_);
     buffer_.resize(partition_size_);
     stub_->async()->FileOp(&context_, this);
+    AddHold();
     StartRead(&res_);
     StartCall();
-    auto task = std::bind(&FileClient::Send, this);
-    util::ThreadPool::Instance()->Post(task);
+  }
+
+  bool Init() {
+    std::thread send_thread(&FileClient::Send, this);
+    send_thread.detach();
+    // auto task = std::bind(&FileClient::Send, this);
+    // util::ThreadPool::Instance()->Post(task);
+    auto print_task = std::bind(&FileClient::Print, this);
+    util::ThreadPool::Instance()->Post(print_task);
+    return true;
   }
 
   void OnWriteDone(bool ok) override {
     if (!ok) {
       LOG(ERROR) << "Write error";
-      send_status_ = common::SendStatus::FATAL;
+    } else {
+      LOG(ERROR) << "Write success";
     }
+    write_done_ = true;
     write_cv_.notify_all();
+    send_num_.fetch_add(1);
   }
 
   void OnReadDone(bool ok) override {
     if (ok) {
-      LOG(INFO) << "file type: " << res_.file_type();
       if (res_.op() == proto::FileOp::FileExists) {
+        LOG(INFO) << res_.src() << " file type: " << res_.file_type();
         if (res_.file_type() == proto::FileType::Dir ||
             res_.file_type() == proto::FileType::Symlink) {
           if (res_.err_code() != proto::ErrCode::Success) {
@@ -122,9 +136,14 @@ class FileClient
             LOG(ERROR) << "Store: " << res_.dst()
                        << ", mark: " << mark[res_.partition_num()]
                        << ", error code: " << res_.err_code();
+          } else {
+            LOG(ERROR) << "Store: " << res_.dst()
+                       << ", error code: " << res_.err_code();
           }
         }
       }
+    } else {
+      LOG(ERROR) << "Read error";
     }
     StartRead(&res_);
   }
@@ -254,10 +273,11 @@ class FileClient
       }
 
       if (ctx->op == proto::FileOp::FileExists) {
+        write_done_.store(false);
         StartWrite(&req_);
         exists_req_num_.fetch_add(1);
         std::unique_lock<std::mutex> l(write_mu_);
-        write_cv_.wait(l);
+        write_cv_.wait(l, [this] { return write_done_.load(); });
         continue;
       }
 
@@ -275,9 +295,10 @@ class FileClient
 
         std::copy(buffer_.data(), buffer_.data() + file.gcount(),
                   req_.mutable_content()->begin());
+        write_done_.store(false);
         StartWrite(&req_);
         std::unique_lock<std::mutex> l(write_mu_);
-        write_cv_.wait(l);
+        write_cv_.wait(l, [this] { return write_done_.load(); });
       };
 
       while (file.read(buffer_.data(), partition_size_) || file.gcount()) {
@@ -301,6 +322,14 @@ class FileClient
 
       send_ctx_map_.erase(req_.uuid());
     }
+    LOG(INFO) << "Send exists";
+  }
+
+  void Print() {
+    while (!stop_.load()) {
+      LOG(INFO) << "Queue size: " << Size() << ", send num: " << send_num_;
+      util::Util::Sleep(1000);
+    }
   }
 
  private:
@@ -321,6 +350,8 @@ class FileClient
 
  private:
   std::atomic<bool> stop_ = false;
+  std::atomic<int32_t> send_num_ = 0;
+  std::atomic<bool> write_done_ = false;
 
   mutable absl::base_internal::SpinLock lock_;
   grpc::Status status_;

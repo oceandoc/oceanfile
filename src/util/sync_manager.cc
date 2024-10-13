@@ -142,6 +142,7 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
   client::FileClient file_client(
       sync_ctx->remote_addr, sync_ctx->remote_port, proto::RepoType::RT_Remote,
       common::NET_BUFFER_SIZE_BYTES, sync_ctx->hash_method);
+  file_client.Init();
 
   for (const auto& d : sync_ctx->scan_ctx->status->scanned_dirs()) {
     auto hash = std::abs(Util::MurmurHash64A(d.first));

@@ -36,6 +36,14 @@ class HandlerProxy {
       }
     } else if (req.repo_type() == proto::RepoType::RT_Remote) {
       ret = util::SyncManager::Instance()->WriteToFile(req);
+      if (ret) {
+        LOG(ERROR) << "Store file error, "
+                   << "path: " << req.dst()
+                   << ", part: " << req.partition_num();
+      } else {
+        LOG(INFO) << "Store file success, "
+                  << "path: " << req.dst() << ", part: " << req.partition_num();
+      }
       util::ReceiveQueueManager::Instance()->Put(req);
     } else {
       LOG(ERROR) << "Unsupported repo type";
@@ -44,10 +52,19 @@ class HandlerProxy {
   }
 
   static int32_t Exists(const proto::FileReq& req, proto::FileRes* res) {
+    LOG(INFO) << "Determin exists: " << req.dst();
     int32_t ret = Err_Success;
     if (!util::Util::Exists(req.dst())) {
-      return ret;
+      if (req.file_type() == proto::FileType::Dir) {
+        util::Util::Mkdir(req.dst());
+        return ret;
+      }
+      if (req.file_type() == proto::FileType::Symlink) {
+        util::Util::CreateSymlink(req.dst(), req.content());
+        return ret;
+      }
     }
+
     if (req.file_type() == proto::FileType::Regular) {
       if (!std::filesystem::is_regular_file(req.dst())) {
         ret = Err_File_type_mismatch;
@@ -86,9 +103,6 @@ class HandlerProxy {
     }
 
     if (ret) {
-      LOG(ERROR) << "Store file error, hash: " << req.hash()
-                 << ", path: " << req.dst()
-                 << ", part: " << req.partition_num();
       res->set_err_code(proto::ErrCode(ret));
     } else {
       res->set_err_code(proto::ErrCode::Success);
