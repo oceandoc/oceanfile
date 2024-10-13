@@ -110,7 +110,8 @@ class Util final {
   static int32_t FilePartitionNum(const int64_t total_size,
                                   int64_t partition_size);
 
-  static bool PrepareFile(const std::string &path, const bool calc_hash,
+  static bool PrepareFile(const std::string &path,
+                          const common::HashMethod hash_method,
                           const int64_t partition_size, common::FileAttr *attr);
 
   static bool SimplifyPath(const std::string &path, std::string *out);

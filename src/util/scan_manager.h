@@ -50,7 +50,6 @@ class ScanContext {
     added_files.clear();
     err_code = Err_Success;
     running_mark = 0;
-    running_threads = 0;
     dir_queue.Clear();
   }
 
@@ -75,7 +74,6 @@ class ScanContext {
   std::set<std::string> added_files;    // full path
   int32_t err_code = Err_Success;
   std::atomic<uint64_t> running_mark = 0;
-  std::atomic<int32_t> running_threads = 0;
   common::BlockingQueue<std::string> dir_queue;
 };
 
@@ -432,7 +430,6 @@ class ScanManager {
 
     for (int32_t i = 0; i < ctx->max_threads; ++i) {
       ctx->running_mark.fetch_or(1ULL << i);
-      ++ctx->running_threads;
       auto task = std::bind(&ScanManager::ParallelFullScan, this, i, ctx);
       ThreadPool::Instance()->Post(task);
     }
@@ -442,7 +439,10 @@ class ScanManager {
         if (ctx->running_mark & (1ULL << i)) {
           continue;
         }
-        ++ctx->running_threads;
+        Util::Sleep(1000);
+        if (ctx->dir_queue.Size() <= 0) {
+          break;
+        }
         ctx->running_mark.fetch_or(1ULL << i);
         auto task = std::bind(&ScanManager::ParallelFullScan, this, i, ctx);
         ThreadPool::Instance()->Post(task);
@@ -471,7 +471,8 @@ class ScanManager {
   }
 
   void ParallelFullScan(const int32_t thread_no, ScanContext* ctx) {
-    LOG(INFO) << "Thread " << thread_no << " for " << ctx->src << " running";
+    LOG(INFO) << "Thread " << thread_no << " for scan " << ctx->src
+              << " running";
     static thread_local std::atomic<int32_t> count = 0;
     while (true) {
       if (stop_.load()) {
@@ -481,12 +482,12 @@ class ScanManager {
 
       std::string cur_dir;
       int try_times = 0;
-      while (!ctx->dir_queue.PopBack(&cur_dir) && try_times < 5) {
+      while (try_times < 3 && !ctx->dir_queue.PopBack(&cur_dir)) {
         Util::Sleep(100);
         ++try_times;
       }
 
-      if (try_times >= 5) {
+      if (try_times >= 3) {
         break;
       }
 
@@ -567,13 +568,12 @@ class ScanManager {
         LOG(ERROR) << "Scan error: " << cur_dir << ", exception: " << e.what();
       }
 
-      if ((count % 3000) == 0) {
+      if ((count % 100) == 0) {
         LOG(INFO) << "Scanning: " << cur_dir << ", thread_no: " << thread_no;
       }
       ++count;
     }
     ctx->running_mark.fetch_and(~(1ULL << thread_no));
-    --ctx->running_threads;
     LOG(INFO) << "Thread " << thread_no << " for " << ctx->src << " exist";
   }
 

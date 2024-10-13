@@ -1,6 +1,7 @@
 #ifndef BAZEL_TEMPLATE_COMMON_BLOCKING_QUEUE_H
 #define BAZEL_TEMPLATE_COMMON_BLOCKING_QUEUE_H
 
+#include <condition_variable>
 #include <cstddef>
 #include <deque>
 #include <mutex>
@@ -18,9 +19,15 @@ class BlockingQueue {
     return queue_.size();
   }
 
+  void Await() {
+    std::unique_lock<std::mutex> lock(mu_);
+    cv_.wait(lock);
+  }
+
   void PushBack(const T& t) {
     std::unique_lock<std::mutex> lock(mu_);
     queue_.emplace_back(t);
+    cv_.notify_one();
   }
 
   bool PopBack(T* t) {
@@ -53,6 +60,7 @@ class BlockingQueue {
  private:
   std::deque<T> queue_;
   std::mutex mu_;
+  std::condition_variable cv_;
 };
 
 }  // namespace common

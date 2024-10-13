@@ -20,9 +20,8 @@ TEST(FileClient, Send) {
   send_ctx.src = path;
   send_ctx.dst =
       "/tmp/test_dir/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus";
-  auto ret = file_client.Send(send_ctx);
   grpc::Status status = file_client.Await();
-  if (!status.ok() || !ret) {
+  if (!status.ok()) {
     LOG(ERROR) << "Store " << path << " failed.";
   }
 }

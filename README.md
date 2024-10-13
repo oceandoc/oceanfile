@@ -1,5 +1,7 @@
 # TODO
 * recursive scan and send
+* implement sync semantic
+* implement backup as fast as possible
 * repo ctl interface
 * log client failed part and retry use queue
 * authentic, sqlite

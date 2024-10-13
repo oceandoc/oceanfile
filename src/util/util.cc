@@ -786,11 +786,11 @@ int32_t Util::FilePartitionNum(const int64_t total_size,
          ((total_size % partition_size) > 0 ? 1 : 0);
 }
 
-bool Util::PrepareFile(const string &path, const bool calc_hash,
+bool Util::PrepareFile(const string &path, const common::HashMethod hash_method,
                        const int64_t partition_size, common::FileAttr *attr) {
   attr->path = path;
 
-  if (calc_hash) {
+  if (hash_method == common::HashMethod::Hash_BLAKE3) {
     if (!FileBlake3(path, &attr->hash)) {
       LOG(ERROR) << "Calc " << path << " hash error";
       return false;
@@ -1299,12 +1299,16 @@ bool Util::JsonToMessage(const string &json, google::protobuf::Message *msg) {
 }
 
 void Util::PrintFileReq(const proto::FileReq &req) {
-  LOG(INFO) << "uuid: " << req.uuid() << ", op: " << req.op()
-            << ", path: " << req.path() << ", hash: " << req.hash()
+  LOG(INFO) << "uuid: " << req.uuid() << ", repo_type: " << req.repo_type()
+            << ", op: " << req.op() << ", src: " << req.src()
+            << ", dst: " << req.dst() << ", hash: " << req.hash()
             << ", size: " << req.size()
             << ", partition_num: " << req.partition_num()
             << ", repo_uuid: " << req.repo_uuid()
             << ", partition_size: " << req.partition_size()
+            << ", file_type: " << req.file_type() << ", user: " << req.user()
+            << ", group: " << req.group()
+            << ", update_time: " << req.update_time()
             << ", content size: " << req.content().size();
 }
 
@@ -1318,12 +1322,18 @@ bool Util::FileReqToJson(const proto::FileReq &req, string *json) {
   document.AddMember(
       "uuid", rapidjson::Value().SetString(req.uuid().c_str(), allocator),
       allocator);
-  document.AddMember(
-      "path", rapidjson::Value().SetString(req.path().c_str(), allocator),
-      allocator);
+  document.AddMember("repo_type", req.repo_type(), allocator);
+  document.AddMember("op", req.op(), allocator);
+  document.AddMember("src",
+                     rapidjson::Value().SetString(req.src().c_str(), allocator),
+                     allocator);
+  document.AddMember("dst",
+                     rapidjson::Value().SetString(req.dst().c_str(), allocator),
+                     allocator);
   document.AddMember(
       "hash", rapidjson::Value().SetString(req.hash().c_str(), allocator),
       allocator);
+  document.AddMember("size", req.size(), allocator);
 
   string base64_content;
   Base64Encode(req.content(), &base64_content);
@@ -1332,14 +1342,13 @@ bool Util::FileReqToJson(const proto::FileReq &req, string *json) {
       rapidjson::Value().SetString(base64_content.c_str(), allocator),
       allocator);
 
+  document.AddMember("partition_num", req.partition_num(), allocator);
   document.AddMember(
       "repo_uuid",
       rapidjson::Value().SetString(req.repo_uuid().c_str(), allocator),
       allocator);
-
-  document.AddMember("op", req.op(), allocator);
-  document.AddMember("size", req.size(), allocator);
-  document.AddMember("partition_num", req.partition_num(), allocator);
+  document.AddMember("partition_size", req.partition_size(), allocator);
+  document.AddMember("file_type", req.file_type(), allocator);
 
   rapidjson::StringBuffer buffer;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -1360,12 +1369,20 @@ bool Util::JsonToFileReq(const string &json, proto::FileReq *req) {
     req->set_uuid(doc["uuid"].GetString());
   }
 
+  if (doc.HasMember("repo_type") && doc["repo_type"].IsInt()) {
+    req->set_repo_type(proto::RepoType(doc["repo_type"].GetInt()));
+  }
+
   if (doc.HasMember("op") && doc["op"].IsInt()) {
     req->set_op(proto::FileOp(doc["op"].GetInt()));
   }
 
-  if (doc.HasMember("path") && doc["path"].IsString()) {
-    req->set_path(doc["path"].GetString());
+  if (doc.HasMember("src") && doc["src"].IsString()) {
+    req->set_src(doc["src"].GetString());
+  }
+
+  if (doc.HasMember("dst") && doc["dst"].IsString()) {
+    req->set_dst(doc["dst"].GetString());
   }
 
   if (doc.HasMember("hash") && doc["hash"].IsString()) {

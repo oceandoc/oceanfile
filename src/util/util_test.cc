@@ -397,7 +397,8 @@ TEST(Util, SyncSymlink) {
 
 TEST(Util, PrepareFile) {
   common::FileAttr attr;
-  Util::PrepareFile("test_data/util_test/target", true,
+  Util::PrepareFile("test_data/util_test/target",
+                    common::HashMethod::Hash_BLAKE3,
                     common::NET_BUFFER_SIZE_BYTES, &attr);
   EXPECT_EQ(attr.hash,
             "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2");
@@ -571,7 +572,7 @@ TEST(Util, LZMA) {
 TEST(Util, MessageToJson) {
   proto::FileReq req;
   req.set_op(proto::FileOp::FilePut);
-  req.set_path("tesxt");
+  req.set_src("tesxt");
   req.set_hash("abbc");
   req.set_size(50);
   req.set_repo_uuid("/tmp/test_repo");
@@ -594,14 +595,14 @@ TEST(Util, JsonToMessage) {
   if (!Util::JsonToMessage(serialized, &req)) {
     LOG(ERROR) << "Req to json error: " << serialized;
   }
-  EXPECT_EQ(req.path(), "tesxt");
+  EXPECT_EQ(req.src(), "tesxt");
   serialized =
       R"({"request_id":"","op":"FilePut","path":"/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus","hash":"4084ec48f2affbd501c02a942b674abcfdbbc6475070049de2c89fb6aa25a3f0","size":359621552,"content":"f0VMRgIBAQMAAAAAAAAAAAIAPgABAAAAMNl8AAAAAABAAAAAAAAAADBZbxUAAAAAAAAAAEAAOAAOAEA","partition_num":2,"repo_uuid":"8636ac78-d409-4c27-8827-c6ddb1a3230c"})";
   if (!Util::JsonToMessage(serialized, &req)) {
     LOG(ERROR) << "Req to json error: " << serialized;
   }
   EXPECT_EQ(
-      req.path(),
+      req.src(),
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus");
 }
 

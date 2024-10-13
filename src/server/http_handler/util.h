@@ -74,7 +74,7 @@ class Util {
             proto::FileOp(util::Util::ToInt<int32_t>(context.data)));
         break;
       case MP_path:
-        context.req->set_path(context.data);
+        context.req->set_src(context.data);
         break;
       case MP_hash:
         context.req->set_hash(context.data);

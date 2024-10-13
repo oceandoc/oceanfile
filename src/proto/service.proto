@@ -87,26 +87,30 @@ message FileReq {
   string uuid = 1;
   RepoType repo_type = 2;
   FileOp op = 3;
-  string path = 4;
-  string hash = 5;
-  int64 size = 6;
-  bytes content = 7;
-  int32 partition_num = 8;
-  string repo_uuid = 9;
-  int64 partition_size = 10;
-  FileType file_type = 11;
-  string user = 12;
-  string group = 13;
+  string src = 4;
+  string dst = 5;
+  string hash = 6;
+  int64 size = 7;
+  bytes content = 8;
+  int32 partition_num = 9;
+  string repo_uuid = 10;
+  int64 partition_size = 11;
+  FileType file_type = 12;
+  string user = 13;
+  string group = 14;
+  int64 update_time = 15;
 }
 
 message FileRes {
   ErrCode err_code = 1;
-  string path = 2;
-  string hash = 3;
-  int32 partition_num = 4;
-  FileType file_type = 5;
-  string uuid = 6;
-  FileOp op = 7;
+  string src = 2;
+  string dst = 3;
+  string hash = 4;
+  int32 partition_num = 5;
+  FileType file_type = 6;
+  string uuid = 7;
+  FileOp op = 8;
+  bool can_skip_upload = 9;
 }
 
 service OceanFile {

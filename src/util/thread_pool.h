@@ -54,6 +54,10 @@ class ThreadPool final {
     boost::asio::post(*pool_.get(), std::move(task));
   }
 
+  void Post(std::packaged_task<void()>& task) {  // NOLINT
+    boost::asio::post(*pool_.get(), std::move(task));
+  }
+
   void Post(std::packaged_task<proto::ErrCode()>& task) {  // NOLINT
     boost::asio::post(*pool_.get(), std::move(task));
   }

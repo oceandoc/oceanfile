@@ -110,7 +110,7 @@ class ReceiveQueueManager final {
           continue;
         }
         std::unique_lock<std::mutex> lock(mu_);
-        to_remove_files_.emplace_back(it->second.req.path());
+        to_remove_files_.emplace_back(it->second.req.dst());
       }
     }
     clean_task_exits = true;

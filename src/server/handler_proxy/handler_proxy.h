@@ -45,23 +45,30 @@ class HandlerProxy {
 
   static int32_t Exists(const proto::FileReq& req, proto::FileRes* res) {
     int32_t ret = Err_Success;
-    if (!util::Util::Exists(req.path())) {
+    if (!util::Util::Exists(req.dst())) {
+      return ret;
     }
     if (req.file_type() == proto::FileType::Regular) {
-      if (!std::filesystem::is_regular_file(req.path())) {
+      if (!std::filesystem::is_regular_file(req.dst())) {
         ret = Err_File_type_mismatch;
       }
     } else if (req.file_type() == proto::FileType::Dir) {
-      if (!std::filesystem::is_directory(req.path())) {
+      if (!std::filesystem::is_directory(req.dst())) {
         ret = Err_File_type_mismatch;
       }
     } else if (req.file_type() == proto::FileType::Symlink) {
-      if (!std::filesystem::is_symlink(req.path())) {
+      if (!std::filesystem::is_symlink(req.dst())) {
         ret = Err_File_type_mismatch;
       }
     } else {
       LOG(ERROR) << "Unsupported file type";
     }
+
+    auto update_time = util::Util::UpdateTime(req.dst());
+    if (update_time != -1 && update_time == req.update_time()) {
+      res->set_can_skip_upload(true);
+    }
+
     return ret;
   }
 
@@ -80,17 +87,20 @@ class HandlerProxy {
 
     if (ret) {
       LOG(ERROR) << "Store file error, hash: " << req.hash()
-                 << ", path: " << req.path()
+                 << ", path: " << req.dst()
                  << ", part: " << req.partition_num();
       res->set_err_code(proto::ErrCode(ret));
     } else {
       res->set_err_code(proto::ErrCode::Success);
     }
 
-    res->set_path(req.path());
+    res->set_src(req.src());
+    res->set_dst(req.dst());
     res->set_hash(req.hash());
     res->set_partition_num(req.partition_num());
     res->set_file_type(req.file_type());
+    res->set_uuid(req.uuid());
+    res->set_op(req.op());
   }
 };
 

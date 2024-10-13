@@ -55,8 +55,8 @@ class FileClient {
     file.seekg(0);
 
     common::FileAttr attr;
-    if (!util::Util::PrepareFile(path, true, common::NET_BUFFER_SIZE_BYTES,
-                                 &attr)) {
+    if (!util::Util::PrepareFile(path, common::Hash_BLAKE3,
+                                 common::NET_BUFFER_SIZE_BYTES, &attr)) {
       LOG(ERROR) << "Prepare error: " << path;
       return false;
     }
@@ -65,7 +65,7 @@ class FileClient {
     proto::FileReq req;
     req.mutable_content()->resize(common::NET_BUFFER_SIZE_BYTES);
     req.set_op(proto::FileOp::FilePut);
-    req.set_path(path);
+    req.set_dst(path);
     req.set_hash(attr.hash);
     req.set_size(attr.size);
     req.set_repo_uuid(repo_uuid);

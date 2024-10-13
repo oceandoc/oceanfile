@@ -7,9 +7,6 @@
 
 #include <filesystem>
 
-#include "grpcpp/client_context.h"
-#include "grpcpp/grpcpp.h"
-#include "grpcpp/support/client_callback.h"
 #include "src/client/grpc_client/grpc_file_client.h"
 
 namespace oceandoc {
@@ -25,13 +22,13 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
   static thread_local std::shared_mutex mu;
 
   if (req.file_type() == proto::FileType::Dir) {
-    if (!Util::Mkdir(req.path())) {
+    if (!Util::Mkdir(req.dst())) {
       return Err_Path_mkdir_error;
     }
     return Err_Success;
   } else if (req.file_type() == proto::FileType::Symlink) {
     try {
-      std::filesystem::create_symlink(req.content(), req.path());
+      std::filesystem::create_symlink(req.content(), req.dst());
     } catch (const std::filesystem::filesystem_error& e) {
       LOG(ERROR) << e.what();
       return Err_Path_create_symlink_error;
@@ -39,12 +36,12 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
     return Err_Success;
   }
 
-  Util::MkParentDir(req.path());
+  Util::MkParentDir(req.dst());
 
   auto err_code = Err_Success;
-  err_code = Util::CreateFileWithSize(req.path(), req.size());
+  err_code = Util::CreateFileWithSize(req.dst(), req.size());
   if (err_code != Err_Success) {
-    LOG(ERROR) << "Create file error: " << req.path();
+    LOG(ERROR) << "Create file error: " << req.dst();
     return err_code;
   }
 
@@ -57,11 +54,11 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
                << ", content size: " << req.content().size();
     return Err_File_partition_size_error;
   }
-  LOG(INFO) << "Now store file " << req.path()
+  LOG(INFO) << "Now store file " << req.dst()
             << ", total part: " << (req.size() / req.partition_size() + 1)
             << ", part: " << req.partition_num() + 1;
   std::unique_lock<std::shared_mutex> locker(mu);
-  return Util::WriteToFile(req.path(), req.content(), start);
+  return Util::WriteToFile(req.dst(), req.content(), start);
 }
 
 int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
@@ -72,12 +69,6 @@ int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
 
   Util::UnifyDir(&sync_ctx->src);
   Util::UnifyDir(&sync_ctx->dst);
-
-  if (Util::StartWith(sync_ctx->src, sync_ctx->dst)) {
-    LOG(ERROR) << "Cannot sync " << sync_ctx->src << " to " << sync_ctx->dst
-               << ", for cannot sync to subdir";
-    return Err_Path_dst_is_src_subdir;
-  }
 
   if (!Util::Exists(sync_ctx->src)) {
     LOG(ERROR) << "Src or dst not exists";
@@ -90,11 +81,6 @@ int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
   }
   sync_ctx->Reset();
 
-  std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
-  std::shared_ptr<grpc::Channel> channel_(
-      grpc::CreateChannel(sync_ctx->remote_addr + ":" + sync_ctx->remote_port,
-                          grpc::InsecureChannelCredentials()));
-
   proto::ScanStatus scan_status;
   scan_status.set_path(sync_ctx->src);
   ScanContext scan_ctx;
@@ -105,7 +91,6 @@ int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
   scan_ctx.sync_method = sync_ctx->sync_method;
   scan_ctx.disable_scan_cache = sync_ctx->disable_scan_cache;
   scan_ctx.skip_scan = sync_ctx->skip_scan;
-
   sync_ctx->scan_ctx = &scan_ctx;
 
   auto ret = ScanManager::Instance()->ParallelScan(&scan_ctx);
@@ -120,26 +105,26 @@ int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
 
   LOG(INFO) << "Now sync " << scan_ctx.src << " to " << scan_ctx.dst;
   LOG(INFO) << "Memory usage: " << Util::MemUsage() << "MB";
+  syncing_.fetch_add(1);
 
   std::unordered_set<std::string> copy_failed_files;
-  std::vector<std::future<bool>> rets;
-
+  std::vector<std::future<void>> rets;
   for (int i = 0; i < sync_ctx->max_threads; ++i) {
-    std::packaged_task<bool()> task(
+    std::packaged_task<void()> task(
         std::bind(&SyncManager::RemoteSyncWorker, this, i, sync_ctx));
     rets.emplace_back(task.get_future());
     ThreadPool::Instance()->Post(task);
   }
+
   for (auto& f : rets) {
-    if (f.get() == false) {
-      success = false;
-    }
+    f.get();
   }
 
   Print(sync_ctx);
   sync_ctx->stop_progress_task = true;
   sync_ctx->cond_var.notify_all();
   SyncStatusDir(&scan_ctx);
+  syncing_.fetch_sub(1);
 
   for (const auto& file : copy_failed_files) {
     LOG(ERROR) << file << " sync failed";
@@ -152,11 +137,11 @@ int32_t SyncManager::SyncRemote(SyncContext* sync_ctx) {
   return Err_Fail;
 }
 
-bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
+void SyncManager::RemoteSyncWorker(const int32_t thread_no,
                                    SyncContext* sync_ctx) {
-  client::FileClient file_client(sync_ctx->remote_addr, sync_ctx->remote_port,
-                                 proto::RepoType::RT_Remote,
-                                 common::NET_BUFFER_SIZE_BYTES, false);
+  client::FileClient file_client(
+      sync_ctx->remote_addr, sync_ctx->remote_port, proto::RepoType::RT_Remote,
+      common::NET_BUFFER_SIZE_BYTES, sync_ctx->hash_method);
 
   for (const auto& d : sync_ctx->scan_ctx->status->scanned_dirs()) {
     auto hash = std::abs(Util::MurmurHash64A(d.first));
@@ -185,10 +170,11 @@ bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
       LOG(ERROR) << dir_src_path << " is symlink";
     }
 
-    client::SendContext dir_send_ctx;
-    dir_send_ctx.src = dir_src_path;
-    dir_send_ctx.dst = dir_dst_path;
-    dir_send_ctx.type = proto::FileType::Dir;
+    client::SendContext* dir_send_ctx = new client::SendContext();
+    dir_send_ctx->src = dir_src_path;
+    dir_send_ctx->dst = dir_dst_path;
+    dir_send_ctx->type = proto::FileType::Dir;
+    dir_send_ctx->op = proto::FileOp::FileExists;
     file_client.Put(dir_send_ctx);
 
     for (const auto& f : d.second.files()) {
@@ -200,15 +186,14 @@ bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
         continue;
       }
 
-      client::SendContext file_send_ctx;
-      file_send_ctx.src = file_src_path;
-      file_send_ctx.dst = file_dst_path;
-      file_send_ctx.type = f.second.file_type();
-      file_client.Put(dir_send_ctx);
-
+      client::SendContext* file_send_ctx = new client::SendContext();
+      file_send_ctx->src = file_src_path;
+      file_send_ctx->dst = file_dst_path;
+      file_send_ctx->type = f.second.file_type();
+      file_send_ctx->op = proto::FileOp::FileExists;
       if (f.second.file_type() == proto::FileType::Symlink) {
         if (!Util::SyncRemoteSymlink(dir_src_path, file_src_path,
-                                     &file_send_ctx.content)) {
+                                     &file_send_ctx->content)) {
           LOG(ERROR) << "Get " << file_dst_path << " target error";
           continue;
         }
@@ -217,7 +202,7 @@ bool SyncManager::RemoteSyncWorker(const int32_t thread_no,
       file_client.Put(file_send_ctx);
     }
   }
-  return true;
+  file_client.Await();
 }
 
 }  // namespace util

@@ -11,20 +11,37 @@
 namespace oceandoc {
 namespace util {
 
-TEST(SyncManager, SyncLocal) {
-  ConfigManager::Instance()->Init("./conf/base_config.json");
-  ThreadPool::Instance()->Init();
-  std::string src("/zfs");
-  std::string dst("/data");
-  Util::Mkdir(dst);
-  SyncContext sync_ctx;
-  sync_ctx.src = src;
-  sync_ctx.dst = dst;
-  sync_ctx.hash_method = common::HashMethod::Hash_NONE;
-  sync_ctx.sync_method = common::SyncMethod::Sync_SYNC;
-  sync_ctx.skip_scan = true;
-  // SyncManager::Instance()->SyncLocal(&sync_ctx);
-}
+// TEST(SyncManager, SyncLocal) {
+// ConfigManager::Instance()->Init("./conf/base_config.json");
+// ThreadPool::Instance()->Init();
+// std::string src("/zfs");
+// std::string dst("/data");
+// Util::Mkdir(dst);
+// SyncContext sync_ctx;
+// sync_ctx.src = src;
+// sync_ctx.dst = dst;
+// sync_ctx.hash_method = common::HashMethod::Hash_NONE;
+// sync_ctx.sync_method = common::SyncMethod::Sync_SYNC;
+// sync_ctx.skip_scan = true;
+//// SyncManager::Instance()->SyncLocal(&sync_ctx);
+//}
+
+// TEST(SyncManager, SyncLocalRecursive) {
+// ConfigManager::Instance()->Init("./conf/base_config.json");
+// ThreadPool::Instance()->Init();
+// std::string src("/usr/local/test_src");
+// std::string dst("/usr/local/test_dst");
+// Util::Remove(dst);
+// Util::Mkdir(dst);
+
+// SyncContext sync_ctx(4);
+// sync_ctx.src = src;
+// sync_ctx.dst = dst;
+// sync_ctx.hash_method = common::HashMethod::Hash_NONE;
+// sync_ctx.sync_method = common::SyncMethod::Sync_SYNC;
+// sync_ctx.skip_scan = true;
+// SyncManager::Instance()->SyncLocalRecursive(&sync_ctx);
+//}
 
 TEST(SyncManager, SyncRemote) {
   ConfigManager::Instance()->Init("./conf/base_config.json");
@@ -38,7 +55,7 @@ TEST(SyncManager, SyncRemote) {
   sync_ctx.sync_method = common::SyncMethod::Sync_SYNC;
   sync_ctx.skip_scan = false;
 
-  sync_ctx.remote_addr = "192.168.4.100";
+  sync_ctx.remote_addr = "127.0.0.1";
   sync_ctx.remote_port = "10001";
 
   SyncManager::Instance()->SyncRemote(&sync_ctx);

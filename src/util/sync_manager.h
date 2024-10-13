@@ -48,21 +48,15 @@ class SyncContext {
   std::condition_variable cond_var;
 
   bool stop_progress_task = false;
-  std::atomic<int32_t> scanned_dir_num = 0;
-  std::atomic<int32_t> skip_dir_num = 0;
   std::atomic<int64_t> syncd_total_cnt = 0;
   std::atomic<int64_t> syncd_success_cnt = 0;
   std::atomic<int64_t> syncd_fail_cnt = 0;
   std::atomic<int64_t> syncd_skipped_cnt = 0;
   std::vector<std::string> copy_failed_files;  // full path
-
-  ScanContext* scan_ctx = nullptr;
-  common::BlockingQueue<std::string> file_queue;
-
-  bool stop_dump_task = false;
   int32_t err_code = Err_Success;
+  ScanContext* scan_ctx = nullptr;
+  common::BlockingQueue<std::string> dir_queue;
   std::atomic<uint64_t> running_mark = 0;
-  std::atomic<int32_t> running_threads = 0;
 
   void Reset() {
     stop_progress_task = false;
@@ -71,12 +65,10 @@ class SyncContext {
     syncd_fail_cnt = 0;
     syncd_skipped_cnt = 0;
     copy_failed_files.clear();
-    scan_ctx = nullptr;
-    file_queue.Clear();
-
     err_code = Err_Success;
+    scan_ctx = nullptr;
+    dir_queue.Clear();
     running_mark = 0;
-    running_threads = 0;
   }
 };
 
@@ -90,7 +82,13 @@ class SyncManager {
 
   bool Init() { return true; }
 
-  void Stop() { ScanManager::Instance()->Stop(); }
+  void Stop() {
+    stop_.store(true);
+    ScanManager::Instance()->Stop();
+    while (syncing_.load() > 0) {
+      Util::Sleep(1000);
+    }
+  }
 
   int32_t ValidateParameters(SyncContext* sync_ctx) {
     if (!Util::IsAbsolute(sync_ctx->src) || !Util::IsAbsolute(sync_ctx->dst)) {
@@ -132,22 +130,18 @@ class SyncManager {
 
     sync_ctx->Reset();
 
-    proto::ScanStatus scan_status;
-    scan_status.set_path(sync_ctx->src);
-
-    bool success = true;
-
     auto progress_task =
         std::bind(&SyncManager::RecursiveProgressTask, this, sync_ctx);
     ThreadPool::Instance()->Post(progress_task);
 
     LOG(INFO) << "Now sync " << sync_ctx->src << " to " << sync_ctx->dst;
     LOG(INFO) << "Memory usage: " << Util::MemUsage() << "MB";
-    std::unordered_set<std::string> copy_failed_files;
 
-    for (int i = 0; i < sync_ctx->max_threads; ++i) {
+    syncing_.fetch_add(1);
+    std::unordered_set<std::string> copy_failed_files;
+    sync_ctx->dir_queue.PushBack(sync_ctx->src);
+    for (int32_t i = 0; i < sync_ctx->max_threads; ++i) {
       sync_ctx->running_mark.fetch_or(1ULL << i);
-      ++sync_ctx->running_threads;
       auto task =
           std::bind(&SyncManager::RecursiveLocalSyncWorker, this, i, sync_ctx);
       ThreadPool::Instance()->Post(task);
@@ -158,7 +152,12 @@ class SyncManager {
         if (sync_ctx->running_mark & (1ULL << i)) {
           continue;
         }
-        ++sync_ctx->running_threads;
+
+        Util::Sleep(1000);
+        if (sync_ctx->dir_queue.Size() <= 0) {
+          break;
+        }
+
         sync_ctx->running_mark.fetch_or(1ULL << i);
         auto task = std::bind(&SyncManager::RecursiveLocalSyncWorker, this, i,
                               sync_ctx);
@@ -173,10 +172,18 @@ class SyncManager {
     for (const auto& file : copy_failed_files) {
       LOG(ERROR) << file << " sync failed";
     }
-    if (success) {
+
+    LOG(INFO) << "syncd count: " << sync_ctx->syncd_total_cnt
+              << ", success count: " << sync_ctx->syncd_success_cnt
+              << ", skipped count: " << sync_ctx->syncd_skipped_cnt
+              << ", failed count: " << sync_ctx->syncd_fail_cnt;
+
+    syncing_.fetch_sub(1);
+    if (sync_ctx->err_code == Err_Success) {
       LOG(INFO) << "Sync success";
       return Err_Success;
     }
+
     LOG(INFO) << "Sync failed";
     return Err_Fail;
   }
@@ -188,7 +195,7 @@ class SyncManager {
     }
 
     sync_ctx->Reset();
-
+    syncing_.fetch_add(1);
     proto::ScanStatus scan_status;
     scan_status.set_path(sync_ctx->src);
     ScanContext scan_ctx;
@@ -199,8 +206,10 @@ class SyncManager {
     scan_ctx.sync_method = sync_ctx->sync_method;
     scan_ctx.disable_scan_cache = sync_ctx->disable_scan_cache;
     scan_ctx.skip_scan = sync_ctx->skip_scan;
-
     sync_ctx->scan_ctx = &scan_ctx;
+
+    scan_ctx.ignored_dirs.insert(sync_ctx->ignored_dirs.begin(),
+                                 sync_ctx->ignored_dirs.end());
 
     ret = ScanManager::Instance()->ParallelScan(&scan_ctx);
     if (ret != Err_Success) {
@@ -215,6 +224,7 @@ class SyncManager {
 
     LOG(INFO) << "Now sync " << scan_ctx.src << " to " << scan_ctx.dst;
     LOG(INFO) << "Memory usage: " << Util::MemUsage() << "MB";
+
     std::unordered_set<std::string> copy_failed_files;
     std::vector<std::future<bool>> rets;
     for (int i = 0; i < sync_ctx->max_threads; ++i) {
@@ -229,6 +239,7 @@ class SyncManager {
       }
     }
 
+    syncing_.fetch_sub(1);
     Print(sync_ctx);
     sync_ctx->stop_progress_task = true;
     sync_ctx->cond_var.notify_all();
@@ -247,7 +258,7 @@ class SyncManager {
 
  private:
   void RecursiveLocalSyncWorker(const int thread_no, SyncContext* sync_ctx) {
-    LOG(INFO) << "Thread " << thread_no << " for " << sync_ctx->src
+    LOG(INFO) << "Thread " << thread_no << " for sync " << sync_ctx->src
               << " running";
     static thread_local std::atomic<int32_t> count = 0;
     while (true) {
@@ -258,18 +269,17 @@ class SyncManager {
 
       std::string cur_dir;
       int try_times = 0;
-      while (!sync_ctx->file_queue.PopBack(&cur_dir) && try_times < 5) {
+      while (try_times < 3 && !sync_ctx->dir_queue.PopBack(&cur_dir)) {
         Util::Sleep(100);
         ++try_times;
       }
 
-      if (try_times >= 5) {
+      if (try_times >= 3) {
         break;
       }
 
       std::string relative_path;
       Util::Relative(cur_dir, sync_ctx->src, &relative_path);
-      sync_ctx->scanned_dir_num.fetch_add(1);
       auto it = sync_ctx->ignored_dirs.find(relative_path);
       if (it != sync_ctx->ignored_dirs.end()) {
         continue;
@@ -278,25 +288,15 @@ class SyncManager {
       if (!Util::Exists(cur_dir)) {
         continue;
       }
-
       const auto& dst_dir = sync_ctx->dst + "/" + relative_path;
       Util::Mkdir(dst_dir);
-
-      auto update_time = Util::UpdateTime(cur_dir);
-      if (update_time == -1) {
-        LOG(INFO) << "Scan error: " << cur_dir;
-        sync_ctx->err_code = Err_File_permission_or_not_exists;
-        continue;
-      }
-
-      auto ret = Err_Success;
       try {
         for (const auto& entry : std::filesystem::directory_iterator(cur_dir)) {
-          if (entry.is_directory()) {
-            sync_ctx->file_queue.PushBack(entry.path().string());
+          if (entry.is_directory() && !entry.is_symlink()) {
+            sync_ctx->dir_queue.PushBack(entry.path().string());
             continue;
           }
-
+          sync_ctx->syncd_total_cnt.fetch_add(1);
           bool ret = true;
           const auto& filename = entry.path().filename().string();
           const auto& file_src_path = cur_dir + "/" + filename;
@@ -321,6 +321,8 @@ class SyncManager {
 
             if (src_update_time != -1 && src_update_time == dst_update_time &&
                 src_size == dst_size) {
+              sync_ctx->syncd_success_cnt.fetch_add(1);
+              sync_ctx->syncd_skipped_cnt.fetch_add(1);
               continue;
             }
           }
@@ -348,25 +350,20 @@ class SyncManager {
             sync_ctx->syncd_fail_cnt.fetch_add(1);
             continue;
           }
+          sync_ctx->syncd_success_cnt.fetch_add(1);
         }
-
-        if (ret != Err_Success) {
-          sync_ctx->err_code = ret;
-          continue;
-        }
-
       } catch (const std::filesystem::filesystem_error& e) {
         LOG(ERROR) << "Scan error: " << cur_dir << ", exception: " << e.what();
       }
 
-      if ((count % 3000) == 0) {
-        LOG(INFO) << "Scanning: " << cur_dir << ", thread_no: " << thread_no;
+      if ((count % 100) == 0) {
+        // LOG(INFO) << "Syncing: " << cur_dir << ", thread_no: " << thread_no;
       }
       ++count;
     }
     sync_ctx->running_mark.fetch_and(~(1ULL << thread_no));
-    --sync_ctx->running_threads;
-    LOG(INFO) << "Thread " << thread_no << " for " << sync_ctx->src << " exist";
+    LOG(INFO) << "Thread " << thread_no << " for sync " << sync_ctx->src
+              << " exist";
   }
 
   bool LocalSyncWorker(const int thread_no, SyncContext* sync_ctx) {
@@ -505,7 +502,7 @@ class SyncManager {
     return success;
   }
 
-  bool RemoteSyncWorker(const int32_t thread_no, SyncContext* sync_ctx);
+  void RemoteSyncWorker(const int32_t thread_no, SyncContext* sync_ctx);
 
   void SyncStatusDir(ScanContext* scan_ctx) {
     const auto& dst_path = ScanManager::Instance()->GenFileName(scan_ctx->dst);
@@ -532,7 +529,7 @@ class SyncManager {
               [sync_ctx] { return sync_ctx->stop_progress_task; })) {
         break;
       }
-      LOG(INFO) << ", syncd count: " << sync_ctx->syncd_total_cnt
+      LOG(INFO) << "syncd count: " << sync_ctx->syncd_total_cnt
                 << ", success count: " << sync_ctx->syncd_success_cnt
                 << ", skipped count: " << sync_ctx->syncd_skipped_cnt
                 << ", failed count: " << sync_ctx->syncd_fail_cnt;
@@ -554,7 +551,8 @@ class SyncManager {
   }
 
  private:
-  std::atomic<bool> stop_;
+  std::atomic<uint32_t> syncing_ = 0;
+  std::atomic<bool> stop_ = false;
 };
 
 }  // namespace util
