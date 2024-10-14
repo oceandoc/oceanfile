@@ -72,7 +72,7 @@ TEST(ScanManager, ParallelScan) {
 
   proto::ScanStatus scan_status;
   scan_status.set_path(path);
-  ScanContext ctx;
+  common::ScanContext ctx;
   ctx.src = final_path;
   ctx.status = &scan_status;
   ctx.hash_method = common::HashMethod::Hash_NONE;

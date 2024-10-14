@@ -48,13 +48,14 @@ TEST(SyncManager, SyncRemote) {
   ThreadPool::Instance()->Init();
   std::string src("/usr/local/test_src");
   std::string dst("/tmp/test_dst");
-  SyncContext sync_ctx(1);
+  common::SyncContext sync_ctx(1);
   sync_ctx.src = src;
   sync_ctx.dst = dst;
   sync_ctx.hash_method = common::HashMethod::Hash_NONE;
   sync_ctx.sync_method = common::SyncMethod::Sync_SYNC;
   sync_ctx.skip_scan = false;
-
+  sync_ctx.repo_type = proto::RepoType::RT_Remote;
+  sync_ctx.partition_size = common::NET_BUFFER_SIZE_BYTES;
   sync_ctx.remote_addr = "127.0.0.1";
   sync_ctx.remote_port = "10001";
 

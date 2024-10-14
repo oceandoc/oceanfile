@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
   std::string path = argv[1];
 
   oceandoc::proto::ScanStatus scan_status;
-  oceandoc::util::ScanContext ctx;
+  oceandoc::common::ScanContext ctx;
   ctx.src = path;
   ctx.skip_scan = false;
   ctx.status = &scan_status;

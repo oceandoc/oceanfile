@@ -80,9 +80,9 @@ Rpc::Rpc(int method_index,
 }
 
 std::unique_ptr<Rpc> Rpc::Clone() {
-  return std::make_unique<Rpc>(
-      method_index_, server_completion_queue_, event_queue_, execution_context_,
-      rpc_handler_info_, service_, weak_ptr_factory_);
+  return std::make_unique<Rpc>(method_index_, server_completion_queue_,
+                               event_queue_, execution_context_,
+                               rpc_handler_info_, service_, weak_ptr_factory_);
 }
 
 void Rpc::OnConnection() {
@@ -272,6 +272,7 @@ void Rpc::PerformFinish(std::unique_ptr<::google::protobuf::Message> message,
   switch (rpc_handler_info_.rpc_type) {
     case ::grpc::internal::RpcMethod::BIDI_STREAMING:
       CHECK(!message);
+      LOG(INFO) << "Finish";
       server_async_reader_writer_->Finish(status, GetRpcEvent(Event::FINISH));
       break;
     case ::grpc::internal::RpcMethod::CLIENT_STREAMING:

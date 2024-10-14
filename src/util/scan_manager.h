@@ -13,7 +13,6 @@
 #include <set>
 #include <sstream>
 #include <string>
-#include <unordered_set>
 
 #include "absl/base/internal/spinlock.h"
 #include "folly/Singleton.h"
@@ -32,51 +31,6 @@
 namespace oceandoc {
 namespace util {
 
-class ScanContext {
- public:
-  ScanContext(const uint32_t max_threads = 4)
-      : status(nullptr),
-        hash_method(common::HashMethod::Hash_NONE),
-        sync_method(common::SyncMethod::Sync_SYNC),
-        disable_scan_cache(false),
-        skip_scan(false),
-        max_threads(max_threads) {}
-
-  void Reset() {
-    scanned_dir_num = 0;
-    skip_dir_num = 0;
-    stop_dump_task = false;
-    removed_files.clear();
-    added_files.clear();
-    err_code = Err_Success;
-    running_mark = 0;
-    dir_queue.Clear();
-  }
-
-  std::string src;
-  std::string dst;
-  proto::ScanStatus* status;
-  common::HashMethod hash_method;
-  common::SyncMethod sync_method;
-  bool disable_scan_cache = false;
-  bool skip_scan = false;
-  std::unordered_set<std::string> ignored_dirs;  // relative to src
-
-  mutable absl::base_internal::SpinLock lock;
-  std::mutex mu;
-  std::condition_variable cond_var;
-  const int max_threads;
-
-  std::atomic<int32_t> scanned_dir_num = 0;
-  std::atomic<int32_t> skip_dir_num = 0;
-  bool stop_dump_task = false;
-  std::set<std::string> removed_files;  // full path
-  std::set<std::string> added_files;    // full path
-  int32_t err_code = Err_Success;
-  std::atomic<uint64_t> running_mark = 0;
-  common::BlockingQueue<std::string> dir_queue;
-};
-
 class ScanManager {
  private:
   friend class folly::Singleton<ScanManager>;
@@ -91,7 +45,7 @@ class ScanManager {
     return path + "/" + common::CONFIG_DIR + "/" + Util::SHA256(path);
   }
 
-  bool LoadCachedScanStatus(ScanContext* ctx) {
+  bool LoadCachedScanStatus(common::ScanContext* ctx) {
     const std::string& cached_status_path = GenFileName(ctx->src);
     if (!Util::Exists(cached_status_path)) {
       LOG(INFO) << cached_status_path << " not exists";
@@ -120,7 +74,7 @@ class ScanManager {
     return false;
   }
 
-  bool ValidateScanStatus(ScanContext* ctx) {
+  bool ValidateScanStatus(common::ScanContext* ctx) {
     const auto& path = ctx->src;
     if (!Util::Exists(path)) {
       LOG(ERROR) << path << " not exists";
@@ -172,7 +126,7 @@ class ScanManager {
     return true;
   }
 
-  void SumStatus(ScanContext* ctx) {
+  void SumStatus(common::ScanContext* ctx) {
     int64_t file_num = 0;
     int64_t symlink_num = 0;
     for (const auto& p : ctx->status->scanned_dirs()) {
@@ -188,7 +142,7 @@ class ScanManager {
     ctx->status->set_symlink_num(symlink_num);
   }
 
-  int32_t Dump(ScanContext* ctx) {
+  int32_t Dump(common::ScanContext* ctx) {
     std::string path = GenFileName(ctx->src);
     {
       absl::base_internal::SpinLockHolder locker(&ctx->lock);
@@ -224,7 +178,7 @@ class ScanManager {
     return Err_Scan_dump_error;
   }
 
-  void DumpTask(ScanContext* ctx) {
+  void DumpTask(common::ScanContext* ctx) {
     int64_t last_time = Util::CurrentTimeMillis();
     while (!(ctx->stop_dump_task)) {
       std::unique_lock<std::mutex> lock(ctx->mu);
@@ -251,7 +205,7 @@ class ScanManager {
     }
   }
 
-  std::string Print(const ScanContext& ctx) {
+  std::string Print(const common::ScanContext& ctx) {
     std::stringstream sstream;
     absl::base_internal::SpinLockHolder locker(&ctx.lock);
     sstream << ctx.src << ", dir num: " << ctx.status->scanned_dirs().size()
@@ -263,7 +217,7 @@ class ScanManager {
     return sstream.str();
   }
 
-  int32_t AddDirItem(const std::string& path, ScanContext* ctx,
+  int32_t AddDirItem(const std::string& path, common::ScanContext* ctx,
                      const std::string& relative_path) {
     proto::DirItem dir_item;
     dir_item.set_path(relative_path);
@@ -288,7 +242,7 @@ class ScanManager {
     return Err_Success;
   }
 
-  int32_t CalcHash(const std::string& path, ScanContext* ctx,
+  int32_t CalcHash(const std::string& path, common::ScanContext* ctx,
                    proto::FileItem* file_item) {
     if (ctx->hash_method == common::HashMethod::Hash_SHA256) {
       if (!Util::FileSHA256(path, file_item->mutable_hash())) {
@@ -307,7 +261,7 @@ class ScanManager {
   }
 
   int32_t AddFileItem(const std::string& filename, const proto::FileType type,
-                      ScanContext* ctx,
+                      common::ScanContext* ctx,
                       const std::string& parent_relative_path) {
     const auto& path = ctx->src + "/" + parent_relative_path + "/" + filename;
     proto::FileItem file_item;
@@ -349,11 +303,10 @@ class ScanManager {
     return Err_Success;
   }
 
-  int32_t RemoveDir(ScanContext* ctx, const std::string& cur_dir,
+  int32_t RemoveDir(common::ScanContext* ctx, const std::string& cur_dir,
                     const std::string& relative_path) {
-    ctx->removed_files.insert(cur_dir);
-
     absl::base_internal::SpinLockHolder locker(&ctx->lock);
+    ctx->removed_files.insert(cur_dir);
     auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
     if (it == ctx->status->mutable_scanned_dirs()->end()) {
       return Err_Success;
@@ -367,7 +320,7 @@ class ScanManager {
     return Err_Success;
   }
 
-  int32_t RemoveFile(ScanContext* ctx, const std::string& cur_dir,
+  int32_t RemoveFile(common::ScanContext* ctx, const std::string& cur_dir,
                      const std::set<std::string>& files,
                      const std::string& relative_path) {
     absl::base_internal::SpinLockHolder locker(&ctx->lock);
@@ -389,7 +342,7 @@ class ScanManager {
     return Err_Success;
   }
 
-  int32_t ParallelScan(ScanContext* ctx) {
+  int32_t ParallelScan(common::ScanContext* ctx) {
     if (!Util::Exists(ctx->src)) {
       LOG(ERROR) << ctx->src << " not exists";
       return Err_Path_not_exists;
@@ -470,7 +423,7 @@ class ScanManager {
     return ctx->err_code;
   }
 
-  void ParallelFullScan(const int32_t thread_no, ScanContext* ctx) {
+  void ParallelFullScan(const int32_t thread_no, common::ScanContext* ctx) {
     LOG(INFO) << "Thread " << thread_no << " for scan " << ctx->src
               << " running";
     static thread_local std::atomic<int32_t> count = 0;

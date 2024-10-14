@@ -23,55 +23,6 @@
 namespace oceandoc {
 namespace util {
 
-class SyncContext {
- public:
-  SyncContext(const int max_threads = 4) : max_threads(max_threads) {}
-  SyncContext(const std::string& remote_addr, const std::string& remote_port,
-              const int max_threads = 4)
-      : remote_addr(remote_addr),
-        remote_port(remote_port),
-        max_threads(max_threads) {}
-
-  std::string remote_addr;
-  std::string remote_port;
-  std::string src;
-  std::string dst;
-  common::HashMethod hash_method = common::HashMethod::Hash_NONE;
-  common::SyncMethod sync_method = common::SyncMethod::Sync_SYNC;
-  bool disable_scan_cache = false;
-  bool skip_scan = false;
-  std::unordered_set<std::string> ignored_dirs;  // relative to src
-
-  const int max_threads;
-  mutable absl::base_internal::SpinLock lock;
-  std::mutex mu;
-  std::condition_variable cond_var;
-
-  bool stop_progress_task = false;
-  std::atomic<int64_t> syncd_total_cnt = 0;
-  std::atomic<int64_t> syncd_success_cnt = 0;
-  std::atomic<int64_t> syncd_fail_cnt = 0;
-  std::atomic<int64_t> syncd_skipped_cnt = 0;
-  std::vector<std::string> copy_failed_files;  // full path
-  int32_t err_code = Err_Success;
-  ScanContext* scan_ctx = nullptr;
-  common::BlockingQueue<std::string> dir_queue;
-  std::atomic<uint64_t> running_mark = 0;
-
-  void Reset() {
-    stop_progress_task = false;
-    syncd_total_cnt = 0;
-    syncd_success_cnt = 0;
-    syncd_fail_cnt = 0;
-    syncd_skipped_cnt = 0;
-    copy_failed_files.clear();
-    err_code = Err_Success;
-    scan_ctx = nullptr;
-    dir_queue.Clear();
-    running_mark = 0;
-  }
-};
-
 class SyncManager {
  private:
   friend class folly::Singleton<SyncManager>;
@@ -90,7 +41,7 @@ class SyncManager {
     }
   }
 
-  int32_t ValidateParameters(SyncContext* sync_ctx) {
+  int32_t ValidateParameters(common::SyncContext* sync_ctx) {
     if (!Util::IsAbsolute(sync_ctx->src) || !Util::IsAbsolute(sync_ctx->dst)) {
       LOG(ERROR) << "Path must be absolute";
       return Err_Path_not_absolute;
@@ -120,9 +71,9 @@ class SyncManager {
 
   int32_t WriteToFile(const proto::FileReq& req);
 
-  int32_t SyncRemote(SyncContext* sync_ctx);
+  int32_t SyncRemote(common::SyncContext* sync_ctx);
 
-  int32_t SyncLocalRecursive(SyncContext* sync_ctx) {
+  int32_t SyncLocalRecursive(common::SyncContext* sync_ctx) {
     auto ret = ValidateParameters(sync_ctx);
     if (ret) {
       return ret;
@@ -188,7 +139,7 @@ class SyncManager {
     return Err_Fail;
   }
 
-  int32_t SyncLocal(SyncContext* sync_ctx) {
+  int32_t SyncLocal(common::SyncContext* sync_ctx) {
     auto ret = ValidateParameters(sync_ctx);
     if (ret) {
       return ret;
@@ -198,7 +149,7 @@ class SyncManager {
     syncing_.fetch_add(1);
     proto::ScanStatus scan_status;
     scan_status.set_path(sync_ctx->src);
-    ScanContext scan_ctx;
+    common::ScanContext scan_ctx;
     scan_ctx.src = sync_ctx->src;
     scan_ctx.dst = sync_ctx->src;
     scan_ctx.status = &scan_status;
@@ -257,7 +208,8 @@ class SyncManager {
   }
 
  private:
-  void RecursiveLocalSyncWorker(const int thread_no, SyncContext* sync_ctx) {
+  void RecursiveLocalSyncWorker(const int thread_no,
+                                common::SyncContext* sync_ctx) {
     LOG(INFO) << "Thread " << thread_no << " for sync " << sync_ctx->src
               << " running";
     static thread_local std::atomic<int32_t> count = 0;
@@ -366,7 +318,7 @@ class SyncManager {
               << " exist";
   }
 
-  bool LocalSyncWorker(const int thread_no, SyncContext* sync_ctx) {
+  bool LocalSyncWorker(const int thread_no, common::SyncContext* sync_ctx) {
     bool success = true;
     for (const auto& d : sync_ctx->scan_ctx->status->scanned_dirs()) {
       auto hash = std::abs(Util::MurmurHash64A(d.first));
@@ -502,16 +454,16 @@ class SyncManager {
     return success;
   }
 
-  void RemoteSyncWorker(const int32_t thread_no, SyncContext* sync_ctx);
+  void RemoteSyncWorker(const int32_t thread_no, common::SyncContext* sync_ctx);
 
-  void SyncStatusDir(ScanContext* scan_ctx) {
+  void SyncStatusDir(common::ScanContext* scan_ctx) {
     const auto& dst_path = ScanManager::Instance()->GenFileName(scan_ctx->dst);
     scan_ctx->status->set_path(scan_ctx->dst);
     scan_ctx->src = scan_ctx->dst;
     ScanManager::Instance()->Dump(scan_ctx);
   }
 
-  void Print(SyncContext* sync_ctx) {
+  void Print(common::SyncContext* sync_ctx) {
     LOG(INFO) << "Total: "
               << sync_ctx->scan_ctx->status->file_num() +
                      sync_ctx->scan_ctx->status->symlink_num()
@@ -521,7 +473,7 @@ class SyncManager {
               << ", failed count: " << sync_ctx->syncd_fail_cnt;
   }
 
-  void RecursiveProgressTask(SyncContext* sync_ctx) {
+  void RecursiveProgressTask(common::SyncContext* sync_ctx) {
     while (!sync_ctx->stop_progress_task) {
       std::unique_lock<std::mutex> lock(sync_ctx->mu);
       if (sync_ctx->cond_var.wait_for(
@@ -537,7 +489,7 @@ class SyncManager {
     LOG(INFO) << "RecursiveProgressTask Exists";
   }
 
-  void ProgressTask(SyncContext* sync_ctx) {
+  void ProgressTask(common::SyncContext* sync_ctx) {
     while (!sync_ctx->stop_progress_task) {
       std::unique_lock<std::mutex> lock(sync_ctx->mu);
       if (sync_ctx->cond_var.wait_for(

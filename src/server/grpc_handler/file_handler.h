@@ -23,7 +23,10 @@ class FileHandler : public async_grpc::RpcHandler<FileOpMethod> {
     Send(std::move(res));
   }
 
-  void OnReadsDone() override { Finish(grpc::Status::OK); }
+  void OnReadsDone() override {
+    LOG(INFO) << "OnReadsDone";
+    Finish(grpc::Status::OK);
+  }
 
  private:
 };

@@ -8,8 +8,13 @@ cpplint()
 
 cc_library(
     name = "defs",
-    hdrs = [
-        "defs.h",
+    hdrs = ["defs.h"],
+    deps = [
+        ":blocking_queue",
+        ":error_code",
+        "//src/proto:cc_data",
+        "//src/proto:cc_error",
+        "//src/proto:cc_service",
     ],
 )
 
