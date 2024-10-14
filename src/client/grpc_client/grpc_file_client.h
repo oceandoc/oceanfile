@@ -245,7 +245,7 @@ class FileClient
       common::SendContext* ctx = nullptr;
       if (!send_queue_.PopBack(&ctx)) {
         util::Util::Sleep(100);
-        if (fill_queue_complete_ && onfly_req_num_.load() <= 0) {
+        if (fill_queue_complete_ && onfly_req_num_.load() <= 0 && Size() <= 0) {
           LOG(INFO) << "StartWritesDone";
           StartWritesDone();
           break;
