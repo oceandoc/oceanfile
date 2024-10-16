@@ -27,6 +27,7 @@ class ReceiveContext final {
   int64_t update_time = 0;
   std::set<int32_t> partitions;
   int32_t part_num = 0;
+  int64_t file_update_time = 0;
 };
 
 class ReceiveQueueManager final {
@@ -68,14 +69,15 @@ class ReceiveQueueManager final {
       ctx.update_time = Util::CurrentTimeMillis();
       ctx.partitions.insert(req.partition_num());
       ctx.part_num = Util::FilePartitionNum(req.size(), req.partition_size());
+      ctx.file_update_time = req.update_time();
       queue_.emplace(req.uuid(), ctx);
     }
   }
 
   void Delete() {
+    LOG(INFO) << "Delte task running";
     while (true) {
       if (stop_.load()) {
-        LOG(INFO) << "ReceiveQueueManager delete task stopped";
         break;
       }
       std::unique_lock<std::mutex> lock(mu_);
@@ -83,24 +85,36 @@ class ReceiveQueueManager final {
                [this] { return stop_.load() || !to_remove_files_.empty(); });
       for (size_t i = 0; i < to_remove_files_.size(); ++i) {
         Util::Remove(to_remove_files_[i]);
-        LOG(INFO) << to_remove_files_[i] << " deleted";
+        LOG(INFO) << "Store " << to_remove_files_[i] << " error";
       }
       to_remove_files_.clear();
     }
     delete_task_exits = true;
+    LOG(INFO) << "Delete task exists";
   }
 
   void Clean() {
+    LOG(INFO) << "Clean task running";
     while (true) {
       if (stop_.load()) {
-        LOG(INFO) << "ReceiveQueueManager clean task stopped";
         break;
       }
       Util::Sleep(1000);
 
-      absl::base_internal::SpinLockHolder locker(&lock_);
+      if (GetSize() <= 5) {
+        continue;
+      }
+
       for (auto it = queue_.begin(); it != queue_.end();) {
         if (it->second.part_num == it->second.partitions.size()) {
+          if (!Util::SetUpdateTime(it->second.dst,
+                                   it->second.file_update_time)) {
+            LOG(INFO) << "Set update time error: " << it->second.dst;
+            std::unique_lock<std::mutex> lock(mu_);
+            to_remove_files_.emplace_back(it->second.dst);
+            cv_.notify_all();
+          }
+          LOG(INFO) << "Store " << it->second.dst << " success";
           it = queue_.erase(it);
           continue;
         }
@@ -111,9 +125,6 @@ class ReceiveQueueManager final {
           continue;
         }
 
-        if (GetSize() < 100) {
-          continue;
-        }
         std::unique_lock<std::mutex> lock(mu_);
         to_remove_files_.emplace_back(it->second.dst);
         it = queue_.erase(it);
@@ -121,6 +132,7 @@ class ReceiveQueueManager final {
       }
     }
     clean_task_exits = true;
+    LOG(INFO) << "Clean task exists";
   }
 
   size_t GetSize() {

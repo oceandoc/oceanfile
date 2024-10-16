@@ -56,9 +56,6 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
                << ", content size: " << req.content().size();
     return Err_File_partition_size_error;
   }
-  LOG(INFO) << "Now store file " << req.dst()
-            << ", total part: " << (req.size() / req.partition_size() + 1)
-            << ", part: " << req.partition_num() + 1;
   std::unique_lock<std::shared_mutex> locker(mu);
   return Util::WriteToFile(req.dst(), req.content(), start);
 }

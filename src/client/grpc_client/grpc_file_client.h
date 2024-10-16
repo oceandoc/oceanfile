@@ -35,6 +35,11 @@ class FileClient
   explicit FileClient(common::SyncContext* ctx) : sync_ctx(ctx) {
     task_ = std::thread(&FileClient::Send, this);
     print_task_ = std::thread(&FileClient::Print, this);
+    // NOTICE: cannot use below code
+    // auto task = std::bind(&FileClient::Send, this);
+    // util::ThreadPool::Instance()->Post(task);
+    // auto print_task = std::bind(&FileClient::Print, this);
+    // util::ThreadPool::Instance()->Post(print_task);
 
     grpc::ResourceQuota quota;
     quota.SetMaxThreads(4);
@@ -81,10 +86,6 @@ class FileClient
     } else {
       LOG(ERROR) << "Failed to connect to the server.";
     }
-    // auto task = std::bind(&FileClient::Send, this);
-    // util::ThreadPool::Instance()->Post(task);
-    // auto print_task = std::bind(&FileClient::Print, this);
-    // util::ThreadPool::Instance()->Post(print_task);
   }
 
   void Stop() {
@@ -130,6 +131,8 @@ class FileClient
           ctx->type = res_.file_type();
           ctx->op = proto::FileOp::FilePut;
           Put(ctx);
+        } else {
+          LOG(INFO) << res_.src() << " skipped";
         }
       }
     } else if (res_.op() == proto::FileOp::FilePut) {
@@ -184,6 +187,7 @@ class FileClient
   void Put(const std::shared_ptr<common::SendContext>& ctx) {
     send_queue_.PushBack(ctx);
   }
+
   size_t Size() { return send_queue_.Size(); }
 
   bool FillRequest(std::shared_ptr<common::SendContext> ctx) {
@@ -251,7 +255,10 @@ class FileClient
   }
 
   void SetFillQueueComplete() { fill_queue_complete_ = true; }
+
   void Send() {
+    // NOTICE: cannot use below code, race condition
+    // send_queue_.Await();
     while (Size() <= 0 && !fill_queue_complete_) {
       util::Util::Sleep(200);
     }
@@ -280,9 +287,7 @@ class FileClient
       }
 
       if (ctx->op == proto::FileOp::FileExists) {
-        if (ctx->type == proto::FileType::Dir) {
-          LOG(INFO) << "Now send dir: " << ctx->src;
-        } else if (ctx->type == proto::FileType::Symlink) {
+        if (ctx->type == proto::FileType::Symlink) {
           LOG(INFO) << "Now send symlink: " << ctx->src;
           sync_ctx->syncd_file_success_cnt.fetch_add(1);
         }
