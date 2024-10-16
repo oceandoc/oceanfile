@@ -272,7 +272,6 @@ void Rpc::PerformFinish(std::unique_ptr<::google::protobuf::Message> message,
   switch (rpc_handler_info_.rpc_type) {
     case ::grpc::internal::RpcMethod::BIDI_STREAMING:
       CHECK(!message);
-      LOG(INFO) << "Finish";
       server_async_reader_writer_->Finish(status, GetRpcEvent(Event::FINISH));
       break;
     case ::grpc::internal::RpcMethod::CLIENT_STREAMING:

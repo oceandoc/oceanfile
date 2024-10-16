@@ -76,6 +76,8 @@ class FileClient
     send_task_stopped_ = false;
     print_task_stopped_ = false;
     fill_queue_complete_ = false;
+    onfly_req_num_ = 0;
+    skipped_num = 0;
   }
 
   void Start() {
@@ -132,7 +134,7 @@ class FileClient
           ctx->op = proto::FileOp::FilePut;
           Put(ctx);
         } else {
-          LOG(INFO) << res_.src() << " skipped";
+          skipped_num.fetch_add(1);
         }
       }
     } else if (res_.op() == proto::FileOp::FilePut) {
@@ -386,6 +388,7 @@ class FileClient
   proto::FileReq req_;
   proto::FileRes res_;
   std::atomic<int32_t> onfly_req_num_ = 0;
+  std::atomic<int32_t> skipped_num = 0;
 
  private:
   std::mutex write_mu_;

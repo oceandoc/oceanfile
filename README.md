@@ -1,20 +1,18 @@
 # TODO
-* recursive scan and send
-* implement sync semantic
-* implement backup as fast as possible
-* repo ctl interface
-* log client failed part and retry use queue
 * authentic, sqlite
 * session cookie
+* repo ctl interface
+* log client failed part and retry
 * public and private ip address, mac address, system info
-* fix self defined toolchain compitible problem with refresh_compile_commands
 
-// TODO(xieyz) add full unit_test
-// TODO(xieyz) dump to disk only file or dir change count over 10 thousand
-// TODO(xieyz) use multiple cache bucket
-// TODO(xieyz) keep user and group
-// TODO(xieyz) sync don't use MurmurHash64A to split thread files;
-// TODO(xieyz) fix scan remove files num
+// TODO(xieyz) scan and sync add fullly unit_test
+// TODO(xieyz) dump to disk only file count over 10 thousand when scan
+// TODO(xieyz) use multiple cache bucket when scan
+// TODO(xieyz) fix remove files num when scan
+// TODO(xieyz) complete sync semantic
+// TODO(xieyz) keep user and group and permission when sync
+// TODO(xieyz) don't use MurmurHash64A to split thread files when sync
+// TODO(xieyz) increment backup, keep as fast as possible with least used disk
 
 # final TODO
 * kill syncthing

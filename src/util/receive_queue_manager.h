@@ -95,13 +95,17 @@ class ReceiveQueueManager final {
 
   void Clean() {
     LOG(INFO) << "Clean task running";
+    int64_t last_time = Util::CurrentTimeMillis();
     while (true) {
       if (stop_.load()) {
         break;
       }
       Util::Sleep(1000);
 
-      if (GetSize() <= 5) {
+      auto now = Util::CurrentTimeMillis();
+      auto offset = now - last_time;
+      last_time = now;
+      if (GetSize() <= 5 && offset < 1000 * 5) {
         continue;
       }
 
@@ -113,12 +117,12 @@ class ReceiveQueueManager final {
             std::unique_lock<std::mutex> lock(mu_);
             to_remove_files_.emplace_back(it->second.dst);
             cv_.notify_all();
+          } else {
+            LOG(INFO) << "Store " << it->second.dst << " success";
           }
-          LOG(INFO) << "Store " << it->second.dst << " success";
           it = queue_.erase(it);
           continue;
         }
-        auto now = Util::CurrentTimeMillis();
         if (now - it->second.update_time <
             ConfigManager::Instance()->ReceiveQueueTimeout()) {
           ++it;
