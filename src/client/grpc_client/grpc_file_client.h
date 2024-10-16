@@ -10,7 +10,9 @@
 #include <atomic>
 #include <condition_variable>
 #include <fstream>
+#include <memory>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -22,7 +24,6 @@
 #include "src/common/defs.h"
 #include "src/proto/service.grpc.pb.h"
 #include "src/proto/service.pb.h"
-#include "src/util/thread_pool.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -32,6 +33,9 @@ class FileClient
     : public grpc::ClientBidiReactor<proto::FileReq, proto::FileRes> {
  public:
   explicit FileClient(common::SyncContext* ctx) : sync_ctx(ctx) {
+    task_ = std::thread(&FileClient::Send, this);
+    print_task_ = std::thread(&FileClient::Print, this);
+
     grpc::ResourceQuota quota;
     quota.SetMaxThreads(4);
     grpc::ChannelArguments channel_args;
@@ -39,6 +43,7 @@ class FileClient
     channel_ = grpc::CreateCustomChannel(
         sync_ctx->remote_addr + ":" + sync_ctx->remote_port,
         grpc::InsecureChannelCredentials(), channel_args);
+
     stub_ = oceandoc::proto::OceanFile::NewStub(channel_);
     req_.mutable_content()->resize(sync_ctx->partition_size);
     buffer_.resize(sync_ctx->partition_size);
@@ -47,30 +52,67 @@ class FileClient
     StartCall();
   }
 
+  ~FileClient() {
+    if (task_.joinable()) {
+      task_.join();
+    }
+    if (print_task_.joinable()) {
+      print_task_.join();
+    }
+  }
+
+  void Reset() {
+    req_.Clear();
+    res_.Clear();
+    done_ = false;
+    write_done_ = false;
+    send_queue_.Clear();
+    send_ctx_map_.clear();
+    send_task_stopped_ = false;
+    print_task_stopped_ = false;
+    fill_queue_complete_ = false;
+  }
+
   void Start() {
     Reset();
-    auto task = std::bind(&FileClient::Send, this);
-    util::ThreadPool::Instance()->Post(task);
-    auto print_task = std::bind(&FileClient::Print, this);
-    util::ThreadPool::Instance()->Post(print_task);
+    auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(10);
+    if (channel_->WaitForConnected(deadline)) {
+      LOG(INFO) << "Connected to the server!";
+    } else {
+      LOG(ERROR) << "Failed to connect to the server.";
+    }
+    // auto task = std::bind(&FileClient::Send, this);
+    // util::ThreadPool::Instance()->Post(task);
+    // auto print_task = std::bind(&FileClient::Print, this);
+    // util::ThreadPool::Instance()->Post(print_task);
+  }
+
+  void Stop() {
+    done_ = true;
+    context_.TryCancel();
+    write_cv_.notify_all();
+    while (!send_task_stopped_ || !print_task_stopped_) {
+      util::Util::Sleep(100);
+    }
+    cv_.notify_all();
+    LOG(INFO) << "FileClient stopped";
   }
 
   void OnWriteDone(bool ok) override {
     if (!ok) {
       LOG(ERROR) << "Write error";
+      // Stop();
     } else {
       onfly_req_num_.fetch_add(1);
-      send_num_.fetch_add(1);
     }
     write_done_.store(true);
     write_cv_.notify_all();
   }
 
-  void CleanAndExist() {}
-
   void OnReadDone(bool ok) override {
     if (!ok) {
-      LOG(ERROR) << "Server gone";
+      LOG(ERROR) << "Read error";
+      // Stop();
       return;
     }
     if (done_) {
@@ -81,7 +123,8 @@ class FileClient
     if (res_.op() == proto::FileOp::FileExists) {
       if (res_.file_type() == proto::FileType::Regular) {
         if (!res_.can_skip_upload()) {
-          common::SendContext* ctx = new common::SendContext();
+          std::shared_ptr<common::SendContext> ctx =
+              std::make_shared<common::SendContext>();
           ctx->src = res_.src();
           ctx->dst = res_.dst();
           ctx->type = res_.file_type();
@@ -125,9 +168,8 @@ class FileClient
     return std::move(status_);
   }
 
-  common::SendStatus GetStatus(common::SendContext* ctx) {
+  common::SendStatus GetStatus(std::shared_ptr<common::SendContext> ctx) {
     bool success = true;
-    absl::base_internal::SpinLockHolder locker(&lock_);
     for (auto m : ctx->mark) {
       if (m > 1) {
         return common::SendStatus::TOO_MANY_RETRY;
@@ -139,35 +181,12 @@ class FileClient
     return success ? common::SendStatus::SUCCESS : common::SendStatus::RETRING;
   }
 
-  void Reset() {
-    req_.Clear();
-    res_.Clear();
-    done_ = false;
-    write_done_ = false;
-    send_num_ = 0;
-    send_file_num_ = 0;
-    send_queue_.Clear();
-    send_ctx_map_.clear();
-    send_task_stopped_ = false;
-    print_task_stopped_ = false;
-    fill_queue_complete_ = false;
+  void Put(const std::shared_ptr<common::SendContext>& ctx) {
+    send_queue_.PushBack(ctx);
   }
-
-  void Put(common::SendContext* ctx) { send_queue_.PushBack(ctx); }
   size_t Size() { return send_queue_.Size(); }
 
-  void Stop() {
-    done_ = true;
-    context_.TryCancel();
-    write_cv_.notify_all();
-    while (!send_task_stopped_ || !print_task_stopped_) {
-      util::Util::Sleep(100);
-    }
-    cv_.notify_all();
-    LOG(INFO) << "FileClient stopped";
-  }
-
-  bool FillRequest(common::SendContext* ctx) {
+  bool FillRequest(std::shared_ptr<common::SendContext> ctx) {
     req_.Clear();
     if (ctx->src.empty()) {
       LOG(ERROR) << "Empty src, this should never happen";
@@ -232,9 +251,11 @@ class FileClient
   }
 
   void SetFillQueueComplete() { fill_queue_complete_ = true; }
-
   void Send() {
-    send_queue_.Await();
+    while (Size() <= 0 && !fill_queue_complete_) {
+      util::Util::Sleep(200);
+    }
+
     send_task_stopped_ = false;
     while (true) {
       if (done_) {
@@ -242,7 +263,7 @@ class FileClient
         break;
       }
 
-      common::SendContext* ctx = nullptr;
+      std::shared_ptr<common::SendContext> ctx = nullptr;
       if (!send_queue_.PopBack(&ctx)) {
         util::Util::Sleep(100);
         if (fill_queue_complete_ && onfly_req_num_.load() <= 0 && Size() <= 0) {
@@ -253,7 +274,6 @@ class FileClient
         continue;
       }
 
-      common::GCEntry gc(ctx);
       if (!FillRequest(ctx)) {
         LOG(ERROR) << "Fill req error";
         continue;
@@ -264,6 +284,7 @@ class FileClient
           LOG(INFO) << "Now send dir: " << ctx->src;
         } else if (ctx->type == proto::FileType::Symlink) {
           LOG(INFO) << "Now send symlink: " << ctx->src;
+          sync_ctx->syncd_file_success_cnt.fetch_add(1);
         }
         write_done_.store(false);
         StartWrite(&req_);
@@ -323,7 +344,7 @@ class FileClient
       } else {
         LOG(ERROR) << "Send file: " << ctx->src << " error";
       }
-      send_file_num_.fetch_add(1);
+      sync_ctx->syncd_file_success_cnt.fetch_add(1);
       send_ctx_map_.erase(req_.uuid());
     }
     send_task_stopped_ = true;
@@ -333,15 +354,15 @@ class FileClient
   void Print() {
     print_task_stopped_ = false;
     while (!done_) {
-      LOG(INFO) << "Queue size: " << Size() << ", send num: " << send_num_
+      LOG(INFO) << "Queue size: " << Size()
                 << ", onfly_req_num: " << onfly_req_num_
-                << ", send file num: " << send_file_num_;
+                << ", send file num: " << sync_ctx->syncd_file_success_cnt;
       util::Util::Sleep(1000);
     }
 
-    LOG(INFO) << "Queue size: " << Size() << ", send num: " << send_num_
+    LOG(INFO) << "Queue size: " << Size()
               << ", onfly_req_num: " << onfly_req_num_
-              << ", send file num: " << send_file_num_;
+              << ", send file num: " << sync_ctx->syncd_file_success_cnt;
     print_task_stopped_ = true;
   }
 
@@ -353,6 +374,8 @@ class FileClient
   bool done_ = false;
   grpc::ClientContext context_;
   std::vector<char> buffer_;
+  std::thread task_;
+  std::thread print_task_;
 
  private:
   proto::FileReq req_;
@@ -368,11 +391,9 @@ class FileClient
   std::mutex mu_;
   std::condition_variable cv_;
 
-  mutable absl::base_internal::SpinLock lock_;
-  std::atomic<int32_t> send_num_ = 0;
-  std::atomic<int32_t> send_file_num_ = 0;
-  common::BlockingQueue<common::SendContext*> send_queue_;
-  std::unordered_map<std::string, common::SendContext*> send_ctx_map_;
+  common::BlockingQueue<std::shared_ptr<common::SendContext>> send_queue_;
+  std::unordered_map<std::string, std::shared_ptr<common::SendContext>>
+      send_ctx_map_;
   bool send_task_stopped_ = false;
   bool print_task_stopped_ = false;
   bool fill_queue_complete_ = false;

@@ -9,6 +9,12 @@
 * public and private ip address, mac address, system info
 * fix self defined toolchain compitible problem with refresh_compile_commands
 
+// TODO(xieyz) add full unit_test
+// TODO(xieyz) dump to disk only file or dir change count over 10 thousand
+// TODO(xieyz) use multiple cache bucket
+// TODO(xieyz) keep user and group
+// TODO(xieyz) sync don't use MurmurHash64A to split thread files;
+// TODO(xieyz) fix scan remove files num
 
 # final TODO
 * kill syncthing

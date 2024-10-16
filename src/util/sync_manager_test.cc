@@ -48,7 +48,7 @@ TEST(SyncManager, SyncRemote) {
   ThreadPool::Instance()->Init();
   std::string src("/usr/local/test_src");
   std::string dst("/tmp/test_dst");
-  common::SyncContext sync_ctx(1);
+  common::SyncContext sync_ctx(4);
   sync_ctx.src = src;
   sync_ctx.dst = dst;
   sync_ctx.hash_method = common::HashMethod::Hash_NONE;

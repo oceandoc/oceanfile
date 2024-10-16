@@ -24,10 +24,6 @@
 #include "src/util/thread_pool.h"
 #include "src/util/util.h"
 
-// TODO(xieyz) add full unit_test
-// TODO(xieyz) dump to disk only file or dir change count over 10 thousand
-// TODO(xieyz) use multiple cache bucket
-
 namespace oceandoc {
 namespace util {
 

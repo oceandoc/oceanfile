@@ -6,6 +6,7 @@
 #include "src/util/sync_manager.h"
 
 #include <filesystem>
+#include <memory>
 
 #include "src/client/grpc_client/grpc_file_client.h"
 #include "src/common/defs.h"
@@ -62,24 +63,157 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
   return Util::WriteToFile(req.dst(), req.content(), start);
 }
 
+int32_t SyncManager::SyncRemoteRecursive(common::SyncContext* sync_ctx) {
+  auto ret = ValidateRemoteSyncParameters(sync_ctx);
+  if (ret) {
+    sync_ctx->err_code = ret;
+    return ret;
+  }
+
+  sync_ctx->Reset();
+
+  LOG(INFO) << "Now sync remote " << sync_ctx->src
+            << " host: " << sync_ctx->remote_addr << ", dir: " << sync_ctx->dst;
+
+  syncing_.fetch_add(1);
+  client::FileClient file_client(sync_ctx);
+  file_client.Start();
+
+  sync_ctx->dir_queue.PushBack(sync_ctx->src);
+  for (int32_t i = 0; i < sync_ctx->max_threads; ++i) {
+    sync_ctx->running_mark.fetch_or(1ULL << i);
+    auto task =
+        std::bind(&SyncManager::RecursiveRemoteSyncWorker, this, i, sync_ctx);
+    ThreadPool::Instance()->Post(task);
+  }
+
+  while (sync_ctx->running_mark) {
+    for (int32_t i = 0; i < sync_ctx->max_threads; ++i) {
+      if (sync_ctx->running_mark & (1ULL << i)) {
+        continue;
+      }
+
+      Util::Sleep(1000);
+      if (sync_ctx->dir_queue.Size() <= 0) {
+        continue;
+      }
+
+      sync_ctx->running_mark.fetch_or(1ULL << i);
+      auto task =
+          std::bind(&SyncManager::RecursiveLocalSyncWorker, this, i, sync_ctx);
+      ThreadPool::Instance()->Post(task);
+    }
+    Util::Sleep(1000);
+  }
+
+  file_client.Await();
+  syncing_.fetch_sub(1);
+
+  if (sync_ctx->err_code == Err_Success) {
+    LOG(INFO) << "Sync success";
+    return Err_Success;
+  }
+
+  LOG(INFO) << "Sync exists error";
+  return Err_Fail;
+}
+
+void SyncManager::RecursiveRemoteSyncWorker(const int32_t thread_no,
+                                            common::SyncContext* sync_ctx) {
+  LOG(INFO) << "Thread " << thread_no << " for sync " << sync_ctx->src
+            << " running";
+  client::FileClient file_client(sync_ctx);
+  file_client.Start();
+  while (true) {
+    if (stop_.load()) {
+      sync_ctx->err_code = Err_Sync_interrupted;
+      break;
+    }
+
+    std::string cur_dir;
+    int try_times = 0;
+    while (try_times < 3 && !sync_ctx->dir_queue.PopBack(&cur_dir)) {
+      Util::Sleep(100);
+      ++try_times;
+    }
+
+    if (try_times >= 3) {
+      break;
+    }
+
+    std::string relative_path;
+    Util::Relative(cur_dir, sync_ctx->src, &relative_path);
+    auto it = sync_ctx->ignored_dirs.find(relative_path);
+    if (it != sync_ctx->ignored_dirs.end()) {
+      continue;
+    }
+
+    if (!Util::Exists(cur_dir)) {
+      continue;
+    }
+
+    while (file_client.Size() > 1000) {
+      Util::Sleep(1000);
+    }
+
+    sync_ctx->total_dir_cnt.fetch_add(1);
+    const auto& dst_dir = sync_ctx->dst + "/" + relative_path;
+    try {
+      for (const auto& entry : std::filesystem::directory_iterator(cur_dir)) {
+        if (entry.is_directory() && !entry.is_symlink()) {
+          sync_ctx->dir_queue.PushBack(entry.path().string());
+          std::shared_ptr<common::SendContext> dir_send_ctx =
+              std::make_shared<common::SendContext>();
+          dir_send_ctx->src = cur_dir;
+          dir_send_ctx->dst = dst_dir;
+          dir_send_ctx->type = proto::FileType::Dir;
+          dir_send_ctx->op = proto::FileOp::FileExists;
+          file_client.Put(dir_send_ctx);
+          continue;
+        }
+
+        sync_ctx->total_file_cnt.fetch_add(1);
+        const auto& filename = entry.path().filename().string();
+        const auto& file_src_path = cur_dir + "/" + filename;
+        const auto& file_dst_path =
+            sync_ctx->dst + "/" + relative_path + "/" + filename;
+
+        std::shared_ptr<common::SendContext> file_send_ctx =
+            std::make_shared<common::SendContext>();
+        file_send_ctx->src = file_src_path;
+        file_send_ctx->dst = file_dst_path;
+        file_send_ctx->op = proto::FileOp::FileExists;
+        if (entry.is_symlink()) {
+          file_send_ctx->type = proto::FileType::Symlink;
+          if (!Util::SyncRemoteSymlink(cur_dir, file_src_path,
+                                       &file_send_ctx->content)) {
+            LOG(ERROR) << "Get " << file_dst_path << " target error";
+            continue;
+          }
+        } else if (entry.is_regular_file()) {
+          file_send_ctx->type = proto::FileType::Regular;
+        }
+
+        file_client.Put(file_send_ctx);
+      }
+    } catch (const std::filesystem::filesystem_error& e) {
+      LOG(ERROR) << "Scan error: " << cur_dir << ", exception: " << e.what();
+    }
+  }
+  file_client.SetFillQueueComplete();
+  file_client.Await();
+  sync_ctx->running_mark.fetch_and(~(1ULL << thread_no));
+  LOG(INFO) << "Thread " << thread_no << " for sync " << sync_ctx->src
+            << " exist";
+}
+
 int32_t SyncManager::SyncRemote(common::SyncContext* sync_ctx) {
-  if (!Util::IsAbsolute(sync_ctx->src) || !Util::IsAbsolute(sync_ctx->dst)) {
-    LOG(ERROR) << "Path must be absolute";
-    return Err_Path_not_absolute;
+  auto ret = ValidateRemoteSyncParameters(sync_ctx);
+  if (ret) {
+    sync_ctx->err_code = ret;
+    return ret;
   }
 
-  Util::UnifyDir(&sync_ctx->src);
-  Util::UnifyDir(&sync_ctx->dst);
-
-  if (!Util::Exists(sync_ctx->src)) {
-    LOG(ERROR) << "Src or dst not exists";
-    return Err_Path_not_exists;
-  }
-
-  if (!std::filesystem::is_directory(sync_ctx->src)) {
-    LOG(ERROR) << "Src or dst not dir";
-    return Err_Path_not_dir;
-  }
   sync_ctx->Reset();
 
   proto::ScanStatus scan_status;
@@ -94,18 +228,22 @@ int32_t SyncManager::SyncRemote(common::SyncContext* sync_ctx) {
   scan_ctx.skip_scan = sync_ctx->skip_scan;
   sync_ctx->scan_ctx = &scan_ctx;
 
-  auto ret = ScanManager::Instance()->ParallelScan(&scan_ctx);
+  ret = ScanManager::Instance()->ParallelScan(&scan_ctx);
   if (ret) {
     LOG(ERROR) << "Scan " << sync_ctx->src << " error";
     return ret;
   }
 
-  LOG(INFO) << "Now sync " << scan_ctx.src << " to " << scan_ctx.dst;
+  sync_ctx->total_dir_cnt = scan_status.scanned_dirs_size();
+  sync_ctx->total_file_cnt = scan_status.file_num() + scan_status.symlink_num();
+
+  LOG(INFO) << "Now sync remote " << sync_ctx->src
+            << " host: " << sync_ctx->remote_addr << ", dir: " << sync_ctx->dst;
   LOG(INFO) << "Memory usage: " << Util::MemUsage() << "MB";
   syncing_.fetch_add(1);
 
   std::vector<std::future<void>> rets;
-  for (int i = 0; i < sync_ctx->max_threads; ++i) {
+  for (int32_t i = 0; i < sync_ctx->max_threads; ++i) {
     std::packaged_task<void()> task(
         std::bind(&SyncManager::RemoteSyncWorker, this, i, sync_ctx));
     rets.emplace_back(task.get_future());
@@ -119,19 +257,27 @@ int32_t SyncManager::SyncRemote(common::SyncContext* sync_ctx) {
   sync_ctx->cond_var.notify_all();
   syncing_.fetch_sub(1);
 
-  for (const auto& file : sync_ctx->copy_failed_files) {
-    LOG(ERROR) << file << " sync failed";
+  if (sync_ctx->err_code == Err_Success) {
+    LOG(INFO) << "Sync success";
+    return Err_Success;
   }
-  LOG(INFO) << "Sync finished";
-  return Err_Fail;
+
+  LOG(ERROR) << "Sync exists error";
+  return sync_ctx->err_code;
 }
 
 void SyncManager::RemoteSyncWorker(const int32_t thread_no,
                                    common::SyncContext* sync_ctx) {
+  LOG(INFO) << "Thread " << thread_no << " for sync " << sync_ctx->src
+            << " running";
   client::FileClient file_client(sync_ctx);
   file_client.Start();
-
   for (const auto& d : sync_ctx->scan_ctx->status->scanned_dirs()) {
+    if (stop_.load()) {
+      sync_ctx->err_code = Err_Sync_interrupted;
+      break;
+    }
+
     auto hash = std::abs(Util::MurmurHash64A(d.first));
     if ((hash % sync_ctx->max_threads) != thread_no) {
       continue;
@@ -158,7 +304,8 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
       LOG(ERROR) << dir_src_path << " is symlink";
     }
 
-    common::SendContext* dir_send_ctx = new common::SendContext();
+    std::shared_ptr<common::SendContext> dir_send_ctx =
+        std::make_shared<common::SendContext>();
     dir_send_ctx->src = dir_src_path;
     dir_send_ctx->dst = dir_dst_path;
     dir_send_ctx->type = proto::FileType::Dir;
@@ -174,7 +321,8 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
         continue;
       }
 
-      common::SendContext* file_send_ctx = new common::SendContext();
+      std::shared_ptr<common::SendContext> file_send_ctx =
+          std::make_shared<common::SendContext>();
       file_send_ctx->src = file_src_path;
       file_send_ctx->dst = file_dst_path;
       file_send_ctx->type = f.second.file_type();
@@ -192,6 +340,8 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
   }
   file_client.SetFillQueueComplete();
   file_client.Await();
+  LOG(INFO) << "Thread " << thread_no << " for sync " << sync_ctx->src
+            << " exist";
 }
 
 }  // namespace util

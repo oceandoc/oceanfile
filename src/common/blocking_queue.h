@@ -27,7 +27,7 @@ class BlockingQueue {
   void PushBack(const T& t) {
     std::unique_lock<std::mutex> lock(mu_);
     queue_.emplace_back(t);
-    cv_.notify_one();
+    cv_.notify_all();
   }
 
   bool PopBack(T* t) {

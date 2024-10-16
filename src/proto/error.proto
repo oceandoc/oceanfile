@@ -27,6 +27,7 @@ enum ErrCode {
   File_crc32_calc_error = 11008;
   File_blake3_calc_error = 11009;
   File_type_mismatch = 11010;
+  File_copy_error = 11011;
 
   // 12000
   Scan_error = 12001;
@@ -41,4 +42,7 @@ enum ErrCode {
 
   // 14000
   Serialize_error = 14000;
+
+  // 15000
+  Sync_interrupted = 15000;
 }
