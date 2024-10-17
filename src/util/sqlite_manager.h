@@ -45,6 +45,25 @@ class SqliteManager final {
       return false;
     }
 
+    sqlite3_stmt* stmt = nullptr;
+    auto ret = util::SqliteManager::Instance()->PrepareStatement(
+        "INSERT OR IGNORE INTO users (username, salt, password) VALUES (?, ?);",
+        stmt);
+    if (ret) {
+      LOG(ERROR) << "Init admin prepare error";
+      return false;
+    }
+
+    sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, "admin", -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, "admin", -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+      LOG(ERROR) << "Init admin execute error";
+      sqlite3_finalize(stmt);
+      return false;
+    }
+    sqlite3_finalize(stmt);
     return true;
   }
 

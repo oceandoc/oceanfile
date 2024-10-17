@@ -16,6 +16,7 @@ message FileItem {
   string user = 5;
   string group = 6;
   string hash = 7;
+  repeated string visible_users = 8;
 }
 
 message DirItem {
@@ -24,6 +25,7 @@ message DirItem {
   string user = 3;
   string group = 4;
   map<string, FileItem> files = 5;  // key is filename relative to path
+  repeated string visible_users = 6;
 }
 
 message ScanStatus {
@@ -45,6 +47,16 @@ enum RepoType {
   RT_Ocean = 3;
 }
 
+message RepoData {
+  string name = 1;
+  string path = 2;
+  string uuid = 3;
+  string location_uuid = 4;
+  uint64 file_num = 5;
+  uint64 symlink_num = 6;
+  map<string, DirItem> dirs = 7;
+}
+
 message RepoMeta {
   string name = 1;
   string path = 2;
@@ -54,19 +66,6 @@ message RepoMeta {
   int64 update_time = 6;
 }
 
-message RepoData {
-  string name = 1;
-  string path = 2;
-  string uuid = 3;
-  uint64 file_num = 4;
-  repeated DirItem dirs = 6;
-}
-
 message Repos {
   map<string, RepoMeta> repos = 1;
-  map<string, RepoMeta> uuid_repos = 2;
-}
-
-message RepoDatas {
-  map<string, RepoData> uuid_repos_data = 1;
 }

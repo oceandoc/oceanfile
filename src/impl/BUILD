@@ -163,3 +163,12 @@ cc_test(
     local_defines = LOCAL_DEFINES,
     deps = [":scan_manager"],
 )
+
+cc_test(
+    name = "user_manager_test",
+    srcs = ["user_manager_test.cc"],
+    copts = COPTS,
+    data = ["//conf:base_config.json"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":user_manager"],
+)

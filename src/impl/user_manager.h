@@ -42,7 +42,7 @@ class UserManager final {
     cv_.notify_all();
   }
 
-  int32_t RegisterUser(const std::string& username, const std::string& password,
+  int32_t UserRegister(const std::string& user, const std::string& password,
                        std::string* token) {
     std::string salt = util::Util::GenerateSalt();
     std::string passwd_hash;
@@ -52,33 +52,29 @@ class UserManager final {
     }
 
     sqlite3_stmt* stmt = nullptr;
-    util::SqliteManager::Instance()->PrepareStatement(
-        "INSERT INTO users (username, salt, password) VALUES (?, ?, ?);", stmt);
-    if (!stmt) {
-      return Err_Sql_prepare_error;
+    auto ret = util::SqliteManager::Instance()->PrepareStatement(
+        "INSERT INTO users (user, salt, password) VALUES (?, ?, ?);", stmt);
+    if (ret) {
+      return Err_User_register_prepare_error;
     }
 
-    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_STATIC);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
       sqlite3_finalize(stmt);
-      return Err_Sql_execute_error;
+      return Err_User_register_execute_error;
     }
     sqlite3_finalize(stmt);
 
-    *token = SessionManager::Instance()->GenerateToken(username);
+    *token = SessionManager::Instance()->GenerateToken(user);
     return Err_Success;
   }
 
-  int32_t DeleteUser(const std::string& to_delete_user,
+  int32_t UserDelete(const std::string& login_user,
+                     const std::string& to_delete_user,
                      const std::string& token) {
-    std::string login_user;
-    if (!SessionManager::Instance()->ValidateSession(token, &login_user)) {
-      return Err_User_session_error;
-    }
-
     if (to_delete_user == "admin") {
       LOG(ERROR) << "Cannot delete admin";
       return Err_User_invalid_name;
@@ -86,20 +82,15 @@ class UserManager final {
 
     if (login_user == "admin" || login_user == to_delete_user) {
       sqlite3_stmt* stmt = nullptr;
-      util::SqliteManager::Instance()->PrepareStatement(
-          "INSERT INTO users (username, salt, password) VALUES (?, ?, ?);",
-          stmt);
-      if (!stmt) {
-        return Err_Sql_prepare_error;
+      auto ret = util::SqliteManager::Instance()->PrepareStatement(
+          "DELETE FROM users WHERE user = ?;", stmt);
+      if (ret) {
+        return Err_User_delete_prepare_error;
       }
-
-      // sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_STATIC);
-      // sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_STATIC);
-      // sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_STATIC);
-
+      sqlite3_bind_text(stmt, 1, to_delete_user.c_str(), -1, SQLITE_STATIC);
       if (sqlite3_step(stmt) != SQLITE_DONE) {
         sqlite3_finalize(stmt);
-        return Err_Sql_execute_error;
+        return Err_User_delete_execute_error;
       }
       SessionManager::Instance()->KickoutByToken(token);
       sqlite3_finalize(stmt);
@@ -107,16 +98,16 @@ class UserManager final {
     return Err_User_invalid_name;
   }
 
-  bool LoginUser(const std::string& username, const std::string& password,
-                 std::string* token) {
+  int32_t UserLogin(const std::string& user, const std::string& password,
+                    std::string* token) {
     sqlite3_stmt* stmt = nullptr;
     util::SqliteManager::Instance()->PrepareStatement(
-        "SELECT salt, password FROM users WHERE username = ?;", stmt);
+        "SELECT salt, password FROM users WHERE user = ?;", stmt);
     if (!stmt) {
-      return Err_Sql_prepare_error;
+      return Err_User_login_prepare_error;
     }
 
-    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
       std::string stored_salt =
@@ -127,7 +118,7 @@ class UserManager final {
 
       if (util::Util::VerifyPassword(password, stored_salt,
                                      stored_hashed_password)) {
-        *token = SessionManager::Instance()->GenerateToken(username);
+        *token = SessionManager::Instance()->GenerateToken(user);
         return Err_Success;
       } else {
         return Err_User_invalid_passwd;
@@ -136,6 +127,55 @@ class UserManager final {
 
     sqlite3_finalize(stmt);
     return Err_User_invalid_name;
+  }
+
+  int32_t UserExists(const std::string& user) {
+    sqlite3_stmt* stmt = nullptr;
+    util::SqliteManager::Instance()->PrepareStatement(
+        "SELECT salt, password FROM users WHERE user = ?;", stmt);
+    if (!stmt) {
+      return Err_User_exists_prepare_error;
+    }
+
+    sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+      sqlite3_finalize(stmt);
+      return Err_User_exists;
+    }
+
+    sqlite3_finalize(stmt);
+    return Err_User_not_exists;
+  }
+
+  int32_t ChangePassword(const std::string& user, const std::string& password,
+                         std::string* token) {
+    std::string salt = util::Util::GenerateSalt();
+    std::string passwd_hash;
+    std::string hashed_password;
+    if (!util::Util::HashPassword(password, salt, &hashed_password)) {
+      return Err_User_change_password_error;
+    }
+
+    sqlite3_stmt* stmt = nullptr;
+    auto ret = util::SqliteManager::Instance()->PrepareStatement(
+        "UPDATE users SET salt = ?, password = ? WHERE user = ?;", stmt);
+    if (ret) {
+      return Err_User_change_password_error;
+    }
+
+    sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+      sqlite3_finalize(stmt);
+      return Err_User_change_password_error;
+    }
+    sqlite3_finalize(stmt);
+
+    *token = SessionManager::Instance()->GenerateToken(user);
+    return Err_Success;
   }
 
  private:
