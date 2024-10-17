@@ -7,7 +7,7 @@
 
 #include "folly/init/Init.h"
 #include "glog/logging.h"
-#include "src/util/scan_manager.h"
+#include "src/impl/scan_manager.h"
 
 int main(int argc, char** argv) {
   folly::Init init(&argc, &argv, false);
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
 
   LOG(INFO) << "Now validate: " << ctx.src;
 
-  oceandoc::util::ScanManager::Instance()->ValidateScanStatus(&ctx);
+  oceandoc::impl::ScanManager::Instance()->ValidateScanStatus(&ctx);
 
   const int32_t max_threads = 4;
   for (const auto& d : ctx.status->scanned_dirs()) {

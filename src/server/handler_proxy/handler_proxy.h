@@ -8,10 +8,10 @@
 
 #include <filesystem>
 
+#include "src/impl/receive_queue_manager.h"
+#include "src/impl/repo_manager.h"
+#include "src/impl/sync_manager.h"
 #include "src/proto/service.pb.h"
-#include "src/util/receive_queue_manager.h"
-#include "src/util/repo_manager.h"
-#include "src/util/sync_manager.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -31,17 +31,17 @@ class HandlerProxy {
         ret = Err_Repo_uuid_error;
         LOG(ERROR) << "Repo uuid empty";
       } else {
-        ret = util::RepoManager::Instance()->WriteToFile(req);
-        util::ReceiveQueueManager::Instance()->Put(req);
+        ret = impl::RepoManager::Instance()->WriteToFile(req);
+        impl::ReceiveQueueManager::Instance()->Put(req);
       }
     } else if (req.repo_type() == proto::RepoType::RT_Remote) {
-      ret = util::SyncManager::Instance()->WriteToFile(req);
+      ret = impl::SyncManager::Instance()->WriteToFile(req);
       if (ret) {
         LOG(ERROR) << "Store part error, "
                    << "path: " << req.dst()
                    << ", part: " << req.partition_num();
       } else {
-        util::ReceiveQueueManager::Instance()->Put(req);
+        impl::ReceiveQueueManager::Instance()->Put(req);
       }
     } else {
       LOG(ERROR) << "Unsupported repo type";

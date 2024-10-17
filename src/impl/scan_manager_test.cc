@@ -3,7 +3,7 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/util/scan_manager.h"
+#include "src/impl/scan_manager.h"
 
 #include <sstream>
 
@@ -11,11 +11,11 @@
 #include "src/common/defs.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 TEST(ScanManager, GenFileName) {
-  ConfigManager::Instance()->Init("./conf/base_config.json");
-  ThreadPool::Instance()->Init();
+  util::ConfigManager::Instance()->Init("./conf/base_config.json");
+  util::ThreadPool::Instance()->Init();
   EXPECT_EQ(ScanManager::Instance()->GenFileName("/usr/local/test_src"),
             "/usr/local/test_src/.Dr.Q.config/"
             "d210d7935537d87080626ecd439374bccd7524dbd18e0b4a379a3fce0866cc08");
@@ -54,13 +54,13 @@ std::string PrintScanStatus(const proto::ScanStatus& status) {
 }
 
 TEST(ScanManager, ParallelScan) {
-  ConfigManager::Instance()->Init("./conf/base_config.json");
-  ThreadPool::Instance()->Init();
+  util::ConfigManager::Instance()->Init("./conf/base_config.json");
+  util::ThreadPool::Instance()->Init();
 
   std::string path = "test_data/util_test/test_scan";
 
-  auto runfile_dir = Util::GetEnv("TEST_SRCDIR");
-  auto workspace_name = Util::GetEnv("TEST_WORKSPACE");
+  auto runfile_dir = util::Util::GetEnv("TEST_SRCDIR");
+  auto workspace_name = util::Util::GetEnv("TEST_WORKSPACE");
   std::string final_path;
   if (runfile_dir.has_value()) {
     final_path = std::string(*runfile_dir) + "/" +
@@ -68,7 +68,7 @@ TEST(ScanManager, ParallelScan) {
   }
 
   LOG(INFO) << final_path;
-  EXPECT_EQ(Util::Create(final_path + "/xiedeacc.txt"), true);
+  EXPECT_EQ(util::Util::Create(final_path + "/xiedeacc.txt"), true);
 
   proto::ScanStatus scan_status;
   scan_status.set_path(path);
@@ -88,9 +88,11 @@ TEST(ScanManager, ParallelScan) {
   scan_status.Clear();
   scan_status.set_path(path);
   ctx.src = final_path;
-  EXPECT_EQ(Util::Mkdir(final_path + "/test_dir1/test_dir2/test_dir3"), true);
-  EXPECT_EQ(Util::Create(final_path + "/test_dir1/test_dir2/test_dir3/txt"),
+  EXPECT_EQ(util::Util::Mkdir(final_path + "/test_dir1/test_dir2/test_dir3"),
             true);
+  EXPECT_EQ(
+      util::Util::Create(final_path + "/test_dir1/test_dir2/test_dir3/txt"),
+      true);
   EXPECT_EQ(ScanManager::Instance()->ParallelScan(&ctx), Err_Success);
   LOG(INFO) << PrintScanStatus(scan_status);
   EXPECT_EQ(scan_status.scanned_dirs().size(), 5);  // add .Dr.Q.config
@@ -101,7 +103,8 @@ TEST(ScanManager, ParallelScan) {
   scan_status.Clear();
   scan_status.set_path(path);
   ctx.src = final_path;
-  EXPECT_EQ(Util::Remove(final_path + "/test_dir1/test_dir2/test_dir3"), true);
+  EXPECT_EQ(util::Util::Remove(final_path + "/test_dir1/test_dir2/test_dir3"),
+            true);
   EXPECT_EQ(ScanManager::Instance()->ParallelScan(&ctx), Err_Success);
   LOG(INFO) << PrintScanStatus(scan_status);
   EXPECT_EQ(scan_status.scanned_dirs().size(), 4);  // add .Dr.Q.config
@@ -110,5 +113,5 @@ TEST(ScanManager, ParallelScan) {
   EXPECT_EQ(ctx.removed_files.size(), 2);
 }
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc

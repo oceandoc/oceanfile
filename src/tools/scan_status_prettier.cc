@@ -7,7 +7,7 @@
 
 #include "folly/init/Init.h"
 #include "glog/logging.h"
-#include "src/util/scan_manager.h"
+#include "src/impl/scan_manager.h"
 #include "src/util/util.h"
 
 int main(int argc, char** argv) {
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
   ctx.status = &scan_status;
 
   LOG(INFO) << "Now pretty: " << ctx.src;
-  oceandoc::util::ScanManager::Instance()->LoadCachedScanStatus(&ctx);
+  oceandoc::impl::ScanManager::Instance()->LoadCachedScanStatus(&ctx);
   std::string json;
   oceandoc::util::Util::MessageToPrettyJson(scan_status, &json);
   oceandoc::util::Util::WriteToFile("./data/pretty.json", json, false);

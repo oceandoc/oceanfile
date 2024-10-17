@@ -7,9 +7,9 @@
 #define BAZEL_TEMPLATE_SERVER_GRPC_HANDLERS_REPO_HANDLER_H
 
 #include "src/async_grpc/rpc_handler.h"
+#include "src/impl/repo_manager.h"
 #include "src/proto/service.pb.h"
 #include "src/server/grpc_handler/meta.h"
-#include "src/util/repo_manager.h"
 
 namespace oceandoc {
 namespace server {
@@ -23,7 +23,7 @@ class RepoHandler : public async_grpc::RpcHandler<RepoOpMethod> {
     bool ret = true;
     switch (req.op()) {
       case proto::RepoOp::RepoCreate:
-        ret = util::RepoManager::Instance()->CreateRepo(req.path(), &uuid);
+        ret = impl::RepoManager::Instance()->CreateRepo(req.path(), &uuid);
         break;
       default:
         LOG(ERROR) << "Unsupported operation";

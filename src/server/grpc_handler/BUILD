@@ -73,9 +73,9 @@ cc_library(
     local_defines = LOCAL_DEFINES,
     deps = [
         "//src/async_grpc",
+        "//src/impl:repo_manager",
         "//src/proto:cc_grpc_service",
         "//src/server/handler_proxy",
         "//src/util",
-        "//src/util:repo_manager",
     ],
 )

@@ -3,8 +3,8 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_UTIL_SCAN_MANAGER_H
-#define BAZEL_TEMPLATE_UTIL_SCAN_MANAGER_H
+#ifndef BAZEL_TEMPLATE_IMPL_SCAN_MANAGER_H
+#define BAZEL_TEMPLATE_IMPL_SCAN_MANAGER_H
 
 #include <cstdlib>
 #include <filesystem>
@@ -25,7 +25,7 @@
 #include "src/util/util.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 class ScanManager {
  private:
@@ -38,19 +38,19 @@ class ScanManager {
   bool Init() { return true; }
 
   std::string GenFileName(const std::string& path) {
-    return path + "/" + common::CONFIG_DIR + "/" + Util::SHA256(path);
+    return path + "/" + common::CONFIG_DIR + "/" + util::Util::SHA256(path);
   }
 
   bool LoadCachedScanStatus(common::ScanContext* ctx) {
     const std::string& cached_status_path = GenFileName(ctx->src);
-    if (!Util::Exists(cached_status_path)) {
+    if (!util::Util::Exists(cached_status_path)) {
       LOG(INFO) << cached_status_path << " not exists";
       return false;
     }
 
     std::string content, decompressed_content;
-    if (Util::LoadSmallFile(cached_status_path, &content)) {
-      if (!Util::LZMADecompress(content, &decompressed_content)) {
+    if (util::Util::LoadSmallFile(cached_status_path, &content)) {
+      if (!util::Util::LZMADecompress(content, &decompressed_content)) {
         LOG(ERROR) << "Decomppress error: " << cached_status_path;
         return false;
       }
@@ -72,7 +72,7 @@ class ScanManager {
 
   bool ValidateScanStatus(common::ScanContext* ctx) {
     const auto& path = ctx->src;
-    if (!Util::Exists(path)) {
+    if (!util::Util::Exists(path)) {
       LOG(ERROR) << path << " not exists";
       return false;
     }
@@ -95,7 +95,7 @@ class ScanManager {
         return false;
       }
 
-      if (Util::IsAbsolute(p.first)) {
+      if (util::Util::IsAbsolute(p.first)) {
         LOG(ERROR) << "Path should be relative: " << p.first;
         return false;
       }
@@ -143,13 +143,13 @@ class ScanManager {
     {
       absl::base_internal::SpinLockHolder locker(&ctx->lock);
       if (ctx->status->uuid().empty()) {
-        ctx->status->set_uuid(Util::UUID());
+        ctx->status->set_uuid(util::Util::UUID());
       }
     }
 
     bool cp_ret = true;
-    if (Util::Exists(path)) {
-      cp_ret = Util::CopyFile(path, path + ".tmp");
+    if (util::Util::Exists(path)) {
+      cp_ret = util::Util::CopyFile(path, path + ".tmp");
     }
 
     std::string content, compressed_content;
@@ -161,33 +161,35 @@ class ScanManager {
         return Err_Serialize_error;
       }
     }
-    Util::LZMACompress(content, &compressed_content);
-    if (Util::WriteToFile(path, compressed_content, false) == Err_Success ||
-        Util::WriteToFile(path, compressed_content, false) == Err_Success) {
+    util::Util::LZMACompress(content, &compressed_content);
+    if (util::Util::WriteToFile(path, compressed_content, false) ==
+            Err_Success ||
+        util::Util::WriteToFile(path, compressed_content, false) ==
+            Err_Success) {
       LOG(INFO) << "Dump success: " << Print(*ctx);
       return Err_Success;
     }
     LOG(ERROR) << "Dump failed";
     if (cp_ret) {
-      Util::CopyFile(path + ".tmp", path);
+      util::Util::CopyFile(path + ".tmp", path);
     }
     return Err_Scan_dump_error;
   }
 
   void DumpTask(common::ScanContext* ctx) {
-    int64_t last_time = Util::CurrentTimeMillis();
+    int64_t last_time = util::Util::CurrentTimeMillis();
     while (!(ctx->stop_dump_task)) {
       std::unique_lock<std::mutex> lock(ctx->mu);
       if (ctx->cond_var.wait_for(lock, std::chrono::seconds(10),
                                  [ctx] { return ctx->stop_dump_task; })) {
         break;
       }
-      int64_t cur_time = Util::CurrentTimeMillis();
+      int64_t cur_time = util::Util::CurrentTimeMillis();
       if (cur_time - last_time > 10 * 60 * 1000) {
         Dump(ctx);
-        last_time = Util::CurrentTimeMillis();
+        last_time = util::Util::CurrentTimeMillis();
       }
-      LOG(INFO) << "Resident memory usage: " << Util::MemUsage()
+      LOG(INFO) << "Resident memory usage: " << util::Util::MemUsage()
                 << "MB, scanned dir num: " << ctx->scanned_dir_num
                 << ", skip dir num: " << ctx->skip_dir_num;
     }
@@ -197,7 +199,7 @@ class ScanManager {
   void Stop() {
     stop_.store(true);
     while (scanning_.load() > 0) {
-      Util::Sleep(1000);
+      util::Util::Sleep(1000);
     }
   }
 
@@ -219,8 +221,9 @@ class ScanManager {
     dir_item.set_path(relative_path);
 
     int64_t update_time = 0, size = 0;
-    if (!Util::FileInfo(path, &update_time, &size, dir_item.mutable_user(),
-                        dir_item.mutable_group())) {
+    if (!util::Util::FileInfo(path, &update_time, &size,
+                              dir_item.mutable_user(),
+                              dir_item.mutable_group())) {
       LOG(ERROR) << "FileInfo error: " << path;
       return Err_File_permission_or_not_exists;
     }
@@ -241,15 +244,15 @@ class ScanManager {
   int32_t CalcHash(const std::string& path, common::ScanContext* ctx,
                    proto::FileItem* file_item) {
     if (ctx->hash_method == common::HashMethod::Hash_SHA256) {
-      if (!Util::FileSHA256(path, file_item->mutable_hash())) {
+      if (!util::Util::FileSHA256(path, file_item->mutable_hash())) {
         return Err_File_hash_calc_error;
       }
     } else if (ctx->hash_method == common::HashMethod::Hash_MD5) {
-      if (!Util::FileMD5(path, file_item->mutable_hash())) {
+      if (!util::Util::FileMD5(path, file_item->mutable_hash())) {
         return Err_File_hash_calc_error;
       }
     } else if (ctx->hash_method == common::HashMethod::Hash_CRC32) {
-      if (!Util::FileMD5(path, file_item->mutable_hash())) {
+      if (!util::Util::FileMD5(path, file_item->mutable_hash())) {
         return Err_File_hash_calc_error;
       }
     }
@@ -263,8 +266,9 @@ class ScanManager {
     proto::FileItem file_item;
     file_item.set_filename(filename);
     int64_t update_time = 0, size = 0;
-    if (!Util::FileInfo(path, &update_time, &size, file_item.mutable_user(),
-                        file_item.mutable_group())) {
+    if (!util::Util::FileInfo(path, &update_time, &size,
+                              file_item.mutable_user(),
+                              file_item.mutable_group())) {
       LOG(ERROR) << "FileInfo error: " << path;
       return Err_File_permission_or_not_exists;
     }
@@ -339,7 +343,7 @@ class ScanManager {
   }
 
   int32_t ParallelScan(common::ScanContext* ctx) {
-    if (!Util::Exists(ctx->src)) {
+    if (!util::Util::Exists(ctx->src)) {
       LOG(ERROR) << ctx->src << " not exists";
       return Err_Path_not_exists;
     }
@@ -375,12 +379,12 @@ class ScanManager {
     }
 
     auto dump_task = std::bind(&ScanManager::DumpTask, this, ctx);
-    ThreadPool::Instance()->Post(dump_task);
+    util::ThreadPool::Instance()->Post(dump_task);
 
     for (int32_t i = 0; i < ctx->max_threads; ++i) {
       ctx->running_mark.fetch_or(1ULL << i);
       auto task = std::bind(&ScanManager::ParallelFullScan, this, i, ctx);
-      ThreadPool::Instance()->Post(task);
+      util::ThreadPool::Instance()->Post(task);
     }
 
     while (ctx->running_mark) {
@@ -388,15 +392,15 @@ class ScanManager {
         if (ctx->running_mark & (1ULL << i)) {
           continue;
         }
-        Util::Sleep(1000);
+        util::Util::Sleep(1000);
         if (ctx->dir_queue.Size() <= 0) {
           break;
         }
         ctx->running_mark.fetch_or(1ULL << i);
         auto task = std::bind(&ScanManager::ParallelFullScan, this, i, ctx);
-        ThreadPool::Instance()->Post(task);
+        util::ThreadPool::Instance()->Post(task);
       }
-      Util::Sleep(1000);
+      util::Util::Sleep(1000);
     }
 
     ctx->stop_dump_task = true;
@@ -407,7 +411,7 @@ class ScanManager {
     }
 
     if (ctx->err_code == Err_Success) {
-      ctx->status->set_complete_time(Util::CurrentTimeMillis());
+      ctx->status->set_complete_time(util::Util::CurrentTimeMillis());
       ctx->status->set_hash_method((int32_t)ctx->hash_method);
     }
 
@@ -432,7 +436,7 @@ class ScanManager {
       std::string cur_dir;
       int try_times = 0;
       while (try_times < 3 && !ctx->dir_queue.PopBack(&cur_dir)) {
-        Util::Sleep(100);
+        util::Util::Sleep(100);
         ++try_times;
       }
 
@@ -441,19 +445,19 @@ class ScanManager {
       }
 
       std::string relative_path;
-      Util::Relative(cur_dir, ctx->src, &relative_path);
+      util::Util::Relative(cur_dir, ctx->src, &relative_path);
       ctx->scanned_dir_num.fetch_add(1);
       auto it = ctx->status->ignored_dirs().find(relative_path);
       if (it != ctx->status->ignored_dirs().end()) {
         continue;
       }
 
-      if (!Util::Exists(cur_dir)) {
+      if (!util::Util::Exists(cur_dir)) {
         RemoveDir(ctx, cur_dir, relative_path);
         continue;
       }
 
-      auto update_time = Util::UpdateTime(cur_dir);
+      auto update_time = util::Util::UpdateTime(cur_dir);
       if (update_time == -1) {
         LOG(INFO) << "Scan error: " << cur_dir;
         ctx->err_code = Err_File_permission_or_not_exists;
@@ -531,7 +535,7 @@ class ScanManager {
   std::atomic<bool> stop_ = false;
 };
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_UTIL_SCAN_MANAGER_H
+#endif  // BAZEL_TEMPLATE_IMPL_SCAN_MANAGER_H

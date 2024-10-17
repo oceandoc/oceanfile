@@ -3,13 +3,13 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/util/sync_manager.h"
+#include "src/impl/sync_manager.h"
 
 #include "gtest/gtest.h"
 #include "src/common/defs.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 // TEST(SyncManager, SyncLocal) {
 // ConfigManager::Instance()->Init("./conf/base_config.json");
@@ -44,8 +44,8 @@ namespace util {
 //}
 
 TEST(SyncManager, SyncRemote) {
-  ConfigManager::Instance()->Init("./conf/base_config.json");
-  ThreadPool::Instance()->Init();
+  util::ConfigManager::Instance()->Init("./conf/base_config.json");
+  util::ThreadPool::Instance()->Init();
   std::string src("/usr/local/test_src");
   std::string dst("/tmp/test_dst");
   common::SyncContext sync_ctx(4);
@@ -62,5 +62,5 @@ TEST(SyncManager, SyncRemote) {
   SyncManager::Instance()->SyncRemote(&sync_ctx);
 }
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc

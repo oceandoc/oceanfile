@@ -3,12 +3,13 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_UTIL_RECEIVE_QUEUE_MANAGER_H
-#define BAZEL_TEMPLATE_UTIL_RECEIVE_QUEUE_MANAGER_H
+#ifndef BAZEL_TEMPLATE_IMPL_RECEIVE_QUEUE_MANAGER_H
+#define BAZEL_TEMPLATE_IMPL_RECEIVE_QUEUE_MANAGER_H
 
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -19,7 +20,7 @@
 #include "src/util/util.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 class ReceiveContext final {
  public:
@@ -44,8 +45,8 @@ class ReceiveQueueManager final {
     queue_.reserve(10000);
     auto clean_task = std::bind(&ReceiveQueueManager::Clean, this);
     auto delete_task = std::bind(&ReceiveQueueManager::Delete, this);
-    ThreadPool::Instance()->Post(clean_task);
-    ThreadPool::Instance()->Post(delete_task);
+    util::ThreadPool::Instance()->Post(clean_task);
+    util::ThreadPool::Instance()->Post(delete_task);
     return true;
   }
 
@@ -53,7 +54,7 @@ class ReceiveQueueManager final {
     stop_.store(true);
     cv_.notify_all();
     while (!delete_task_exits || !clean_task_exits) {
-      Util::Sleep(500);
+      util::Util::Sleep(500);
     }
   }
 
@@ -61,14 +62,15 @@ class ReceiveQueueManager final {
     absl::base_internal::SpinLockHolder locker(&lock_);
     auto it = queue_.find(req.uuid());
     if (it != queue_.end()) {
-      it->second.update_time = Util::CurrentTimeMillis();
+      it->second.update_time = util::Util::CurrentTimeMillis();
       it->second.partitions.insert(req.partition_num());
     } else {
       ReceiveContext ctx;
       ctx.dst = req.dst();
-      ctx.update_time = Util::CurrentTimeMillis();
+      ctx.update_time = util::Util::CurrentTimeMillis();
       ctx.partitions.insert(req.partition_num());
-      ctx.part_num = Util::FilePartitionNum(req.size(), req.partition_size());
+      ctx.part_num =
+          util::Util::FilePartitionNum(req.size(), req.partition_size());
       ctx.file_update_time = req.update_time();
       queue_.emplace(req.uuid(), ctx);
     }
@@ -84,7 +86,7 @@ class ReceiveQueueManager final {
       cv_.wait(lock,
                [this] { return stop_.load() || !to_remove_files_.empty(); });
       for (size_t i = 0; i < to_remove_files_.size(); ++i) {
-        Util::Remove(to_remove_files_[i]);
+        util::Util::Remove(to_remove_files_[i]);
         LOG(INFO) << "Store " << to_remove_files_[i] << " error";
       }
       to_remove_files_.clear();
@@ -95,14 +97,14 @@ class ReceiveQueueManager final {
 
   void Clean() {
     LOG(INFO) << "Clean task running";
-    int64_t last_time = Util::CurrentTimeMillis();
+    int64_t last_time = util::Util::CurrentTimeMillis();
     while (true) {
       if (stop_.load()) {
         break;
       }
-      Util::Sleep(1000);
+      util::Util::Sleep(1000);
 
-      auto now = Util::CurrentTimeMillis();
+      auto now = util::Util::CurrentTimeMillis();
       auto offset = now - last_time;
       last_time = now;
       if (GetSize() <= 5 && offset < 1000 * 5) {
@@ -111,8 +113,8 @@ class ReceiveQueueManager final {
 
       for (auto it = queue_.begin(); it != queue_.end();) {
         if (it->second.part_num == it->second.partitions.size()) {
-          if (!Util::SetUpdateTime(it->second.dst,
-                                   it->second.file_update_time)) {
+          if (!util::Util::SetUpdateTime(it->second.dst,
+                                         it->second.file_update_time)) {
             LOG(INFO) << "Set update time error: " << it->second.dst;
             std::unique_lock<std::mutex> lock(mu_);
             to_remove_files_.emplace_back(it->second.dst);
@@ -124,7 +126,7 @@ class ReceiveQueueManager final {
           continue;
         }
         if (now - it->second.update_time <
-            ConfigManager::Instance()->ReceiveQueueTimeout()) {
+            util::ConfigManager::Instance()->ReceiveQueueTimeout()) {
           ++it;
           continue;
         }
@@ -155,7 +157,7 @@ class ReceiveQueueManager final {
   bool delete_task_exits = false;
 };
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_UTIL_RECEIVE_QUEUE_MANAGER_H
+#endif  // BAZEL_TEMPLATE_IMPL_RECEIVE_QUEUE_MANAGER_H

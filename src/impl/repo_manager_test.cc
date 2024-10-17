@@ -3,12 +3,12 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/util/repo_manager.h"
+#include "src/impl/repo_manager.h"
 
 #include "gtest/gtest.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 TEST(RepoManager, CreateRepo) {
   std::string path("/tmp");
@@ -16,5 +16,5 @@ TEST(RepoManager, CreateRepo) {
   RepoManager::Instance()->CreateRepo(path, &uuid);
 }
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc

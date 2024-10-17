@@ -4,6 +4,8 @@ load("//bazel:cpplint.bzl", "cpplint")
 
 package(default_visibility = ["//visibility:public"])
 
+cpplint()
+
 COPTS = GLOBAL_COPTS + select({
     "@oceandoc//bazel:not_cross_compiling_on_windows": [
         "/Iexternal/double-conversion",
@@ -47,102 +49,6 @@ cc_library(
         "//src/proto:cc_config",
         "@folly",
     ],
-)
-
-cc_library(
-    name = "repo_manager",
-    srcs = ["repo_manager.cc"],
-    hdrs = ["repo_manager.h"],
-    copts = COPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        ":scan_manager",
-        ":timer",
-        ":util",
-        "//src/proto:cc_config",
-        "//src/proto:cc_data",
-        "@folly",
-    ],
-)
-
-cc_test(
-    name = "repo_manager_test",
-    srcs = ["repo_manager_test.cc"],
-    copts = COPTS,
-    data = ["//conf:base_config.json"],
-    local_defines = LOCAL_DEFINES,
-    deps = [":repo_manager"],
-)
-
-cc_library(
-    name = "scan_manager",
-    srcs = ["scan_manager.cc"],
-    hdrs = ["scan_manager.h"],
-    copts = COPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        ":thread_pool",
-        ":util",
-        "//src/common:blocking_queue",
-        "//src/common:defs",
-        "//src/proto:cc_data",
-        "@folly",
-    ],
-)
-
-cc_library(
-    name = "sync_manager",
-    srcs = ["sync_manager.cc"],
-    hdrs = ["sync_manager.h"],
-    copts = COPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        ":scan_manager",
-        ":thread_pool",
-        ":util",
-        "//src/client/grpc_client:grpc_clients",
-        "//src/common:defs",
-        "//src/proto:cc_data",
-        "//src/proto:cc_grpc_service",
-        "@com_github_grpc_grpc//:grpc++",
-        "@folly",
-    ],
-)
-
-cc_library(
-    name = "receive_queue_manager",
-    srcs = ["receive_queue_manager.cc"],
-    hdrs = ["receive_queue_manager.h"],
-    copts = COPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        ":thread_pool",
-        ":util",
-        "//src/client/grpc_client:grpc_clients",
-        "//src/common:defs",
-        "//src/proto:cc_data",
-        "//src/proto:cc_grpc_service",
-        "@com_github_grpc_grpc//:grpc++",
-        "@folly",
-    ],
-)
-
-cc_test(
-    name = "sync_manager_test",
-    srcs = ["sync_manager_test.cc"],
-    copts = COPTS,
-    data = ["//conf:base_config.json"],
-    local_defines = LOCAL_DEFINES,
-    deps = [":sync_manager"],
-)
-
-cc_test(
-    name = "scan_manager_test",
-    srcs = ["scan_manager_test.cc"],
-    copts = COPTS,
-    data = ["//conf:base_config.json"],
-    local_defines = LOCAL_DEFINES,
-    deps = [":scan_manager"],
 )
 
 cc_library(
@@ -231,5 +137,3 @@ cc_test(
     local_defines = LOCAL_DEFINES,
     deps = [":config_manager"],
 )
-
-cpplint()

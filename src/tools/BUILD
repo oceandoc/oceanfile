@@ -70,8 +70,8 @@ cc_binary(
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        "//src/impl:scan_manager",
         "//src/util",
-        "//src/util:scan_manager",
     ],
 )
 
@@ -85,8 +85,8 @@ cc_binary(
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        "//src/impl:scan_manager",
         "//src/util",
-        "//src/util:scan_manager",
     ],
 )
 
@@ -100,7 +100,7 @@ cc_binary(
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        "//src/impl:scan_manager",
         "//src/util",
-        "//src/util:scan_manager",
     ],
 )

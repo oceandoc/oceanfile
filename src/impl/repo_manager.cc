@@ -3,16 +3,16 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/util/receive_queue_manager.h"
+#include "src/impl/repo_manager.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
-static folly::Singleton<ReceiveQueueManager> receive_queue_manager;
+static folly::Singleton<RepoManager> repo_manager;
 
-std::shared_ptr<ReceiveQueueManager> ReceiveQueueManager::Instance() {
-  return receive_queue_manager.try_get();
+std::shared_ptr<RepoManager> RepoManager::Instance() {
+  return repo_manager.try_get();
 }
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc

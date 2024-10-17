@@ -3,8 +3,8 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_UTIL_SYNC_MANAGER_H
-#define BAZEL_TEMPLATE_UTIL_SYNC_MANAGER_H
+#ifndef BAZEL_TEMPLATE_IMPL_SYNC_MANAGER_H
+#define BAZEL_TEMPLATE_IMPL_SYNC_MANAGER_H
 
 #include <chrono>
 #include <filesystem>
@@ -16,12 +16,12 @@
 #include "absl/base/internal/spinlock.h"
 #include "folly/Singleton.h"
 #include "src/common/defs.h"
+#include "src/impl/scan_manager.h"
 #include "src/proto/data.pb.h"
-#include "src/util/scan_manager.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 class SyncManager {
  private:
@@ -37,7 +37,7 @@ class SyncManager {
     stop_.store(true);
     ScanManager::Instance()->Stop();
     while (syncing_.load() > 0) {
-      Util::Sleep(1000);
+      util::Util::Sleep(1000);
     }
   }
 
@@ -96,21 +96,23 @@ class SyncManager {
   }
 
   int32_t ValidateLocalSyncParameters(common::SyncContext* sync_ctx) {
-    if (!Util::IsAbsolute(sync_ctx->src) || !Util::IsAbsolute(sync_ctx->dst)) {
+    if (!util::Util::IsAbsolute(sync_ctx->src) ||
+        !util::Util::IsAbsolute(sync_ctx->dst)) {
       LOG(ERROR) << "Path must be absolute";
       return Err_Path_not_absolute;
     }
 
-    Util::UnifyDir(&sync_ctx->src);
-    Util::UnifyDir(&sync_ctx->dst);
+    util::Util::UnifyDir(&sync_ctx->src);
+    util::Util::UnifyDir(&sync_ctx->dst);
 
-    if (Util::StartWith(sync_ctx->src, sync_ctx->dst)) {
+    if (util::Util::StartWith(sync_ctx->src, sync_ctx->dst)) {
       LOG(ERROR) << "Cannot sync " << sync_ctx->src << " to " << sync_ctx->dst
                  << ", for cannot sync to subdir";
       return Err_Path_dst_is_src_subdir;
     }
 
-    if (!Util::Exists(sync_ctx->src) || !Util::Exists(sync_ctx->dst)) {
+    if (!util::Util::Exists(sync_ctx->src) ||
+        !util::Util::Exists(sync_ctx->dst)) {
       LOG(ERROR) << "Src or dst not exists";
       return Err_Path_not_exists;
     }
@@ -124,15 +126,16 @@ class SyncManager {
   }
 
   int32_t ValidateRemoteSyncParameters(common::SyncContext* sync_ctx) {
-    if (!Util::IsAbsolute(sync_ctx->src) || !Util::IsAbsolute(sync_ctx->dst)) {
+    if (!util::Util::IsAbsolute(sync_ctx->src) ||
+        !util::Util::IsAbsolute(sync_ctx->dst)) {
       LOG(ERROR) << "Path must be absolute";
       return Err_Path_not_absolute;
     }
 
-    Util::UnifyDir(&sync_ctx->src);
-    Util::UnifyDir(&sync_ctx->dst);
+    util::Util::UnifyDir(&sync_ctx->src);
+    util::Util::UnifyDir(&sync_ctx->dst);
 
-    if (!Util::Exists(sync_ctx->src)) {
+    if (!util::Util::Exists(sync_ctx->src)) {
       LOG(ERROR) << "Src or dst not exists";
       return Err_Path_not_exists;
     }
@@ -157,14 +160,14 @@ class SyncManager {
 
     auto progress_task =
         std::bind(&SyncManager::RecursiveProgressTask, this, sync_ctx);
-    ThreadPool::Instance()->Post(progress_task);
+    util::ThreadPool::Instance()->Post(progress_task);
 
     sync_ctx->dir_queue.PushBack(sync_ctx->src);
     for (int32_t i = 0; i < sync_ctx->max_threads; ++i) {
       sync_ctx->running_mark.fetch_or(1ULL << i);
       auto task =
           std::bind(&SyncManager::RecursiveLocalSyncWorker, this, i, sync_ctx);
-      ThreadPool::Instance()->Post(task);
+      util::ThreadPool::Instance()->Post(task);
     }
 
     while (sync_ctx->running_mark) {
@@ -173,7 +176,7 @@ class SyncManager {
           continue;
         }
 
-        Util::Sleep(1000);
+        util::Util::Sleep(1000);
         if (sync_ctx->dir_queue.Size() <= 0) {
           continue;
         }
@@ -181,9 +184,9 @@ class SyncManager {
         sync_ctx->running_mark.fetch_or(1ULL << i);
         auto task = std::bind(&SyncManager::RecursiveLocalSyncWorker, this, i,
                               sync_ctx);
-        ThreadPool::Instance()->Post(task);
+        util::ThreadPool::Instance()->Post(task);
       }
-      Util::Sleep(1000);
+      util::Util::Sleep(1000);
     }
 
     sync_ctx->stop_progress_task = true;
@@ -213,7 +216,7 @@ class SyncManager {
     sync_ctx->Reset();
     syncing_.fetch_add(1);
     auto progress_task = std::bind(&SyncManager::ProgressTask, this, sync_ctx);
-    ThreadPool::Instance()->Post(progress_task);
+    util::ThreadPool::Instance()->Post(progress_task);
 
     proto::ScanStatus scan_status;
     scan_status.set_path(sync_ctx->src);
@@ -241,14 +244,14 @@ class SyncManager {
         scan_status.file_num() + scan_status.symlink_num();
 
     LOG(INFO) << "Now sync local " << sync_ctx->src << " to " << sync_ctx->dst;
-    LOG(INFO) << "Memory usage: " << Util::MemUsage() << "MB";
+    LOG(INFO) << "Memory usage: " << util::Util::MemUsage() << "MB";
 
     std::vector<std::future<void>> rets;
     for (int i = 0; i < sync_ctx->max_threads; ++i) {
       std::packaged_task<void()> task(
           std::bind(&SyncManager::LocalSyncWorker, this, i, sync_ctx));
       rets.emplace_back(task.get_future());
-      ThreadPool::Instance()->Post(task);
+      util::ThreadPool::Instance()->Post(task);
     }
     for (auto& f : rets) {
       f.get();
@@ -290,7 +293,7 @@ class SyncManager {
       std::string cur_dir;
       int try_times = 0;
       while (try_times < 3 && !sync_ctx->dir_queue.PopBack(&cur_dir)) {
-        Util::Sleep(100);
+        util::Util::Sleep(100);
         ++try_times;
       }
 
@@ -299,19 +302,19 @@ class SyncManager {
       }
 
       std::string relative_path;
-      Util::Relative(cur_dir, sync_ctx->src, &relative_path);
+      util::Util::Relative(cur_dir, sync_ctx->src, &relative_path);
       auto it = sync_ctx->ignored_dirs.find(relative_path);
       if (it != sync_ctx->ignored_dirs.end()) {
         continue;
       }
 
-      if (!Util::Exists(cur_dir)) {
+      if (!util::Util::Exists(cur_dir)) {
         continue;
       }
 
       sync_ctx->total_dir_cnt.fetch_add(1);
       const auto& dst_dir = sync_ctx->dst + "/" + relative_path;
-      Util::Mkdir(dst_dir);
+      util::Util::Mkdir(dst_dir);
       try {
         for (const auto& entry : std::filesystem::directory_iterator(cur_dir)) {
           if (entry.is_directory() && !entry.is_symlink()) {
@@ -328,16 +331,16 @@ class SyncManager {
 
           int64_t src_update_time = 0, src_size = 0;
           std::string user, group;
-          if (!Util::FileInfo(file_src_path, &src_update_time, &src_size, &user,
-                              &group)) {
+          if (!util::Util::FileInfo(file_src_path, &src_update_time, &src_size,
+                                    &user, &group)) {
             LOG(ERROR) << "FileInfo error: " << file_src_path;
             sync_ctx->err_code = Err_File_permission_or_not_exists;
           }
 
-          if (Util::Exists(file_dst_path)) {
+          if (util::Util::Exists(file_dst_path)) {
             int64_t dst_update_time = 0, dst_size = 0;
-            if (!Util::FileInfo(file_dst_path, &dst_update_time, &dst_size,
-                                nullptr, nullptr)) {
+            if (!util::Util::FileInfo(file_dst_path, &dst_update_time,
+                                      &dst_size, nullptr, nullptr)) {
               LOG(ERROR) << "FileInfo error: " << file_dst_path;
               sync_ctx->err_code = Err_File_permission_or_not_exists;
             }
@@ -351,10 +354,10 @@ class SyncManager {
           }
 
           if (entry.is_symlink()) {
-            ret =
-                Util::SyncSymlink(sync_ctx->src, sync_ctx->dst, file_src_path);
+            ret = util::Util::SyncSymlink(sync_ctx->src, sync_ctx->dst,
+                                          file_src_path);
           } else if (entry.is_regular_file()) {
-            ret = Util::CopyFile(file_src_path, file_dst_path);
+            ret = util::Util::CopyFile(file_src_path, file_dst_path);
           }
 
           if (!ret) {
@@ -365,7 +368,7 @@ class SyncManager {
             continue;
           }
 
-          ret = Util::SetUpdateTime(file_dst_path, src_update_time);
+          ret = util::Util::SetUpdateTime(file_dst_path, src_update_time);
           if (!ret) {
             LOG(ERROR) << "Set update_time error: " << file_dst_path;
             absl::base_internal::SpinLockHolder locker(&sync_ctx->lock);
@@ -390,7 +393,7 @@ class SyncManager {
         sync_ctx->err_code = Err_Sync_interrupted;
         break;
       }
-      auto hash = std::abs(Util::MurmurHash64A(d.first));
+      auto hash = std::abs(util::Util::MurmurHash64A(d.first));
       if ((hash % sync_ctx->max_threads) != thread_no) {
         continue;
       }
@@ -398,7 +401,7 @@ class SyncManager {
       const auto& dir_src_path = sync_ctx->src + "/" + d.first;
       const auto& dir_dst_path = sync_ctx->dst + "/" + d.first;
 
-      if (!Util::Exists(dir_src_path)) {
+      if (!util::Util::Exists(dir_src_path)) {
         LOG(ERROR) << dir_src_path << " not exists";
         continue;
       }
@@ -412,12 +415,12 @@ class SyncManager {
         LOG(ERROR) << dir_src_path << " is symlink";
       }
 
-      if (!Util::Exists(dir_dst_path)) {
-        Util::Mkdir(dir_dst_path);
+      if (!util::Util::Exists(dir_dst_path)) {
+        util::Util::Mkdir(dir_dst_path);
       }
 
       if (!d.first.empty()) {
-        if (!Util::SetUpdateTime(dir_dst_path, d.second.update_time())) {
+        if (!util::Util::SetUpdateTime(dir_dst_path, d.second.update_time())) {
           LOG(ERROR) << "Set update time error: " << dir_dst_path;
         }
       }
@@ -426,7 +429,7 @@ class SyncManager {
         const auto& file_src_path = dir_src_path + "/" + f.first;
         const auto& file_dst_path = dir_dst_path + "/" + f.first;
 
-        if (!Util::Exists(file_src_path)) {
+        if (!util::Util::Exists(file_src_path)) {
           LOG(ERROR) << file_src_path << " src file not exists when sync";
           sync_ctx->err_code = Err_File_permission_or_not_exists;
           sync_ctx->syncd_file_fail_cnt.fetch_add(1);
@@ -441,8 +444,8 @@ class SyncManager {
         }
 
         int64_t update_time = 0, file_size = 0;
-        Util::FileInfo(file_dst_path, &update_time, &file_size, nullptr,
-                       nullptr);
+        util::Util::FileInfo(file_dst_path, &update_time, &file_size, nullptr,
+                             nullptr);
         if (update_time != -1 && update_time == f.second.update_time() &&
             file_size == f.second.size()) {
           sync_ctx->syncd_file_success_cnt.fetch_add(1);
@@ -452,9 +455,10 @@ class SyncManager {
 
         bool ret = true;
         if (f.second.file_type() == proto::Symlink) {
-          ret = Util::SyncSymlink(sync_ctx->src, sync_ctx->dst, file_src_path);
+          ret = util::Util::SyncSymlink(sync_ctx->src, sync_ctx->dst,
+                                        file_src_path);
         } else {
-          ret = Util::CopyFile(file_src_path, file_dst_path);
+          ret = util::Util::CopyFile(file_src_path, file_dst_path);
         }
 
         if (!ret) {
@@ -466,7 +470,7 @@ class SyncManager {
           continue;
         }
 
-        ret = Util::SetUpdateTime(file_dst_path, f.second.update_time());
+        ret = util::Util::SetUpdateTime(file_dst_path, f.second.update_time());
         if (!ret) {
           LOG(ERROR) << "Set update_time error: " << file_dst_path;
           sync_ctx->err_code = Err_File_permission_or_not_exists;
@@ -482,24 +486,24 @@ class SyncManager {
 
     if (sync_ctx->sync_method == common::SyncMethod::Sync_SYNC) {
       for (const auto& p : sync_ctx->scan_ctx->removed_files) {
-        auto hash = std::abs(Util::MurmurHash64A(p));
+        auto hash = std::abs(util::Util::MurmurHash64A(p));
         if ((hash % sync_ctx->max_threads) != thread_no) {
           continue;
         }
 
-        if (Util::IsAbsolute(p)) {
+        if (util::Util::IsAbsolute(p)) {
           LOG(ERROR) << "Must be relative: " << p;
           continue;
         }
 
         const auto& src_path = sync_ctx->src + "/" + p;
         const auto& dst_path = sync_ctx->dst + "/" + p;
-        if (Util::Exists(src_path)) {
+        if (util::Util::Exists(src_path)) {
           LOG(ERROR) << src_path << " exists";
           continue;
         }
 
-        if (!Util::Remove(dst_path)) {
+        if (!util::Util::Remove(dst_path)) {
           LOG(ERROR) << "Delete " << dst_path << " error";
           continue;
         }
@@ -517,7 +521,7 @@ class SyncManager {
   std::atomic<bool> stop_ = false;
 };
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_UTIL_SYNC_MANAGER_H
+#endif  // BAZEL_TEMPLATE_IMPL_SYNC_MANAGER_H

@@ -3,7 +3,7 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/util/sync_manager.h"
+#include "src/impl/sync_manager.h"
 
 #include <filesystem>
 #include <memory>
@@ -12,7 +12,7 @@
 #include "src/common/defs.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 static folly::Singleton<SyncManager> sync_manager;
 
@@ -24,7 +24,7 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
   static thread_local std::shared_mutex mu;
 
   if (req.file_type() == proto::FileType::Dir) {
-    if (!Util::Mkdir(req.dst())) {
+    if (!util::Util::Mkdir(req.dst())) {
       return Err_Path_mkdir_error;
     }
     return Err_Success;
@@ -38,18 +38,18 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
     return Err_Success;
   }
 
-  Util::MkParentDir(req.dst());
+  util::Util::MkParentDir(req.dst());
 
   auto err_code = Err_Success;
-  err_code = Util::CreateFileWithSize(req.dst(), req.size());
+  err_code = util::Util::CreateFileWithSize(req.dst(), req.size());
   if (err_code != Err_Success) {
     LOG(ERROR) << "Create file error: " << req.dst();
     return err_code;
   }
 
   int64_t start = 0, end = 0;
-  Util::CalcPartitionStart(req.size(), req.partition_num(),
-                           req.partition_size(), &start, &end);
+  util::Util::CalcPartitionStart(req.size(), req.partition_num(),
+                                 req.partition_size(), &start, &end);
   if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
     LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
                << ", start: " << start << ", end: " << end
@@ -57,7 +57,7 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
     return Err_File_partition_size_error;
   }
   std::unique_lock<std::shared_mutex> locker(mu);
-  return Util::WriteToFile(req.dst(), req.content(), start);
+  return util::Util::WriteToFile(req.dst(), req.content(), start);
 }
 
 int32_t SyncManager::SyncRemoteRecursive(common::SyncContext* sync_ctx) {
@@ -81,7 +81,7 @@ int32_t SyncManager::SyncRemoteRecursive(common::SyncContext* sync_ctx) {
     sync_ctx->running_mark.fetch_or(1ULL << i);
     auto task =
         std::bind(&SyncManager::RecursiveRemoteSyncWorker, this, i, sync_ctx);
-    ThreadPool::Instance()->Post(task);
+    util::ThreadPool::Instance()->Post(task);
   }
 
   while (sync_ctx->running_mark) {
@@ -90,7 +90,7 @@ int32_t SyncManager::SyncRemoteRecursive(common::SyncContext* sync_ctx) {
         continue;
       }
 
-      Util::Sleep(1000);
+      util::Util::Sleep(1000);
       if (sync_ctx->dir_queue.Size() <= 0) {
         continue;
       }
@@ -98,9 +98,9 @@ int32_t SyncManager::SyncRemoteRecursive(common::SyncContext* sync_ctx) {
       sync_ctx->running_mark.fetch_or(1ULL << i);
       auto task =
           std::bind(&SyncManager::RecursiveLocalSyncWorker, this, i, sync_ctx);
-      ThreadPool::Instance()->Post(task);
+      util::ThreadPool::Instance()->Post(task);
     }
-    Util::Sleep(1000);
+    util::Util::Sleep(1000);
   }
 
   file_client.Await();
@@ -130,7 +130,7 @@ void SyncManager::RecursiveRemoteSyncWorker(const int32_t thread_no,
     std::string cur_dir;
     int try_times = 0;
     while (try_times < 3 && !sync_ctx->dir_queue.PopBack(&cur_dir)) {
-      Util::Sleep(100);
+      util::Util::Sleep(100);
       ++try_times;
     }
 
@@ -139,18 +139,18 @@ void SyncManager::RecursiveRemoteSyncWorker(const int32_t thread_no,
     }
 
     std::string relative_path;
-    Util::Relative(cur_dir, sync_ctx->src, &relative_path);
+    util::Util::Relative(cur_dir, sync_ctx->src, &relative_path);
     auto it = sync_ctx->ignored_dirs.find(relative_path);
     if (it != sync_ctx->ignored_dirs.end()) {
       continue;
     }
 
-    if (!Util::Exists(cur_dir)) {
+    if (!util::Util::Exists(cur_dir)) {
       continue;
     }
 
     while (file_client.Size() > 1000) {
-      Util::Sleep(1000);
+      util::Util::Sleep(1000);
     }
 
     sync_ctx->total_dir_cnt.fetch_add(1);
@@ -182,8 +182,8 @@ void SyncManager::RecursiveRemoteSyncWorker(const int32_t thread_no,
         file_send_ctx->op = proto::FileOp::FileExists;
         if (entry.is_symlink()) {
           file_send_ctx->type = proto::FileType::Symlink;
-          if (!Util::SyncRemoteSymlink(cur_dir, file_src_path,
-                                       &file_send_ctx->content)) {
+          if (!util::Util::SyncRemoteSymlink(cur_dir, file_src_path,
+                                             &file_send_ctx->content)) {
             LOG(ERROR) << "Get " << file_dst_path << " target error";
             continue;
           }
@@ -236,7 +236,7 @@ int32_t SyncManager::SyncRemote(common::SyncContext* sync_ctx) {
 
   LOG(INFO) << "Now sync remote " << sync_ctx->src
             << " host: " << sync_ctx->remote_addr << ", dir: " << sync_ctx->dst;
-  LOG(INFO) << "Memory usage: " << Util::MemUsage() << "MB";
+  LOG(INFO) << "Memory usage: " << util::Util::MemUsage() << "MB";
   syncing_.fetch_add(1);
 
   std::vector<std::future<void>> rets;
@@ -244,7 +244,7 @@ int32_t SyncManager::SyncRemote(common::SyncContext* sync_ctx) {
     std::packaged_task<void()> task(
         std::bind(&SyncManager::RemoteSyncWorker, this, i, sync_ctx));
     rets.emplace_back(task.get_future());
-    ThreadPool::Instance()->Post(task);
+    util::ThreadPool::Instance()->Post(task);
   }
 
   for (auto& f : rets) {
@@ -275,19 +275,19 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
       break;
     }
 
-    auto hash = std::abs(Util::MurmurHash64A(d.first));
+    auto hash = std::abs(util::Util::MurmurHash64A(d.first));
     if ((hash % sync_ctx->max_threads) != thread_no) {
       continue;
     }
 
     while (file_client.Size() > 1000) {
-      Util::Sleep(1000);
+      util::Util::Sleep(1000);
     }
 
     const std::string& dir_src_path = sync_ctx->src + "/" + d.first;
     const std::string& dir_dst_path = sync_ctx->dst + "/" + d.first;
 
-    if (!Util::Exists(dir_src_path)) {
+    if (!util::Util::Exists(dir_src_path)) {
       LOG(ERROR) << dir_src_path << " not exists";
       continue;
     }
@@ -313,7 +313,7 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
       const auto& file_src_path = dir_src_path + "/" + f.first;
       const auto& file_dst_path = dir_dst_path + "/" + f.first;
 
-      if (!Util::Exists(file_src_path)) {
+      if (!util::Util::Exists(file_src_path)) {
         LOG(ERROR) << file_src_path << " not exists";
         continue;
       }
@@ -325,8 +325,8 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
       file_send_ctx->type = f.second.file_type();
       file_send_ctx->op = proto::FileOp::FileExists;
       if (f.second.file_type() == proto::FileType::Symlink) {
-        if (!Util::SyncRemoteSymlink(dir_src_path, file_src_path,
-                                     &file_send_ctx->content)) {
+        if (!util::Util::SyncRemoteSymlink(dir_src_path, file_src_path,
+                                           &file_send_ctx->content)) {
           LOG(ERROR) << "Get " << file_dst_path << " target error";
           continue;
         }
@@ -341,5 +341,5 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
             << " exist";
 }
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc

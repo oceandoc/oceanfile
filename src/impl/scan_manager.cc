@@ -3,10 +3,10 @@
  * All rights reserved.
  *******************************************************************************/
 
-#include "src/util/scan_manager.h"
+#include "src/impl/scan_manager.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 static folly::Singleton<ScanManager> scan_manager;
 
@@ -14,5 +14,5 @@ std::shared_ptr<ScanManager> ScanManager::Instance() {
   return scan_manager.try_get();
 }
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc

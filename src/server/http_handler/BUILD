@@ -44,10 +44,10 @@ cc_library(
     ],
     copts = COPTS,
     deps = [
+        "//src/impl:repo_manager",
         "//src/server/handler_proxy",
         "//src/util",
         "//src/util:config_manager",
-        "//src/util:repo_manager",
         "//src/util:timer",
         "@multipart-parser",
         "@proxygen",

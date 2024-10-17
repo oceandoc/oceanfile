@@ -7,7 +7,7 @@
 
 #include "folly/init/Init.h"
 #include "glog/logging.h"
-#include "src/util/scan_manager.h"
+#include "src/impl/scan_manager.h"
 
 int main(int argc, char** argv) {
   folly::Init init(&argc, &argv, false);
@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
   ctx.skip_scan = false;
   ctx.status = &scan_status;
 
-  oceandoc::util::ScanManager::Instance()->ParallelScan(&ctx);
+  oceandoc::impl::ScanManager::Instance()->ParallelScan(&ctx);
 
   for (const auto& f : ctx.added_files) {
     LOG(INFO) << f << " added\n";

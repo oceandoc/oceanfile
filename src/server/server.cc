@@ -13,13 +13,13 @@
 #include <signal.h>
 #endif
 
+#include "src/impl/receive_queue_manager.h"
+#include "src/impl/repo_manager.h"
+#include "src/impl/scan_manager.h"
 #include "src/server/grpc_server_impl.h"
 #include "src/server/http_server_impl.h"
 #include "src/server/server_context.h"
 #include "src/util/config_manager.h"
-#include "src/util/receive_queue_manager.h"
-#include "src/util/repo_manager.h"
-#include "src/util/scan_manager.h"
 #include "src/util/thread_pool.h"
 
 #if !defined(_WIN32)
@@ -64,9 +64,9 @@ int main(int argc, char **argv) {
 
   oceandoc::util::ConfigManager::Instance()->Init("./conf/base_config.json");
   oceandoc::util::ThreadPool::Instance()->Init();
-  oceandoc::util::ScanManager::Instance()->Init();
-  oceandoc::util::RepoManager::Instance()->Init();
-  oceandoc::util::ReceiveQueueManager::Instance()->Init();
+  oceandoc::impl::ScanManager::Instance()->Init();
+  oceandoc::impl::RepoManager::Instance()->Init();
+  oceandoc::impl::ReceiveQueueManager::Instance()->Init();
 
 #if !defined(_WIN32)
   RegisterSignalHandler();
@@ -95,8 +95,8 @@ int main(int argc, char **argv) {
     shutdown_thread.join();
   }
 #endif
-  oceandoc::util::ReceiveQueueManager::Instance()->Stop();
-  oceandoc::util::RepoManager::Instance()->Stop();
+  oceandoc::impl::ReceiveQueueManager::Instance()->Stop();
+  oceandoc::impl::RepoManager::Instance()->Stop();
   oceandoc::util::ThreadPool::Instance()->Stop();
 
   // ProfilerStop();

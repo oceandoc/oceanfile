@@ -3,8 +3,8 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_UTIL_REPO_MANAGER_H
-#define BAZEL_TEMPLATE_UTIL_REPO_MANAGER_H
+#ifndef BAZEL_TEMPLATE_IMPL_REPO_MANAGER_H
+#define BAZEL_TEMPLATE_IMPL_REPO_MANAGER_H
 
 #include <filesystem>
 #include <memory>
@@ -19,7 +19,7 @@
 #include "src/util/util.h"
 
 namespace oceandoc {
-namespace util {
+namespace impl {
 
 class RepoManager {
  private:
@@ -31,10 +31,10 @@ class RepoManager {
 
   bool Init() {
     std::string content;
-    auto ret = Util::LoadSmallFile(common::REPOS_CONFIG_FILE, &content);
+    auto ret = util::Util::LoadSmallFile(common::REPOS_CONFIG_FILE, &content);
 
     absl::base_internal::SpinLockHolder locker(&lock_);
-    if (ret && !Util::JsonToMessage(content, &repos_)) {
+    if (ret && !util::Util::JsonToMessage(content, &repos_)) {
       LOG(ERROR) << "Read repos config error, content: " << content;
       return false;
     }
@@ -51,15 +51,15 @@ class RepoManager {
     std::string content;
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
-      if (!Util::MessageToJson(repos_, &content)) {
+      if (!util::Util::MessageToJson(repos_, &content)) {
         LOG(ERROR) << "Repos config convert to json error";
         return false;
       }
     }
 
-    if (Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false) ||
-        Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false) ||
-        Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false)) {
+    if (util::Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false) ||
+        util::Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false) ||
+        util::Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false)) {
       LOG(INFO) << "Flush repos config success";
       return true;
     }
@@ -77,7 +77,7 @@ class RepoManager {
 
   bool ExistsRepo(const std::string& path, std::string* uuid = nullptr) {
     std::string repo_config_dir = path + "/" + common::CONFIG_DIR;
-    if (!Util::Exists(repo_config_dir) ||
+    if (!util::Util::Exists(repo_config_dir) ||
         !std::filesystem::is_directory(repo_config_dir)) {
       return false;
     }
@@ -103,11 +103,11 @@ class RepoManager {
     proto::RepoMeta repo;
     std::string repo_path = RepoPath(path, uuid);
 
-    if (!Util::LoadSmallFile(repo_path, &content)) {
+    if (!util::Util::LoadSmallFile(repo_path, &content)) {
       return false;
     }
 
-    if (!Util::JsonToMessage(content, &repo)) {
+    if (!util::Util::JsonToMessage(content, &repo)) {
       LOG(ERROR) << "Parse repo config error, content: " << content;
       return false;
     }
@@ -148,10 +148,11 @@ class RepoManager {
       return true;
     }
 
-    *uuid = Util::UUID();
+    *uuid = util::Util::UUID();
     const std::string& repo_file_path = RepoPath(path, *uuid);
     proto::RepoMeta repo;
-    repo.set_create_time(Util::ToTimeStr(Util::CurrentTimeMillis()));
+    repo.set_create_time(
+        util::Util::ToTimeStr(util::Util::CurrentTimeMillis()));
     repo.set_uuid(*uuid);
     repo.set_path(path);
 
@@ -166,11 +167,11 @@ class RepoManager {
     }
 
     std::string content;
-    if (!Util::MessageToJson(repo, &content)) {
+    if (!util::Util::MessageToJson(repo, &content)) {
       LOG(ERROR) << "Convert to json error";
       return false;
     }
-    return Util::WriteToFile(repo_file_path, content, false);
+    return util::Util::WriteToFile(repo_file_path, content, false);
   }
 
   bool DeleteRepoByPath(const std::string& path) {
@@ -193,7 +194,7 @@ class RepoManager {
       }
     }
 
-    Util::Remove(RepoDir(path));
+    util::Util::Remove(RepoDir(path));
     return true;
   }
 
@@ -223,24 +224,25 @@ class RepoManager {
       return Err_Repo_not_exists;
     }
 
-    const auto& repo_file_path = Util::RepoFilePath(repo_path, req.hash());
+    const auto& repo_file_path =
+        util::Util::RepoFilePath(repo_path, req.hash());
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
       return Err_Repo_uuid_error;
     }
 
-    Util::MkParentDir(repo_file_path);
+    util::Util::MkParentDir(repo_file_path);
 
     auto err_code = Err_Success;
-    err_code = Util::CreateFileWithSize(repo_file_path, req.size());
+    err_code = util::Util::CreateFileWithSize(repo_file_path, req.size());
     if (err_code != Err_Success) {
       LOG(ERROR) << "Create file error: " << repo_file_path;
       return err_code;
     }
 
     int64_t start = 0, end = 0;
-    Util::CalcPartitionStart(req.size(), req.partition_num(),
-                             req.partition_size(), &start, &end);
+    util::Util::CalcPartitionStart(req.size(), req.partition_num(),
+                                   req.partition_size(), &start, &end);
     if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
       LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
                  << ", start: " << start << ", end: " << end
@@ -250,7 +252,7 @@ class RepoManager {
     LOG(INFO) << "Now store file " << repo_file_path
               << ", part: " << req.partition_num();
     std::unique_lock<std::shared_mutex> locker(mu);
-    return Util::WriteToFile(repo_file_path, req.content(), start);
+    return util::Util::WriteToFile(repo_file_path, req.content(), start);
   }
 
   void Stop() { stop_.store(true); }
@@ -262,7 +264,7 @@ class RepoManager {
   std::shared_mutex mutex_;
 };
 
-}  // namespace util
+}  // namespace impl
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_UTIL_REPO_MANAGER_H
+#endif  // BAZEL_TEMPLATE_IMPL_REPO_MANAGER_H
