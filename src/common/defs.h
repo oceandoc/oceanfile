@@ -8,7 +8,6 @@
 
 #include <condition_variable>
 #include <fstream>
-#include <memory>
 #include <mutex>
 #include <string>
 
@@ -27,6 +26,7 @@ constexpr int64_t CALC_BUFFER_SIZE_BYTES = 64 * 1024;       // 64KB
 
 constexpr int64_t MAX_GRPC_MSG_SIZE = 2 * 64 * 1024 * 1024 * 8;  // 128MB
 constexpr double TRACING_SAMPLER_PROBALITITY = 0.01;             // 1 Percent
+constexpr int64_t SESSION_INTERVAL = 5 * 60 * 1000;              // 5min
 
 enum SendStatus {
   SUCCESS = 0,

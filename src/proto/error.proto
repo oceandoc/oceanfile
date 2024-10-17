@@ -45,4 +45,13 @@ enum ErrCode {
 
   // 15000
   Sync_interrupted = 15000;
+
+  // 16000
+  Sql_prepare_error = 16000;
+  Sql_execute_error = 16001;
+
+  // 17000
+  User_invalid_name = 17000;
+  User_invalid_passwd = 17001;
+  User_session_error = 17002;
 }

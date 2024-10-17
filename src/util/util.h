@@ -28,6 +28,10 @@ class Util final {
   ~Util() {}
 
  public:
+  static constexpr int kSaltSize = 16;        // 16 bytes (128 bits)
+  static constexpr int kDerivedKeySize = 32;  // 32 bytes (256 bits)
+  static constexpr int kIterations = 100000;  // PBKDF2 iterations
+
   static int64_t CurrentTimeMillis();
   static int64_t CurrentTimeNanos();
   static int64_t StrToTimeStampUTC(const std::string &time);
@@ -228,6 +232,13 @@ class Util final {
 
   static bool FileMD5(const std::string &path, std::string *out,
                       const bool use_upper_case = false);
+
+  static std::string GenerateSalt();
+  static bool HashPassword(const std::string &password, const std::string &salt,
+                           std::string *hash);
+  static bool VerifyPassword(const std::string &password,
+                             const std::string &salt,
+                             const std::string &stored_hash);
 
   static bool HexStrToInt64(const std::string &in, int64_t *out);
 

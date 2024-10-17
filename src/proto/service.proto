@@ -19,6 +19,10 @@ enum UserOp {
   UserDel = 2;
   UserAddGroup = 3;
   UserDelGroup = 4;
+  UserJoinGroup = 5;
+  UserLeaveGroup = 6;
+  UserLogin = 7;
+  UserLogout = 8;
 }
 
 message UserReq {

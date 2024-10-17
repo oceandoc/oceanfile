@@ -49,8 +49,9 @@ message RepoMeta {
   string name = 1;
   string path = 2;
   string uuid = 3;
-  string create_time = 4;
-  int64 update_time = 5;
+  string location_uuid = 4;
+  string create_time = 5;
+  int64 update_time = 6;
 }
 
 message RepoData {
@@ -58,7 +59,6 @@ message RepoData {
   string path = 2;
   string uuid = 3;
   uint64 file_num = 4;
-  repeated FileItem files = 5;
   repeated DirItem dirs = 6;
 }
 

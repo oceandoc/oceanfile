@@ -115,6 +115,37 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "user_manager",
+    srcs = ["user_manager.cc"],
+    hdrs = ["user_manager.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        ":session_manager",
+        "//src/common:defs",
+        "//src/proto:cc_data",
+        "//src/proto:cc_grpc_service",
+        "//src/util",
+        "//src/util:sqlite_manager",
+        "@folly",
+        "@sqlite",
+    ],
+)
+
+cc_library(
+    name = "session_manager",
+    srcs = ["session_manager.cc"],
+    hdrs = ["session_manager.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        "//src/common:defs",
+        "//src/util",
+        "@folly",
+    ],
+)
+
 cc_test(
     name = "sync_manager_test",
     srcs = ["sync_manager_test.cc"],

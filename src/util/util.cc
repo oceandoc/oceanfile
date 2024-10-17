@@ -33,6 +33,7 @@
 #include "google/protobuf/json/json.h"
 #include "lzma.h"  // NOLINT
 #include "openssl/evp.h"
+#include "openssl/rand.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
@@ -1195,6 +1196,37 @@ bool Util::SmallFileSHA256(const string &path, string *out,
 bool Util::FileSHA256(const string &path, string *out,
                       const bool use_upper_case) {
   return FileHash(path, EVP_sha256(), out, use_upper_case);
+}
+
+string Util::GenerateSalt() {
+  std::vector<unsigned char> salt(kSaltSize);
+  if (RAND_bytes(salt.data(), kSaltSize) != 1) {
+    throw std::runtime_error("Failed to generate random salt.");
+  }
+  return string(salt.begin(), salt.end());
+}
+
+bool Util::HashPassword(const string &password, const string &salt,
+                        string *hash) {
+  std::vector<unsigned char> derived_key(kDerivedKeySize);
+  if (PKCS5_PBKDF2_HMAC(password.c_str(), password.size(),
+                        reinterpret_cast<const unsigned char *>(salt.c_str()),
+                        salt.size(), kIterations, EVP_sha256(), kDerivedKeySize,
+                        derived_key.data()) != 1) {
+    return false;
+  }
+
+  hash->append(derived_key.begin(), derived_key.end());
+  return true;
+}
+
+bool Util::VerifyPassword(const string &password, const string &salt,
+                          const string &stored_hash) {
+  string computed_hash;
+  if (!HashPassword(password, salt, &computed_hash)) {
+    return false;
+  }
+  return computed_hash == stored_hash;
 }
 
 bool Util::LZMACompress(const string &data, string *out) {

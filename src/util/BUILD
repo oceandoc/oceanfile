@@ -52,6 +52,20 @@ cc_library(
 )
 
 cc_library(
+    name = "sqlite_manager",
+    srcs = ["sqlite_manager.cc"],
+    hdrs = ["sqlite_manager.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        "//src/common:defs",
+        "@com_github_glog_glog//:glog",
+        "@folly",
+        "@sqlite",
+    ],
+)
+
+cc_library(
     name = "thread_pool",
     srcs = ["thread_pool.cc"],
     hdrs = ["thread_pool.h"],
