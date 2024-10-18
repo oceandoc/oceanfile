@@ -17,24 +17,23 @@ enum UserOp {
   UserUnused = 0;
   UserCreate = 1;
   UserDel = 2;
-  UserAddGroup = 3;
-  UserDelGroup = 4;
-  UserJoinGroup = 5;
-  UserLeaveGroup = 6;
-  UserLogin = 7;
-  UserLogout = 8;
+  UserLogin = 3;
+  UserLogout = 4;
+  UserChangePassword = 5;
 }
 
 message UserReq {
   string request_id = 1;
   UserOp op = 2;
-  string path = 3;
-  string repo_uuid = 4;
+  string user = 3;
+  string password = 4;
+  string token = 5;
+  string to_delete_user = 6;
 }
 
 message UserRes {
   ErrCode err_code = 1;
-  string repo_uuid = 2;
+  string token = 5;
 }
 
 enum ServerOp {
@@ -63,6 +62,7 @@ enum RepoOp {
   RepoDelete = 2;
   RepoChmod = 3;
   RepoChowner = 4;
+  RepoList = 5;
 }
 
 message RepoReq {
@@ -71,11 +71,15 @@ message RepoReq {
   RepoType type = 3;
   string path = 4;
   string repo_uuid = 5;
+  string name = 6;
+  string token = 7;
+  string user = 8;
 }
 
 message RepoRes {
   ErrCode err_code = 1;
   string repo_uuid = 2;
+  map<string, RepoMeta> repos = 3;
 }
 
 enum FileOp {
@@ -88,7 +92,7 @@ enum FileOp {
 }
 
 message FileReq {
-  string uuid = 1;
+  string request_id = 1;
   RepoType repo_type = 2;
   FileOp op = 3;
   string src = 4;
@@ -112,7 +116,7 @@ message FileRes {
   string hash = 4;
   int32 partition_num = 5;
   FileType file_type = 6;
-  string uuid = 7;
+  string request_id = 7;
   FileOp op = 8;
   bool can_skip_upload = 9;
 }

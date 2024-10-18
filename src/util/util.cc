@@ -1331,10 +1331,10 @@ bool Util::JsonToMessage(const string &json, google::protobuf::Message *msg) {
 }
 
 void Util::PrintFileReq(const proto::FileReq &req) {
-  LOG(INFO) << "uuid: " << req.uuid() << ", repo_type: " << req.repo_type()
-            << ", op: " << req.op() << ", src: " << req.src()
-            << ", dst: " << req.dst() << ", hash: " << req.hash()
-            << ", size: " << req.size()
+  LOG(INFO) << "request_id: " << req.request_id()
+            << ", repo_type: " << req.repo_type() << ", op: " << req.op()
+            << ", src: " << req.src() << ", dst: " << req.dst()
+            << ", hash: " << req.hash() << ", size: " << req.size()
             << ", partition_num: " << req.partition_num()
             << ", repo_uuid: " << req.repo_uuid()
             << ", partition_size: " << req.partition_size()
@@ -1352,7 +1352,8 @@ bool Util::FileReqToJson(const proto::FileReq &req, string *json) {
 
   // Add Protobuf fields to the JSON document
   document.AddMember(
-      "uuid", rapidjson::Value().SetString(req.uuid().c_str(), allocator),
+      "request_id",
+      rapidjson::Value().SetString(req.request_id().c_str(), allocator),
       allocator);
   document.AddMember("repo_type", req.repo_type(), allocator);
   document.AddMember("op", req.op(), allocator);
@@ -1397,8 +1398,8 @@ bool Util::JsonToFileReq(const string &json, proto::FileReq *req) {
     return 1;
   }
 
-  if (doc.HasMember("uuid") && doc["uuid"].IsString()) {
-    req->set_uuid(doc["uuid"].GetString());
+  if (doc.HasMember("request_id") && doc["request_id"].IsString()) {
+    req->set_request_id(doc["request_id"].GetString());
   }
 
   if (doc.HasMember("repo_type") && doc["repo_type"].IsInt()) {

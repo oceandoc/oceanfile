@@ -74,6 +74,7 @@ cc_library(
     deps = [
         "//src/async_grpc",
         "//src/impl:repo_manager",
+        "//src/impl:user_manager",
         "//src/proto:cc_grpc_service",
         "//src/server/handler_proxy",
         "//src/util",

@@ -139,7 +139,7 @@ class FileClient
       }
     } else if (res_.op() == proto::FileOp::FilePut) {
       if (res_.file_type() == proto::FileType::Regular) {
-        auto it = send_ctx_map_.find(res_.uuid());
+        auto it = send_ctx_map_.find(res_.request_id());
         if (it != send_ctx_map_.end()) {
           auto& mark = it->second->mark;
           if (res_.err_code() != proto::ErrCode::Success) {
@@ -199,7 +199,7 @@ class FileClient
       return false;
     }
 
-    req_.set_uuid(util::Util::UUID());
+    req_.set_request_id(util::Util::UUID());
     req_.set_src(ctx->src);
     if (sync_ctx->repo_type == proto::RepoType::RT_Ocean) {
       if (ctx->repo_uuid.empty()) {
@@ -300,7 +300,7 @@ class FileClient
         continue;
       }
 
-      send_ctx_map_.insert({req_.uuid(), ctx});
+      send_ctx_map_.insert({req_.request_id(), ctx});
       std::ifstream file(ctx->src, std::ios::binary);
       if (!file || !file.is_open()) {
         LOG(ERROR) << "Check file exists or file permissions: " << ctx->src;
@@ -352,7 +352,7 @@ class FileClient
         LOG(ERROR) << "Send file: " << ctx->src << " error";
       }
       sync_ctx->syncd_file_success_cnt.fetch_add(1);
-      send_ctx_map_.erase(req_.uuid());
+      send_ctx_map_.erase(req_.request_id());
     }
     send_task_stopped_ = true;
     LOG(INFO) << "Send exists";

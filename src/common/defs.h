@@ -21,6 +21,7 @@ namespace common {
 
 const std::string CONFIG_DIR = ".Dr.Q.config";
 const std::string REPOS_CONFIG_FILE = "./data/repos.json";
+const std::string REPOS_CONFIG_TMP_FILE = "./data/repos.tmp.json";
 constexpr int64_t NET_BUFFER_SIZE_BYTES = 4 * 1024 * 1024;  // 8MB
 constexpr int64_t CALC_BUFFER_SIZE_BYTES = 64 * 1024;       // 64KB
 

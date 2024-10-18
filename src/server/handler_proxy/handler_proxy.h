@@ -10,7 +10,9 @@
 
 #include "src/impl/receive_queue_manager.h"
 #include "src/impl/repo_manager.h"
+#include "src/impl/session_manager.h"
 #include "src/impl/sync_manager.h"
+#include "src/impl/user_manager.h"
 #include "src/proto/service.pb.h"
 #include "src/util/util.h"
 
@@ -32,7 +34,13 @@ class HandlerProxy {
         LOG(ERROR) << "Repo uuid empty";
       } else {
         ret = impl::RepoManager::Instance()->WriteToFile(req);
-        impl::ReceiveQueueManager::Instance()->Put(req);
+        if (ret) {
+          LOG(ERROR) << "Store part error, "
+                     << "path: " << req.dst()
+                     << ", part: " << req.partition_num();
+        } else {
+          impl::ReceiveQueueManager::Instance()->Put(req);
+        }
       }
     } else if (req.repo_type() == proto::RepoType::RT_Remote) {
       ret = impl::SyncManager::Instance()->WriteToFile(req);
@@ -87,7 +95,7 @@ class HandlerProxy {
   }
 
   static void FileOpHandle(const proto::FileReq& req, proto::FileRes* res) {
-    int32_t ret = true;
+    int32_t ret = Err_Success;
     switch (req.op()) {
       case proto::FileOp::FilePut:
         ret = SaveFile(req, res);
@@ -110,8 +118,94 @@ class HandlerProxy {
     res->set_hash(req.hash());
     res->set_partition_num(req.partition_num());
     res->set_file_type(req.file_type());
-    res->set_uuid(req.uuid());
+    res->set_request_id(req.request_id());
     res->set_op(req.op());
+  }
+
+  static void UserOpHandle(const proto::UserReq& req, proto::UserRes* res) {
+    std::string session_user;
+    if (req.token().empty() && req.op() != proto::UserOp::UserCreate &&
+        req.op() != proto::UserOp::UserLogin) {
+      res->set_err_code(proto::ErrCode(Err_User_session_error));
+    }
+    if (!req.token().empty() &&
+        !impl::SessionManager::Instance()->ValidateSession(req.token(),
+                                                           &session_user)) {
+      res->set_err_code(proto::ErrCode(Err_User_session_error));
+      return;
+    }
+
+    if (session_user.empty() || session_user != req.user()) {
+      res->set_err_code(proto::ErrCode(Err_User_session_error));
+      return;
+    }
+
+    int32_t ret = Err_Success;
+
+    switch (req.op()) {
+      case proto::UserOp::UserCreate:
+        ret = impl::UserManager::Instance()->UserRegister(
+            req.user(), req.password(), res->mutable_token());
+        break;
+      case proto::UserOp::UserDel:
+        ret = impl::UserManager::Instance()->UserDelete(
+            session_user, req.to_delete_user(), req.token());
+        break;
+      case proto::UserOp::UserLogin:
+        ret = impl::UserManager::Instance()->UserLogin(
+            req.user(), req.password(), res->mutable_token());
+        break;
+      case proto::UserOp::UserChangePassword:
+        ret = impl::UserManager::Instance()->ChangePassword(
+            req.user(), req.password(), res->mutable_token());
+        break;
+      case proto::UserOp::UserLogout:
+        ret = impl::UserManager::Instance()->UserLogout(req.token());
+        break;
+      default:
+        LOG(ERROR) << "Unsupported operation";
+    }
+
+    if (ret) {
+      res->set_err_code(proto::ErrCode(ret));
+    } else {
+      res->set_err_code(proto::ErrCode::Success);
+    }
+  }
+
+  static void RepoOpHandle(const proto::RepoReq& req, proto::RepoRes* res) {
+    if (req.token().empty()) {
+      res->set_err_code(proto::ErrCode(Err_User_session_error));
+      return;
+    }
+
+    std::string session_user;
+    if (!impl::SessionManager::Instance()->ValidateSession(req.token(),
+                                                           &session_user)) {
+      res->set_err_code(proto::ErrCode(Err_User_session_error));
+      return;
+    }
+
+    if (session_user.empty() || session_user != req.user()) {
+      res->set_err_code(proto::ErrCode(Err_User_session_error));
+      return;
+    }
+
+    int32_t ret = Err_Success;
+
+    switch (req.op()) {
+      case proto::RepoOp::RepoCreate:
+        ret = impl::RepoManager::Instance()->CreateRepo(
+            req.name(), req.path(), res->mutable_repo_uuid());
+        break;
+      default:
+        LOG(ERROR) << "Unsupported operation";
+    }
+    if (ret) {
+      res->set_err_code(proto::ErrCode(ret));
+    } else {
+      res->set_err_code(proto::ErrCode::Success);
+    }
   }
 };
 

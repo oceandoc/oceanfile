@@ -60,7 +60,7 @@ class ReceiveQueueManager final {
 
   void Put(const proto::FileReq& req) {
     absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = queue_.find(req.uuid());
+    auto it = queue_.find(req.request_id());
     if (it != queue_.end()) {
       it->second.update_time = util::Util::CurrentTimeMillis();
       it->second.partitions.insert(req.partition_num());
@@ -72,12 +72,12 @@ class ReceiveQueueManager final {
       ctx.part_num =
           util::Util::FilePartitionNum(req.size(), req.partition_size());
       ctx.file_update_time = req.update_time();
-      queue_.emplace(req.uuid(), ctx);
+      queue_.emplace(req.request_id(), ctx);
     }
   }
 
   void Delete() {
-    LOG(INFO) << "Delte task running";
+    LOG(INFO) << "Delete task running";
     while (true) {
       if (stop_.load()) {
         break;

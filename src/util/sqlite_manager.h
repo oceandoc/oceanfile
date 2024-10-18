@@ -9,8 +9,8 @@
 #include <memory>
 #include <string>
 
+#include "external/sqlite/sqlite3.h"
 #include "folly/Singleton.h"
-#include "sqlite3.h"  // NOLINT
 #include "src/common/error.h"
 #include "src/util/util.h"
 

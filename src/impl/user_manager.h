@@ -44,11 +44,11 @@ class UserManager final {
 
   int32_t UserRegister(const std::string& user, const std::string& password,
                        std::string* token) {
-    if (user.size() > 64) {
+    if (user.size() > 64 || user.empty()) {
       return Err_User_invalid_name;
     }
 
-    if (password.size() > 64) {
+    if (password.size() > 64 || password.empty()) {
       return Err_User_invalid_passwd;
     }
 
@@ -91,7 +91,7 @@ class UserManager final {
   int32_t UserDelete(const std::string& login_user,
                      const std::string& to_delete_user,
                      const std::string& token) {
-    if (to_delete_user.size() > 64) {
+    if (to_delete_user.size() > 64 || to_delete_user.empty()) {
       return Err_User_invalid_name;
     }
 
@@ -128,11 +128,11 @@ class UserManager final {
 
   int32_t UserLogin(const std::string& user, const std::string& password,
                     std::string* token) {
-    if (user.size() > 64) {
+    if (user.size() > 64 || user.empty()) {
       return Err_User_invalid_name;
     }
 
-    if (password.size() > 64) {
+    if (password.size() > 64 || password.empty()) {
       return Err_User_invalid_passwd;
     }
 
@@ -168,8 +168,13 @@ class UserManager final {
     return Err_User_invalid_name;
   }
 
+  int32_t UserLogout(const std::string& token) {
+    SessionManager::Instance()->KickoutByToken(token);
+    return Err_Success;
+  }
+
   int32_t UserExists(const std::string& user) {
-    if (user.size() > 64) {
+    if (user.size() > 64 || user.empty()) {
       return Err_User_invalid_name;
     }
 
@@ -198,11 +203,11 @@ class UserManager final {
 
   int32_t ChangePassword(const std::string& user, const std::string& password,
                          std::string* token) {
-    if (user.size() > 64) {
+    if (user.size() > 64 || user.empty()) {
       return Err_User_invalid_name;
     }
 
-    if (password.size() > 64) {
+    if (password.size() > 64 || password.empty()) {
       return Err_User_invalid_passwd;
     }
 

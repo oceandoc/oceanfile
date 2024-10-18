@@ -52,6 +52,9 @@ class SessionManager final {
   }
 
   bool ValidateSession(const std::string& token, std::string* user) {
+    if (token.empty()) {
+      return false;
+    }
     absl::base_internal::SpinLockHolder locker(&lock_);
     auto it = token_sessions_.find(token);
     if (it == token_sessions_.end()) {

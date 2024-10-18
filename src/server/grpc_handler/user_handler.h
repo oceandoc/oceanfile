@@ -9,7 +9,7 @@
 #include "src/async_grpc/rpc_handler.h"
 #include "src/proto/service.pb.h"
 #include "src/server/grpc_handler/meta.h"
-#include "src/server/server_context.h"
+#include "src/server/handler_proxy/handler_proxy.h"
 
 namespace oceandoc {
 namespace server {
@@ -20,10 +20,13 @@ class UserHandler : public async_grpc::RpcHandler<UserMethod> {
   void OnRequest(const proto::UserReq& req) override {
     LOG(INFO) << "qid: " << req.request_id();
     auto res = std::make_unique<proto::UserRes>();
-    res->set_repo_uuid(
-        static_cast<oceandoc::server::ServerContext*>(execution_context_)
-            ->ToString());
+    handler_proxy::HandlerProxy::UserOpHandle(req, res.get());
     Send(std::move(res));
+  }
+
+  void OnReadsDone() override {
+    LOG(INFO) << "OnReadsDone";
+    Finish(grpc::Status::OK);
   }
 };
 

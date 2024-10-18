@@ -25,6 +25,11 @@ class ServerHandler : public async_grpc::RpcHandler<ServerMethod> {
             ->ToString());
     Send(std::move(res));
   }
+
+  void OnReadsDone() override {
+    LOG(INFO) << "OnReadsDone";
+    Finish(grpc::Status::OK);
+  }
 };
 
 }  // namespace grpc_handler

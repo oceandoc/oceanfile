@@ -38,16 +38,16 @@ class RepoManager {
       LOG(ERROR) << "Read repos config error, content: " << content;
       return false;
     }
-
-    for (const auto& p : repos_.repos()) {
-      repos_.mutable_uuid_repos()->insert({p.second.uuid(), p.second});
-    }
-
     return true;
   }
 
-  // TODO(xiedeacc): copy to a tmp file first
   bool FlushReposConfig() {
+    auto ret = util::Util::CopyFile(common::REPOS_CONFIG_FILE,
+                                    common::REPOS_CONFIG_TMP_FILE);
+    if (!ret) {
+      return false;
+    }
+
     std::string content;
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
@@ -63,28 +63,23 @@ class RepoManager {
       LOG(INFO) << "Flush repos config success";
       return true;
     }
+    util::Util::CopyFile(common::REPOS_CONFIG_TMP_FILE,
+                         common::REPOS_CONFIG_FILE);
     LOG(ERROR) << "Disaster: flush repos config error";
     return false;
-  }
-
-  std::string RepoDir(const std::string& path) {
-    return path + "/" + common::CONFIG_DIR;
-  }
-
-  std::string RepoPath(const std::string& path, const std::string& uuid) {
-    return path + "/" + common::CONFIG_DIR + "/" + uuid + ".repo";
   }
 
   bool ExistsRepo(const std::string& path, std::string* uuid = nullptr) {
     std::string repo_config_dir = path + "/" + common::CONFIG_DIR;
     if (!util::Util::Exists(repo_config_dir) ||
+        std::filesystem::is_symlink(repo_config_dir) ||
         !std::filesystem::is_directory(repo_config_dir)) {
       return false;
     }
 
     for (const auto& entry :
          std::filesystem::directory_iterator(repo_config_dir)) {
-      if (entry.is_symlink() || !entry.is_directory()) {
+      if (entry.is_symlink() || entry.is_directory()) {
         continue;
       }
       if (entry.path().extension().string() == ".repo") {
@@ -101,9 +96,10 @@ class RepoManager {
     LOG(INFO) << "Now restore repo from path: " << path;
     std::string content;
     proto::RepoMeta repo;
-    std::string repo_path = RepoPath(path, uuid);
+    std::string repo_config_file_path =
+        path + "/" + common::CONFIG_DIR + "/" + uuid + ".repo";
 
-    if (!util::Util::LoadSmallFile(repo_path, &content)) {
+    if (!util::Util::LoadSmallFile(repo_config_file_path, &content)) {
       return false;
     }
 
@@ -119,8 +115,7 @@ class RepoManager {
 
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
-      (*repos_.mutable_repos())[repo.path()] = repo;
-      (*repos_.mutable_uuid_repos())[repo.uuid()] = repo;
+      (*repos_.mutable_repos())[repo.uuid()] = repo;
     }
     return FlushReposConfig();
   }
@@ -133,36 +128,35 @@ class RepoManager {
     return false;
   }
 
-  bool CreateRepo(const std::string& path, std::string* uuid) {
-    {
-      absl::base_internal::SpinLockHolder locker(&lock_);
-      auto it = repos_.repos().find(path);
-      if (it != repos_.repos().end()) {
-        *uuid = it->second.uuid();
-        return true;
-      }
-    }
-
+  bool CreateRepo(const std::string& name, const std::string& path,
+                  std::string* uuid) {
     if (ExistsRepo(path, uuid)) {
       RestoreRepo(path, *uuid);
       return true;
     }
 
     *uuid = util::Util::UUID();
-    const std::string& repo_file_path = RepoPath(path, *uuid);
+    std::string repo_config_file_path =
+        path + "/" + common::CONFIG_DIR + "/" + *uuid + ".repo";
+
     proto::RepoMeta repo;
     repo.set_create_time(
         util::Util::ToTimeStr(util::Util::CurrentTimeMillis()));
     repo.set_uuid(*uuid);
     repo.set_path(path);
+    repo.set_name(name);
+    repo.set_location_uuid(util::Util::UUID());
 
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
-      repos_.mutable_repos()->insert({path, repo});
-      repos_.mutable_uuid_repos()->insert({*uuid, repo});
+      repos_.mutable_repos()->insert({*uuid, repo});
     }
 
     if (!FlushReposConfig()) {
+      {
+        absl::base_internal::SpinLockHolder locker(&lock_);
+        repos_.mutable_repos()->erase(*uuid);
+      }
       return false;
     }
 
@@ -171,46 +165,40 @@ class RepoManager {
       LOG(ERROR) << "Convert to json error";
       return false;
     }
-    return util::Util::WriteToFile(repo_file_path, content, false);
-  }
-
-  bool DeleteRepoByPath(const std::string& path) {
-    LOG(INFO) << "Now delete repo from path: " << path;
-    std::string uuid;
-    if (!ExistsRepo(path, &uuid)) {
-      return true;
-    }
-
-    {
-      absl::base_internal::SpinLockHolder locker(&lock_);
-      auto it = repos_.mutable_repos()->find(path);
-      if (it != repos_.repos().end()) {
-        repos_.mutable_repos()->erase(it);
-      }
-
-      it = repos_.mutable_uuid_repos()->find(uuid);
-      if (it != repos_.uuid_repos().end()) {
-        repos_.mutable_uuid_repos()->erase(it);
-      }
-    }
-
-    util::Util::Remove(RepoDir(path));
-    return true;
+    return util::Util::WriteToFile(repo_config_file_path, content, false);
   }
 
   bool DeleteRepoByUUID(const std::string& uuid) {
     LOG(INFO) << "Now delete repo from uuid: " << uuid;
-    auto it = repos_.uuid_repos().find(uuid);
-    if (it != repos_.uuid_repos().end()) {
-      return DeleteRepoByPath(it->second.path());
+    auto it = repos_.repos().find(uuid);
+    if (it != repos_.repos().end()) {
+      std::string uuid;
+      if (!ExistsRepo(it->second.path(), &uuid)) {
+        {
+          absl::base_internal::SpinLockHolder locker(&lock_);
+          repos_.mutable_repos()->erase(uuid);
+        }
+        return true;
+      }
+
+      std::string repo_config_file_path =
+          it->second.path() + "/" + common::CONFIG_DIR + "/" + uuid + ".repo";
+      if (!util::Util::Remove(repo_config_file_path)) {
+        return false;
+      }
+
+      {
+        absl::base_internal::SpinLockHolder locker(&lock_);
+        repos_.mutable_repos()->erase(uuid);
+      }
     }
     return true;
   }
 
   std::string RepoPathByUUID(const std::string& uuid) {
     absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = repos_.uuid_repos().find(uuid);
-    if (it != repos_.uuid_repos().end()) {
+    auto it = repos_.repos().find(uuid);
+    if (it != repos_.repos().end()) {
       return it->second.path();
     }
     return "";
@@ -249,8 +237,6 @@ class RepoManager {
                  << ", content size: " << req.content().size();
       return Err_File_partition_size_error;
     }
-    LOG(INFO) << "Now store file " << repo_file_path
-              << ", part: " << req.partition_num();
     std::unique_lock<std::shared_mutex> locker(mu);
     return util::Util::WriteToFile(repo_file_path, req.content(), start);
   }
