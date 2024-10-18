@@ -62,7 +62,11 @@ enum RepoOp {
   RepoDelete = 2;
   RepoChmod = 3;
   RepoChowner = 4;
-  RepoList = 5;
+  RepoServerDir = 5;
+  RepoRepoDir = 6;
+  RepoCreateDir = 7;
+  RepoDelDir = 8;
+  RepoDelFile = 9;
 }
 
 message RepoReq {
@@ -80,6 +84,7 @@ message RepoRes {
   ErrCode err_code = 1;
   string repo_uuid = 2;
   map<string, RepoMeta> repos = 3;
+  DirItem dir = 4;
 }
 
 enum FileOp {

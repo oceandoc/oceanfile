@@ -99,7 +99,7 @@ class SyncManager {
     if (!util::Util::IsAbsolute(sync_ctx->src) ||
         !util::Util::IsAbsolute(sync_ctx->dst)) {
       LOG(ERROR) << "Path must be absolute";
-      return Err_Path_not_absolute;
+      return Err_File_not_absolute;
     }
 
     util::Util::UnifyDir(&sync_ctx->src);
@@ -108,19 +108,19 @@ class SyncManager {
     if (util::Util::StartWith(sync_ctx->src, sync_ctx->dst)) {
       LOG(ERROR) << "Cannot sync " << sync_ctx->src << " to " << sync_ctx->dst
                  << ", for cannot sync to subdir";
-      return Err_Path_dst_is_src_subdir;
+      return Err_File_dst_is_src_subdir;
     }
 
     if (!util::Util::Exists(sync_ctx->src) ||
         !util::Util::Exists(sync_ctx->dst)) {
       LOG(ERROR) << "Src or dst not exists";
-      return Err_Path_not_exists;
+      return Err_File_not_exists;
     }
 
     if (!std::filesystem::is_directory(sync_ctx->src) ||
         !std::filesystem::is_directory(sync_ctx->dst)) {
       LOG(ERROR) << "Src or dst not dir";
-      return Err_Path_not_dir;
+      return Err_File_not_dir;
     }
     return Err_Success;
   }
@@ -129,7 +129,7 @@ class SyncManager {
     if (!util::Util::IsAbsolute(sync_ctx->src) ||
         !util::Util::IsAbsolute(sync_ctx->dst)) {
       LOG(ERROR) << "Path must be absolute";
-      return Err_Path_not_absolute;
+      return Err_File_not_absolute;
     }
 
     util::Util::UnifyDir(&sync_ctx->src);
@@ -137,12 +137,12 @@ class SyncManager {
 
     if (!util::Util::Exists(sync_ctx->src)) {
       LOG(ERROR) << "Src or dst not exists";
-      return Err_Path_not_exists;
+      return Err_File_not_exists;
     }
 
     if (!std::filesystem::is_directory(sync_ctx->src)) {
       LOG(ERROR) << "Src or dst not dir";
-      return Err_Path_not_dir;
+      return Err_File_not_dir;
     }
     return Err_Success;
   }

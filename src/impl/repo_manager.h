@@ -16,6 +16,7 @@
 #include "src/common/defs.h"
 #include "src/common/error.h"
 #include "src/proto/data.pb.h"
+#include "src/proto/service.pb.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -241,6 +242,122 @@ class RepoManager {
     return util::Util::WriteToFile(repo_file_path, req.content(), start);
   }
 
+  int32_t ListServerDir(const proto::RepoReq& req, proto::RepoRes* res) {
+    std::string path = req.path();
+    if (path.empty()) {
+      path = "/";
+    }
+
+    res->mutable_dir()->set_path(path);
+    try {
+      for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        const auto& filename = entry.path().filename().string();
+
+        proto::FileItem file;
+        file.set_filename(filename);
+        if (entry.is_symlink()) {
+          file.set_file_type(proto::FileType::Symlink);
+        } else if (entry.is_regular_file()) {
+          file.set_file_type(proto::FileType::Regular);
+        } else if (entry.is_directory()) {
+          file.set_file_type(proto::FileType::Dir);
+        } else {
+          LOG(ERROR) << "Unknow file type: " << entry.path();
+        }
+        res->mutable_dir()->mutable_files()->emplace(filename, file);
+      }
+    } catch (const std::filesystem::filesystem_error& e) {
+      return Err_Fail;
+    }
+    return Err_Success;
+  }
+
+  int32_t ListRepoDir(const proto::RepoReq& req, proto::RepoRes* res) {
+    if (req.repo_uuid().empty()) {
+      return Err_Repo_uuid_error;
+    }
+
+    auto ret = GetDir(req, res);
+    if (ret == Err_Success) {
+      return Err_Success;
+    }
+
+    ret = LoadRepoData(req.repo_uuid());
+    if (ret) {
+      return ret;
+    }
+
+    ret = GetDir(req, res);
+    if (ret) {
+      return ret;
+    }
+    return Err_Success;
+  }
+
+  int32_t GetDir(const proto::RepoReq& req, proto::RepoRes* res) {
+    std::string path = req.path();
+    if (path.empty()) {
+      path = "/";
+    }
+
+    absl::base_internal::SpinLockHolder locker(&lock_);
+    auto it = repo_datas_.find(req.repo_uuid());
+    if (it != repo_datas_.end()) {
+      auto dir_it = it->second.dirs().find(path);
+      if (dir_it == it->second.dirs().end()) {
+        LOG(ERROR) << "Cannot find dir " << path << " in repo: " << it->first
+                   << ", path: " << it->second.path();
+        return Err_File_not_exists;
+      }
+      *res->mutable_dir() = dir_it->second;
+      return Err_Success;
+    }
+    return Err_File_not_exists;
+  }
+
+  int32_t LoadRepoData(const std::string& repo_uuid) {
+    std::string repo_data_file_path = "./data/" + repo_uuid + ".repodata";
+    proto::RepoData repo_data;
+    if (util::Util::Exists(repo_data_file_path)) {
+      auto ret = LoadRepoData(repo_data_file_path, &repo_data);
+      if (ret) {
+        return ret;
+      }
+    } else {
+      const auto& repo_path = RepoPathByUUID(repo_uuid);
+      if (repo_path.empty()) {
+        LOG(ERROR) << "Invalid repo path";
+        return Err_Repo_not_exists;
+      }
+      repo_data_file_path = "./data/" + repo_uuid + ".repodata";
+      auto ret = LoadRepoData(repo_data_file_path, &repo_data);
+      if (ret) {
+        return ret;
+      }
+    }
+    absl::base_internal::SpinLockHolder locker(&lock_);
+    repo_datas_.emplace(repo_uuid, repo_data);
+    return Err_Success;
+  }
+
+  int32_t LoadRepoData(const std::string& path, proto::RepoData* repo_data) {
+    std::string content, decompressed_content;
+    if (util::Util::LoadSmallFile(path, &content)) {
+      if (!util::Util::LZMADecompress(content, &decompressed_content)) {
+        LOG(ERROR) << "Decomppress error: " << path;
+        return Err_Decompress_error;
+      }
+
+      if (!repo_data->ParseFromString(decompressed_content)) {
+        LOG(ERROR) << "Parse error: " << path;
+        return Err_Deserialize_error;
+      }
+      return Err_Success;
+    }
+    LOG(ERROR) << "Load cache status error: " << path;
+    return Err_File_not_exists;
+  }
+
   void Stop() { stop_.store(true); }
 
  private:
@@ -248,6 +365,7 @@ class RepoManager {
   mutable absl::base_internal::SpinLock lock_;
   std::atomic<bool> stop_ = false;
   std::shared_mutex mutex_;
+  std::map<std::string, proto::RepoData> repo_datas_;
 };
 
 }  // namespace impl

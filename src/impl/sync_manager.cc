@@ -25,7 +25,7 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
 
   if (req.file_type() == proto::FileType::Dir) {
     if (!util::Util::Mkdir(req.dst())) {
-      return Err_Path_mkdir_error;
+      return Err_File_mkdir_error;
     }
     return Err_Success;
   } else if (req.file_type() == proto::FileType::Symlink) {
@@ -33,7 +33,7 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
       std::filesystem::create_symlink(req.content(), req.dst());
     } catch (const std::filesystem::filesystem_error& e) {
       LOG(ERROR) << e.what();
-      return Err_Path_create_symlink_error;
+      return Err_File_create_symlink_error;
     }
     return Err_Success;
   }

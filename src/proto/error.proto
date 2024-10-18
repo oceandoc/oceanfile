@@ -7,27 +7,26 @@ enum ErrCode {
   Fail = 1;
 
   // 10000
-  Path_not_absolute = 10000;
-  Path_dst_is_src_subdir = 10001;
-  Path_not_exists = 10002;
-  Path_exists = 10003;
-  Path_not_dir = 10004;
-  Path_mkdir_error = 10005;
-  Path_create_symlink_error = 10006;
 
-  // 11000
-  File_size_set_error = 11000;
-  File_permission = 11001;
-  File_disk_full = 11002;
-  File_partition_size_error = 11003;
-  File_permission_or_not_exists = 11004;
-  File_hash_calc_error = 11005;
-  File_sha256_calc_error = 11006;
-  File_md5_calc_error = 11007;
-  File_crc32_calc_error = 11008;
-  File_blake3_calc_error = 11009;
-  File_type_mismatch = 11010;
-  File_copy_error = 11011;
+  File_size_set_error = 10000;
+  File_permission = 10001;
+  File_disk_full = 10002;
+  File_partition_size_error = 10003;
+  File_permission_or_not_exists = 10004;
+  File_hash_calc_error = 10005;
+  File_sha256_calc_error = 10006;
+  File_md5_calc_error = 10007;
+  File_crc32_calc_error = 10008;
+  File_blake3_calc_error = 10009;
+  File_type_mismatch = 10010;
+  File_copy_error = 10011;
+  File_not_absolute = 10012;
+  File_dst_is_src_subdir = 10013;
+  File_not_exists = 10014;
+  File_exists = 10015;
+  File_not_dir = 10016;
+  File_mkdir_error = 10017;
+  File_create_symlink_error = 10018;
 
   // 12000
   Scan_error = 12001;
@@ -42,6 +41,9 @@ enum ErrCode {
 
   // 14000
   Serialize_error = 14000;
+  Deserialize_error = 14001;
+  Decompress_error = 14002;
+  Compress_error = 14003;
 
   // 15000
   Sync_interrupted = 15000;

@@ -192,11 +192,18 @@ class HandlerProxy {
     }
 
     int32_t ret = Err_Success;
-
     switch (req.op()) {
       case proto::RepoOp::RepoCreate:
         ret = impl::RepoManager::Instance()->CreateRepo(
             req.name(), req.path(), res->mutable_repo_uuid());
+        break;
+      case proto::RepoOp::RepoDelete:
+        ret = impl::RepoManager::Instance()->DeleteRepoByUUID(res->repo_uuid());
+      case proto::RepoOp::RepoServerDir:
+        ret = impl::RepoManager::Instance()->ListServerDir(req, res);
+        break;
+      case proto::RepoOp::RepoRepoDir:
+        ret = impl::RepoManager::Instance()->ListRepoDir(req, res);
         break;
       default:
         LOG(ERROR) << "Unsupported operation";

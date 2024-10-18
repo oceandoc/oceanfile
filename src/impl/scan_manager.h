@@ -345,12 +345,12 @@ class ScanManager {
   int32_t ParallelScan(common::ScanContext* ctx) {
     if (!util::Util::Exists(ctx->src)) {
       LOG(ERROR) << ctx->src << " not exists";
-      return Err_Path_not_exists;
+      return Err_File_not_exists;
     }
 
     if (!std::filesystem::is_directory(ctx->src)) {
       LOG(ERROR) << ctx->src << " not directory";
-      return Err_Path_not_dir;
+      return Err_File_not_dir;
     }
 
     if (scanning_.load() > 0) {
