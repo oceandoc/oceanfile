@@ -1199,24 +1199,24 @@ bool Util::FileSHA256(const string &path, string *out,
 }
 
 string Util::GenerateSalt() {
-  std::vector<unsigned char> salt(kSaltSize);
-  if (RAND_bytes(salt.data(), kSaltSize) != 1) {
+  std::string salt;
+  salt.resize(kSaltSize);
+  if (RAND_bytes(reinterpret_cast<unsigned char *>(salt.data()), kSaltSize) !=
+      1) {
     throw std::runtime_error("Failed to generate random salt.");
   }
-  return string(salt.begin(), salt.end());
+  return salt;
 }
 
 bool Util::HashPassword(const string &password, const string &salt,
                         string *hash) {
-  std::vector<unsigned char> derived_key(kDerivedKeySize);
+  hash->resize(kDerivedKeySize);
   if (PKCS5_PBKDF2_HMAC(password.c_str(), password.size(),
                         reinterpret_cast<const unsigned char *>(salt.c_str()),
                         salt.size(), kIterations, EVP_sha256(), kDerivedKeySize,
-                        derived_key.data()) != 1) {
+                        reinterpret_cast<unsigned char *>(hash->data())) != 1) {
     return false;
   }
-
-  hash->append(derived_key.begin(), derived_key.end());
   return true;
 }
 

@@ -58,6 +58,7 @@ cc_library(
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        ":util",
         "//src/common:defs",
         "@com_github_glog_glog//:glog",
         "@folly",

@@ -11,7 +11,7 @@ namespace oceandoc {
 namespace util {
 
 TEST(SqliteManager, ExecuteNonQuery) {
-  EXPECT_EQ(SqliteManager::Instance()->Init("./data/user.db"), true);
+  EXPECT_EQ(SqliteManager::Instance()->Init(), true);
 }
 
 }  // namespace util

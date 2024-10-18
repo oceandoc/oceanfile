@@ -9,7 +9,9 @@
 #include <filesystem>
 #include <functional>
 #include <thread>
+#include <vector>
 
+// #include "fmt/core.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "src/common/defs.h"
@@ -604,6 +606,31 @@ TEST(Util, JsonToMessage) {
   EXPECT_EQ(
       req.src(),
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus");
+}
+
+TEST(Util, HashPassword) {
+  std::vector<uint8_t> salt_arr{0x45, 0x2c, 0x03, 0x06, 0x73, 0x0b, 0x0f, 0x3a,
+                                0xc3, 0x08, 0x6d, 0x4f, 0x62, 0xef, 0xfc, 0x20};
+  std::vector<uint8_t> hashed_password_arr{
+      0x29, 0x9a, 0xe5, 0x3a, 0xb2, 0x2c, 0x08, 0x5a, 0x47, 0x96, 0xb5,
+      0x91, 0x87, 0xd2, 0xb5, 0x4c, 0x21, 0x7e, 0x48, 0x30, 0xb4, 0xab,
+      0xe4, 0xad, 0xe7, 0x9d, 0x7d, 0x8e, 0x6d, 0x90, 0xf5, 0x1a};
+  std::string salt(salt_arr.begin(), salt_arr.end());
+  std::string standard_hashed_password(hashed_password_arr.begin(),
+                                       hashed_password_arr.end());
+
+  std::string hashed_password;
+  if (!Util::HashPassword(Util::SHA256("admin"), salt, &hashed_password)) {
+    LOG(INFO) << "error";
+  }
+
+  // std::string format_hex;
+  // for (auto i : hashed_password) {
+  // format_hex.append(fmt::format("0x{:02x}", static_cast<uint8_t>(i)));
+  // format_hex.append(", ");
+  // }
+  // LOG(INFO) << "hashed_password: " << format_hex;
+  EXPECT_EQ(standard_hashed_password, hashed_password);
 }
 
 }  // namespace util

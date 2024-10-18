@@ -44,8 +44,15 @@ class UserManager final {
 
   int32_t UserRegister(const std::string& user, const std::string& password,
                        std::string* token) {
+    if (user.size() > 64) {
+      return Err_User_invalid_name;
+    }
+
+    if (password.size() > 64) {
+      return Err_User_invalid_passwd;
+    }
+
     std::string salt = util::Util::GenerateSalt();
-    std::string passwd_hash;
     std::string hashed_password;
     if (!util::Util::HashPassword(password, salt, &hashed_password)) {
       return Err_Fail;
@@ -53,14 +60,16 @@ class UserManager final {
 
     sqlite3_stmt* stmt = nullptr;
     auto ret = util::SqliteManager::Instance()->PrepareStatement(
-        "INSERT INTO users (user, salt, password) VALUES (?, ?, ?);", stmt);
+        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);",
+        &stmt);
     if (ret) {
       return Err_User_register_prepare_error;
     }
 
-    sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, salt.c_str(), salt.size(), SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), hashed_password.size(),
+                      SQLITE_STATIC);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
       sqlite3_finalize(stmt);
@@ -68,13 +77,24 @@ class UserManager final {
     }
     sqlite3_finalize(stmt);
 
-    *token = SessionManager::Instance()->GenerateToken(user);
-    return Err_Success;
+    int changes = util::SqliteManager::Instance()->AffectRows();
+    if (changes > 0) {
+      *token = SessionManager::Instance()->GenerateToken(user);
+      return Err_Success;
+    } else {
+      LOG(ERROR) << "No records were updated. user '" << user
+                 << " may exist already";
+    }
+    return Err_User_exists;
   }
 
   int32_t UserDelete(const std::string& login_user,
                      const std::string& to_delete_user,
                      const std::string& token) {
+    if (to_delete_user.size() > 64) {
+      return Err_User_invalid_name;
+    }
+
     if (to_delete_user == "admin") {
       LOG(ERROR) << "Cannot delete admin";
       return Err_User_invalid_name;
@@ -83,41 +103,60 @@ class UserManager final {
     if (login_user == "admin" || login_user == to_delete_user) {
       sqlite3_stmt* stmt = nullptr;
       auto ret = util::SqliteManager::Instance()->PrepareStatement(
-          "DELETE FROM users WHERE user = ?;", stmt);
+          "DELETE FROM users WHERE user = ?;", &stmt);
       if (ret) {
         return Err_User_delete_prepare_error;
       }
-      sqlite3_bind_text(stmt, 1, to_delete_user.c_str(), -1, SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 1, to_delete_user.c_str(), to_delete_user.size(),
+                        SQLITE_STATIC);
       if (sqlite3_step(stmt) != SQLITE_DONE) {
         sqlite3_finalize(stmt);
         return Err_User_delete_execute_error;
       }
-      SessionManager::Instance()->KickoutByToken(token);
       sqlite3_finalize(stmt);
+      int changes = util::SqliteManager::Instance()->AffectRows();
+      if (changes > 0) {
+        SessionManager::Instance()->KickoutByToken(token);
+        return Err_Success;
+      } else {
+        LOG(ERROR) << "No records were deleted. user '" << to_delete_user
+                   << " may not exist";
+      }
     }
     return Err_User_invalid_name;
   }
 
   int32_t UserLogin(const std::string& user, const std::string& password,
                     std::string* token) {
+    if (user.size() > 64) {
+      return Err_User_invalid_name;
+    }
+
+    if (password.size() > 64) {
+      return Err_User_invalid_passwd;
+    }
+
     sqlite3_stmt* stmt = nullptr;
     util::SqliteManager::Instance()->PrepareStatement(
-        "SELECT salt, password FROM users WHERE user = ?;", stmt);
+        "SELECT salt, password FROM users WHERE user = ?;", &stmt);
     if (!stmt) {
       return Err_User_login_prepare_error;
     }
 
-    sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
-      std::string stored_salt =
-          reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-      std::string stored_hashed_password =
-          reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+      std::string salt;
+      salt.reserve(util::Util::kSaltSize);
+      salt.append(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)),
+                  util::Util::kSaltSize);
+      std::string hashed_password;
+      hashed_password.reserve(util::Util::kDerivedKeySize);
+      hashed_password.append(
+          reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)),
+          util::Util::kDerivedKeySize);
       sqlite3_finalize(stmt);
-
-      if (util::Util::VerifyPassword(password, stored_salt,
-                                     stored_hashed_password)) {
+      if (util::Util::VerifyPassword(password, salt, hashed_password)) {
         *token = SessionManager::Instance()->GenerateToken(user);
         return Err_Success;
       } else {
@@ -130,16 +169,25 @@ class UserManager final {
   }
 
   int32_t UserExists(const std::string& user) {
+    if (user.size() > 64) {
+      return Err_User_invalid_name;
+    }
+
     sqlite3_stmt* stmt = nullptr;
     util::SqliteManager::Instance()->PrepareStatement(
-        "SELECT salt, password FROM users WHERE user = ?;", stmt);
+        "SELECT salt, password FROM users WHERE user = ?;", &stmt);
     if (!stmt) {
       return Err_User_exists_prepare_error;
     }
 
-    sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
+      std::string hashed_password;
+      hashed_password.reserve(util::Util::kDerivedKeySize);
+      hashed_password.append(
+          reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)),
+          util::Util::kDerivedKeySize);
       sqlite3_finalize(stmt);
       return Err_User_exists;
     }
@@ -150,8 +198,15 @@ class UserManager final {
 
   int32_t ChangePassword(const std::string& user, const std::string& password,
                          std::string* token) {
+    if (user.size() > 64) {
+      return Err_User_invalid_name;
+    }
+
+    if (password.size() > 64) {
+      return Err_User_invalid_passwd;
+    }
+
     std::string salt = util::Util::GenerateSalt();
-    std::string passwd_hash;
     std::string hashed_password;
     if (!util::Util::HashPassword(password, salt, &hashed_password)) {
       return Err_User_change_password_error;
@@ -159,14 +214,15 @@ class UserManager final {
 
     sqlite3_stmt* stmt = nullptr;
     auto ret = util::SqliteManager::Instance()->PrepareStatement(
-        "UPDATE users SET salt = ?, password = ? WHERE user = ?;", stmt);
+        "UPDATE users SET salt = ?, password = ? WHERE user = ?;", &stmt);
     if (ret) {
       return Err_User_change_password_error;
     }
 
-    sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, user.c_str(), user.size(), SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, salt.c_str(), salt.size(), SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, hashed_password.c_str(), hashed_password.size(),
+                      SQLITE_STATIC);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
       sqlite3_finalize(stmt);
@@ -174,8 +230,15 @@ class UserManager final {
     }
     sqlite3_finalize(stmt);
 
-    *token = SessionManager::Instance()->GenerateToken(user);
-    return Err_Success;
+    int changes = util::SqliteManager::Instance()->AffectRows();
+    if (changes > 0) {
+      *token = SessionManager::Instance()->GenerateToken(user);
+      return Err_Success;
+    } else {
+      LOG(ERROR) << "No records were updated. user '" << user
+                 << " may not exist.";
+    }
+    return Err_User_change_password_error;
   }
 
  private:
