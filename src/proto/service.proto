@@ -29,6 +29,7 @@ message UserReq {
   string password = 4;
   string token = 5;
   string to_delete_user = 6;
+  string old_password = 7;
 }
 
 message UserRes {
@@ -67,6 +68,8 @@ enum RepoOp {
   RepoCreateDir = 7;
   RepoDelDir = 8;
   RepoDelFile = 9;
+  RepoListUserRepo = 10;
+  RepoServerCreateDir = 11;
 }
 
 message RepoReq {

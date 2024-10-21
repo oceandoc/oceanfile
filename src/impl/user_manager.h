@@ -126,8 +126,7 @@ class UserManager final {
     return Err_User_invalid_name;
   }
 
-  int32_t UserLogin(const std::string& user, const std::string& password,
-                    std::string* token) {
+  int32_t VerifyPassword(const std::string& user, const std::string& password) {
     if (user.size() > 64 || user.empty()) {
       return Err_User_invalid_name;
     }
@@ -157,7 +156,6 @@ class UserManager final {
           util::Util::kDerivedKeySize);
       sqlite3_finalize(stmt);
       if (util::Util::VerifyPassword(password, salt, hashed_password)) {
-        *token = SessionManager::Instance()->GenerateToken(user);
         return Err_Success;
       } else {
         return Err_User_invalid_passwd;
@@ -166,6 +164,16 @@ class UserManager final {
 
     sqlite3_finalize(stmt);
     return Err_User_invalid_name;
+  }
+
+  int32_t UserLogin(const std::string& user, const std::string& password,
+                    std::string* token) {
+    auto ret = VerifyPassword(user, password);
+    if (ret) {
+      return ret;
+    }
+    *token = SessionManager::Instance()->GenerateToken(user);
+    return Err_Success;
   }
 
   int32_t UserLogout(const std::string& token) {
@@ -201,14 +209,20 @@ class UserManager final {
     return Err_User_not_exists;
   }
 
-  int32_t ChangePassword(const std::string& user, const std::string& password,
-                         std::string* token) {
+  int32_t ChangePassword(const std::string& user,
+                         const std::string& old_password,
+                         const std::string& password, std::string* token) {
     if (user.size() > 64 || user.empty()) {
       return Err_User_invalid_name;
     }
 
     if (password.size() > 64 || password.empty()) {
       return Err_User_invalid_passwd;
+    }
+
+    auto ret = VerifyPassword(user, old_password);
+    if (ret) {
+      return ret;
     }
 
     std::string salt = util::Util::GenerateSalt();
@@ -218,7 +232,7 @@ class UserManager final {
     }
 
     sqlite3_stmt* stmt = nullptr;
-    auto ret = util::SqliteManager::Instance()->PrepareStatement(
+    ret = util::SqliteManager::Instance()->PrepareStatement(
         "UPDATE users SET salt = ?, password = ? WHERE user = ?;", &stmt);
     if (ret) {
       return Err_User_change_password_error;

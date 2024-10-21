@@ -5,9 +5,15 @@ package oceandoc.proto;
 enum ErrCode {
   Success = 0;
   Fail = 1;
+  Unsupported_op = 2;
+  Serialize_error = 3;
+  Deserialize_error = 4;
+  Decompress_error = 5;
+  Compress_error = 6;
+  Sql_prepare_error = 7;
+  Sql_execute_error = 8;
 
   // 10000
-
   File_size_set_error = 10000;
   File_permission = 10001;
   File_disk_full = 10002;
@@ -39,18 +45,8 @@ enum ErrCode {
   Repo_not_exists = 13000;
   Repo_uuid_error = 13001;
 
-  // 14000
-  Serialize_error = 14000;
-  Deserialize_error = 14001;
-  Decompress_error = 14002;
-  Compress_error = 14003;
-
   // 15000
   Sync_interrupted = 15000;
-
-  // 16000
-  Sql_prepare_error = 16000;
-  Sql_execute_error = 16001;
 
   // 17000
   User_invalid_name = 17000;

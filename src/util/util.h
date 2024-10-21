@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "boost/algorithm/string/replace.hpp"
+#include "folly/IPAddress.h"
 #include "google/protobuf/message.h"
 #include "openssl/types.h"
 #include "src/common/defs.h"
@@ -280,6 +281,9 @@ class Util final {
   static int64_t FDCount();
   static int64_t MemUsage();
   static bool IsMountPoint(const std::string &path);
+  static void ListAllIPAddresses(std::vector<folly::IPAddress> *ip_addrs);
+  static std::string ExecutablePath();
+  static std::string HomeDir();
 };
 
 }  // namespace util

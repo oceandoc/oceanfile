@@ -25,7 +25,7 @@ TEST(UserManager, UserExists) {
 
   plain_passwd = "admin1";
   EXPECT_EQ(UserManager::Instance()->ChangePassword(
-                "admin", util::Util::SHA256(plain_passwd), &token),
+                "admin", "admin", util::Util::SHA256(plain_passwd), &token),
             Err_Success);
   EXPECT_EQ(UserManager::Instance()->UserExists(user), Err_User_exists);
 

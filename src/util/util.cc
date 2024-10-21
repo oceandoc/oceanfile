@@ -45,8 +45,11 @@
 
 #if defined(_WIN32)
 #elif defined(__linux__)
+#include <arpa/inet.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -1510,6 +1513,56 @@ bool IsMountPoint(const string &path) {
     return true;
   }
   return false;
+}
+
+void Util::ListAllIPAddresses(std::vector<folly::IPAddress> *ip_addrs) {
+#if defined(__linux__) || defined(__APPLE__)
+  struct ifaddrs *ifAddrStruct = nullptr;
+  struct ifaddrs *ifa = nullptr;
+  void *addr_ptr = nullptr;
+  getifaddrs(&ifAddrStruct);
+
+  for (ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (!ifa->ifa_addr) continue;
+    if (ifa->ifa_addr->sa_family == AF_INET) {  // IPv4
+      addr_ptr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+      char addr_buf[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, addr_ptr, addr_buf, INET_ADDRSTRLEN);
+      ip_addrs->emplace_back(folly::IPAddress(addr_buf));
+    } else if (ifa->ifa_addr->sa_family == AF_INET6) {  // IPv6
+      addr_ptr = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
+      char addr_buf[INET6_ADDRSTRLEN];
+      inet_ntop(AF_INET6, addr_ptr, addr_buf, INET6_ADDRSTRLEN);
+      ip_addrs->emplace_back(folly::IPAddress(addr_buf));
+    }
+  }
+
+  if (ifAddrStruct != nullptr) {
+    freeifaddrs(ifAddrStruct);
+  }
+#elif defined(_WIN32)
+
+#endif
+}
+
+string Util::ExecutablePath() {
+#if defined(__linux__)
+  char result[PATH_MAX];
+  ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+  return std::string(result, (count > 0) ? count : 0);
+#elif defined(_WIN32)
+#elif defined(__APPLE__)
+
+#endif
+}
+
+string Util::HomeDir() {
+  auto current_path = std::filesystem::current_path().string();
+  if (current_path == "/") {
+    std::filesystem::path workspace(ExecutablePath());
+    return workspace.parent_path().parent_path().string();
+  }
+  return current_path;
 }
 
 }  // namespace util

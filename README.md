@@ -1,4 +1,7 @@
 # TODO
+// TODO(xieyz) admin user can delete other user and repo, but not permission check other's file
+
+
 // TODO(xieyz) repo need provide list dir api
 // TODO(xieyz) scan and sync add fullly unit_test
 // TODO(xieyz) dump to disk only file count over 10 thousand when scan

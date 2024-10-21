@@ -134,14 +134,12 @@ class HandlerProxy {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
       return;
     }
-
-    if (session_user.empty() || session_user != req.user()) {
+    if (!session_user.empty() && session_user != req.user()) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
       return;
     }
 
     int32_t ret = Err_Success;
-
     switch (req.op()) {
       case proto::UserOp::UserCreate:
         ret = impl::UserManager::Instance()->UserRegister(
@@ -157,12 +155,14 @@ class HandlerProxy {
         break;
       case proto::UserOp::UserChangePassword:
         ret = impl::UserManager::Instance()->ChangePassword(
-            req.user(), req.password(), res->mutable_token());
+            req.user(), req.old_password(), req.password(),
+            res->mutable_token());
         break;
       case proto::UserOp::UserLogout:
         ret = impl::UserManager::Instance()->UserLogout(req.token());
         break;
       default:
+        ret = Err_Unsupported_op;
         LOG(ERROR) << "Unsupported operation";
     }
 
@@ -185,8 +185,7 @@ class HandlerProxy {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
       return;
     }
-
-    if (session_user.empty() || session_user != req.user()) {
+    if (!session_user.empty() && session_user != req.user()) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
       return;
     }
@@ -205,7 +204,11 @@ class HandlerProxy {
       case proto::RepoOp::RepoRepoDir:
         ret = impl::RepoManager::Instance()->ListRepoDir(req, res);
         break;
+      case proto::RepoOp::RepoListUserRepo:
+        ret = impl::RepoManager::Instance()->ListUserRepo(req, res);
+        break;
       default:
+        ret = Err_Unsupported_op;
         LOG(ERROR) << "Unsupported operation";
     }
     if (ret) {

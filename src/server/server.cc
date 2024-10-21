@@ -54,7 +54,9 @@ void RegisterSignalHandler() {
 
 int main(int argc, char **argv) {
   // ProfilerStart("oceandoc_profile");
-  LOG(INFO) << "Grpc server initializing ...";
+  LOG(INFO) << "Server initializing ...";
+  std::string home_dir = oceandoc::util::Util::HomeDir();
+  LOG(INFO) << "Home dir: " << home_dir;
 
   folly::Init init(&argc, &argv, false);
   // google::InitGoogleLogging(argv[0]); // already called in folly::Init
@@ -62,11 +64,16 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
   LOG(INFO) << "CommandLine: " << google::GetArgv();
 
-  oceandoc::util::ConfigManager::Instance()->Init("./conf/base_config.json");
+  oceandoc::util::ConfigManager::Instance()->Init(
+      home_dir + "/conf/server_base_config.json");
   oceandoc::util::ThreadPool::Instance()->Init();
   oceandoc::impl::ScanManager::Instance()->Init();
   oceandoc::impl::RepoManager::Instance()->Init();
   oceandoc::impl::ReceiveQueueManager::Instance()->Init();
+  if (!oceandoc::impl::UserManager::Instance()->Init()) {
+    LOG(ERROR) << "UserManager init error";
+    return -1;
+  }
 
 #if !defined(_WIN32)
   RegisterSignalHandler();
@@ -95,6 +102,7 @@ int main(int argc, char **argv) {
     shutdown_thread.join();
   }
 #endif
+  oceandoc::impl::UserManager::Instance()->Stop();
   oceandoc::impl::ReceiveQueueManager::Instance()->Stop();
   oceandoc::impl::RepoManager::Instance()->Stop();
   oceandoc::util::ThreadPool::Instance()->Stop();

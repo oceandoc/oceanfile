@@ -3,8 +3,8 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_CLIENT_GRPC_STATUS_CLIENT_H
-#define BAZEL_TEMPLATE_CLIENT_GRPC_STATUS_CLIENT_H
+#ifndef BAZEL_TEMPLATE_CLIENT_GRPC_SERVER_CLIENT_H
+#define BAZEL_TEMPLATE_CLIENT_GRPC_SERVER_CLIENT_H
 
 #include <memory>
 
@@ -43,4 +43,4 @@ class ServerClient {
 }  // namespace client
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_CLIENT_GRPC_STATUS_CLIENT_H
+#endif  // BAZEL_TEMPLATE_CLIENT_GRPC_SERVER_CLIENT_H

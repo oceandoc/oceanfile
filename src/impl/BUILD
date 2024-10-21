@@ -57,7 +57,7 @@ cc_test(
     name = "repo_manager_test",
     srcs = ["repo_manager_test.cc"],
     copts = COPTS,
-    data = ["//conf:base_config.json"],
+    data = ["//conf:client_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":repo_manager"],
 )
@@ -150,7 +150,7 @@ cc_test(
     name = "sync_manager_test",
     srcs = ["sync_manager_test.cc"],
     copts = COPTS,
-    data = ["//conf:base_config.json"],
+    data = ["//conf:client_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":sync_manager"],
 )
@@ -159,7 +159,7 @@ cc_test(
     name = "scan_manager_test",
     srcs = ["scan_manager_test.cc"],
     copts = COPTS,
-    data = ["//conf:base_config.json"],
+    data = ["//conf:client_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":scan_manager"],
 )
@@ -168,7 +168,7 @@ cc_test(
     name = "user_manager_test",
     srcs = ["user_manager_test.cc"],
     copts = COPTS,
-    data = ["//conf:base_config.json"],
+    data = ["//conf:client_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":user_manager"],
 )

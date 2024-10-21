@@ -83,7 +83,7 @@ cc_test(
     name = "thread_pool_test",
     srcs = ["thread_pool_test.cc"],
     copts = COPTS,
-    data = ["//conf:base_config.json"],
+    data = ["//conf:server_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":thread_pool"],
 )
@@ -132,10 +132,12 @@ cc_test(
     name = "util_test",
     timeout = "short",
     srcs = ["util_test.cc"],
+    copts = COPTS,
     data = [
-        "//conf:base_config.json",
+        "//conf:client_base_config.json",
         "//test_data/util_test",
     ],
+    local_defines = LOCAL_DEFINES,
     deps = [
         ":util",
         "//src/test:test_util",
@@ -148,7 +150,7 @@ cc_test(
         "config_manager_test.cc",
     ],
     copts = COPTS,
-    data = ["//conf:base_config.json"],
+    data = ["//conf:client_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":config_manager"],
 )

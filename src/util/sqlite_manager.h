@@ -32,7 +32,8 @@ class SqliteManager final {
   }
 
   bool Init() {
-    std::string user_db_path = "./data/user.db";
+    std::string home_dir = oceandoc::util::Util::HomeDir();
+    std::string user_db_path = home_dir + "/data/user.db";
     if (sqlite3_open(user_db_path.c_str(), &db_) != SQLITE_OK) {
       LOG(ERROR) << "open database error";
       return false;
@@ -79,6 +80,12 @@ class SqliteManager final {
       sqlite3_finalize(stmt);
       return false;
     }
+    if (AffectRows() > 0) {
+      LOG(INFO) << "Add admin success";
+    } else {
+      LOG(INFO) << "Already exists admin";
+    }
+
     sqlite3_finalize(stmt);
     return true;
   }

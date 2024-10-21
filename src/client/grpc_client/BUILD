@@ -65,7 +65,8 @@ cc_library(
     hdrs = [
         "grpc_file_client.h",
         "grpc_repo_client.h",
-        "grpc_server_client.h",
+        #"grpc_server_client.h",
+        "grpc_user_client.h",
     ],
     copts = COPTS,
     linkopts = LINKOPTS,
@@ -81,11 +82,38 @@ cc_library(
     ],
 )
 
+#cc_test(
+#name = "grpc_file_client_test",
+#srcs = ["grpc_file_client_test.cc"],
+#copts = COPTS,
+#data = ["//conf:base_config.json"],
+#local_defines = LOCAL_DEFINES,
+#deps = [":grpc_clients"],
+#)
+
 cc_test(
-    name = "grpc_file_client_test",
-    srcs = ["grpc_file_client_test.cc"],
+    name = "grpc_repo_client_test",
+    srcs = ["grpc_repo_client_test.cc"],
     copts = COPTS,
-    data = ["//conf:base_config.json"],
+    data = ["//conf:client_base_config.json"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":grpc_clients"],
+)
+
+#cc_test(
+#name = "grpc_server_client_test",
+#srcs = ["grpc_server_client_test.cc"],
+#copts = COPTS,
+#data = ["//conf:base_config.json"],
+#local_defines = LOCAL_DEFINES,
+#deps = [":grpc_clients"],
+#)
+
+cc_test(
+    name = "grpc_user_client_test",
+    srcs = ["grpc_user_client_test.cc"],
+    copts = COPTS,
+    data = ["//conf:client_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":grpc_clients"],
 )

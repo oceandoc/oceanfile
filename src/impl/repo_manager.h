@@ -272,6 +272,28 @@ class RepoManager {
     return Err_Success;
   }
 
+  int32_t ListUserRepo(const proto::RepoReq& req, proto::RepoRes* res) {
+    if (req.repo_uuid().empty()) {
+      return Err_Repo_uuid_error;
+    }
+
+    auto ret = GetDir(req, res);
+    if (ret == Err_Success) {
+      return Err_Success;
+    }
+
+    ret = LoadRepoData(req.repo_uuid());
+    if (ret) {
+      return ret;
+    }
+
+    ret = GetDir(req, res);
+    if (ret) {
+      return ret;
+    }
+    return Err_Success;
+  }
+
   int32_t ListRepoDir(const proto::RepoReq& req, proto::RepoRes* res) {
     if (req.repo_uuid().empty()) {
       return Err_Repo_uuid_error;
