@@ -217,24 +217,23 @@ class ScanManager {
 
   int32_t AddDirItem(const std::string& path, common::ScanContext* ctx,
                      const std::string& relative_path) {
-    proto::DirItem dir_item;
-    dir_item.set_path(relative_path);
+    proto::Dir dir;
+    dir.set_path(relative_path);
 
     int64_t update_time = 0, size = 0;
-    if (!util::Util::FileInfo(path, &update_time, &size,
-                              dir_item.mutable_user(),
-                              dir_item.mutable_group())) {
+    if (!util::Util::FileInfo(path, &update_time, &size, dir.mutable_user(),
+                              dir.mutable_group())) {
       LOG(ERROR) << "FileInfo error: " << path;
       return Err_File_permission_or_not_exists;
     }
-    dir_item.set_update_time(update_time);
+    dir.set_update_time(update_time);
     {
       absl::base_internal::SpinLockHolder locker(&ctx->lock);
       auto it = ctx->status->mutable_scanned_dirs()->find(relative_path);
       if (it != ctx->status->mutable_scanned_dirs()->end()) {
-        it->second.Swap(&dir_item);
+        it->second.Swap(&dir);
       } else {
-        (*ctx->status->mutable_scanned_dirs())[relative_path] = dir_item;
+        (*ctx->status->mutable_scanned_dirs())[relative_path] = dir;
         ctx->added_files.insert(path);
       }
     }
@@ -242,42 +241,45 @@ class ScanManager {
   }
 
   int32_t CalcHash(const std::string& path, common::ScanContext* ctx,
-                   proto::FileItem* file_item) {
+                   proto::File* file) {
     if (ctx->hash_method == common::HashMethod::Hash_SHA256) {
-      if (!util::Util::FileSHA256(path, file_item->mutable_hash())) {
+      if (!util::Util::FileSHA256(path, file->mutable_file_hash())) {
+        return Err_File_hash_calc_error;
+      }
+    } else if (ctx->hash_method == common::HashMethod::Hash_BLAKE3) {
+      if (!util::Util::FileMD5(path, file->mutable_file_hash())) {
         return Err_File_hash_calc_error;
       }
     } else if (ctx->hash_method == common::HashMethod::Hash_MD5) {
-      if (!util::Util::FileMD5(path, file_item->mutable_hash())) {
+      if (!util::Util::FileMD5(path, file->mutable_file_hash())) {
         return Err_File_hash_calc_error;
       }
     } else if (ctx->hash_method == common::HashMethod::Hash_CRC32) {
-      if (!util::Util::FileMD5(path, file_item->mutable_hash())) {
+      if (!util::Util::FileMD5(path, file->mutable_file_hash())) {
         return Err_File_hash_calc_error;
       }
     }
     return Err_Success;
   }
 
-  int32_t AddFileItem(const std::string& filename, const proto::FileType type,
-                      common::ScanContext* ctx,
+  int32_t AddFileItem(const std::string& file_name,
+                      const proto::FileType file_type, common::ScanContext* ctx,
                       const std::string& parent_relative_path) {
-    const auto& path = ctx->src + "/" + parent_relative_path + "/" + filename;
-    proto::FileItem file_item;
-    file_item.set_filename(filename);
-    int64_t update_time = 0, size = 0;
-    if (!util::Util::FileInfo(path, &update_time, &size,
-                              file_item.mutable_user(),
-                              file_item.mutable_group())) {
+    const auto& path = ctx->src + "/" + parent_relative_path + "/" + file_name;
+    proto::File file;
+    file.set_file_name(file_name);
+    int64_t update_time = 0, file_size = 0;
+    if (!util::Util::FileInfo(path, &update_time, &file_size,
+                              file.mutable_user(), file.mutable_group())) {
       LOG(ERROR) << "FileInfo error: " << path;
       return Err_File_permission_or_not_exists;
     }
 
-    file_item.set_update_time(update_time);
-    file_item.set_size(size);
-    file_item.set_file_type(type);
+    file.set_update_time(update_time);
+    file.set_file_size(file_size);
+    file.set_file_type(file_type);
 
-    auto ret = CalcHash(path, ctx, &file_item);
+    auto ret = CalcHash(path, ctx, &file);
     if (ret != Err_Success) {
       LOG(ERROR) << "CalcHash error: " << path;
       return ret;
@@ -292,11 +294,11 @@ class ScanManager {
                    << parent_relative_path;
         return Err_Fail;
       }
-      auto file_it = dir_it->second.mutable_files()->find(filename);
+      auto file_it = dir_it->second.mutable_files()->find(file_name);
       if (file_it != dir_it->second.mutable_files()->end()) {
-        file_it->second.Swap(&file_item);
+        file_it->second.Swap(&file);
       } else {
-        (*dir_it->second.mutable_files())[filename] = file_item;
+        (*dir_it->second.mutable_files())[file_name] = file;
         ctx->added_files.emplace(path);
       }
     }

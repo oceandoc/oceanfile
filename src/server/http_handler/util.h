@@ -77,10 +77,10 @@ class Util {
         context.req->set_src(context.data);
         break;
       case MP_hash:
-        context.req->set_hash(context.data);
+        context.req->set_file_hash(context.data);
         break;
       case MP_size:
-        context.req->set_size(util::Util::ToInt<int64_t>(context.data));
+        context.req->set_file_size(util::Util::ToInt<int64_t>(context.data));
         break;
       case MP_content:
         context.req->mutable_content()->append(context.data);

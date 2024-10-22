@@ -103,20 +103,20 @@ class RepoManager {
     res->mutable_dir()->set_path(path);
     try {
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        const auto& filename = entry.path().filename().string();
+        const auto& file_name = entry.path().filename().string();
 
-        proto::FileItem file;
-        file.set_filename(filename);
+        proto::File file;
+        file.set_file_name(file_name);
         if (entry.is_symlink()) {
           file.set_file_type(proto::FileType::Symlink);
         } else if (entry.is_regular_file()) {
           file.set_file_type(proto::FileType::Regular);
         } else if (entry.is_directory()) {
-          file.set_file_type(proto::FileType::Dir);
+          file.set_file_type(proto::FileType::Direcotry);
         } else {
           LOG(ERROR) << "Unknow file type: " << entry.path();
         }
-        res->mutable_dir()->mutable_files()->emplace(filename, file);
+        res->mutable_dir()->mutable_files()->emplace(file_name, file);
       }
     } catch (const std::filesystem::filesystem_error& e) {
       return Err_Fail;
@@ -183,9 +183,9 @@ class RepoManager {
       return false;
     }
 
-    if (path != repo->path()) {
-      LOG(WARNING) << "Repo moved, origin path: " << repo->path();
-      repo->set_path(path);
+    if (path != repo->repo_path()) {
+      LOG(WARNING) << "Repo moved, origin path: " << repo->repo_path();
+      repo->set_repo_path(path);
     }
     LOG(INFO) << "Restored " << repo->repo_uuid();
 
@@ -212,9 +212,9 @@ class RepoManager {
     repo.set_create_time(
         util::Util::ToTimeStr(util::Util::CurrentTimeMillis()));
     repo.set_update_time(repo.create_time());
-    repo.set_path(req.path());
+    repo.set_repo_path(req.path());
     repo.set_repo_name(req.repo_name());
-    repo.set_location_uuid(util::Util::UUID());
+    repo.set_repo_location_uuid(util::Util::UUID());
     repo.set_owner(req.user());
 
     std::string content;
@@ -266,7 +266,7 @@ class RepoManager {
     absl::base_internal::SpinLockHolder locker(&lock_);
     auto it = repos_.repos().find(uuid);
     if (it != repos_.repos().end()) {
-      return it->second.path();
+      return it->second.repo_path();
     }
     return "";
   }
@@ -348,10 +348,10 @@ class RepoManager {
       auto dir_it = it->second.dirs().find(path);
       if (dir_it == it->second.dirs().end()) {
         LOG(ERROR) << "Cannot find dir " << path << " in repo: " << it->first
-                   << ", path: " << it->second.path();
+                   << ", path: " << it->second.repo_path();
         return Err_File_not_exists;
       }
-      *res->mutable_dir() = dir_it->second;
+      *res->mutable_repo_dir() = dir_it->second;
       return Err_Success;
     }
     return Err_File_not_exists;
@@ -366,7 +366,7 @@ class RepoManager {
     }
 
     const auto& repo_file_path =
-        util::Util::RepoFilePath(repo_path, req.hash());
+        util::Util::RepoFilePath(repo_path, req.file_hash());
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
       return Err_Repo_uuid_error;
@@ -375,14 +375,14 @@ class RepoManager {
     util::Util::MkParentDir(repo_file_path);
 
     auto err_code = Err_Success;
-    err_code = util::Util::CreateFileWithSize(repo_file_path, req.size());
+    err_code = util::Util::CreateFileWithSize(repo_file_path, req.file_size());
     if (err_code != Err_Success) {
       LOG(ERROR) << "Create file error: " << repo_file_path;
       return err_code;
     }
 
     int64_t start = 0, end = 0;
-    util::Util::CalcPartitionStart(req.size(), req.partition_num(),
+    util::Util::CalcPartitionStart(req.file_size(), req.partition_num(),
                                    req.partition_size(), &start, &end);
     if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
       LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
@@ -392,6 +392,29 @@ class RepoManager {
     }
     std::unique_lock<std::shared_mutex> locker(mu);
     return util::Util::WriteToFile(repo_file_path, req.content(), start);
+  }
+
+  int32_t InsertFileToRepo(const std::string& repo_uuid,
+                           const std::string& repo_dir,
+                           const std::string& file_name,
+                           const std::string& file_hash) {
+    proto::RepoFile file;
+    file.set_file_name(file_name);
+    file.set_file_hash(file_hash);
+    absl::base_internal::SpinLockHolder locker(&lock_);
+    auto it = repo_datas_.find(repo_uuid);
+    if (it != repo_datas_.end()) {
+      auto dir_it = it->second.mutable_dirs()->find(repo_dir);
+      if (dir_it == it->second.dirs().end()) {
+        proto::RepoDir dir;
+        dir.set_path(repo_dir);
+        dir.mutable_files()->emplace(file_name, file);
+      } else {
+      }
+      dir_it->second.mutable_files()->emplace(file_name, file);
+      return Err_Success;
+    }
+    return Err_Repo_data_not_exists;
   }
 
   void Stop() { stop_.store(true); }

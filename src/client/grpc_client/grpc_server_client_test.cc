@@ -14,8 +14,8 @@ namespace client {
 TEST(FileClient, Send) {
   std::string path =
       "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus";
-  oceandoc::client::FileClient file_client(nullptr);
-  oceandoc::common::SendContext send_ctx;
+  FileClient file_client(nullptr);
+  common::SendContext send_ctx;
   send_ctx.src = path;
   send_ctx.dst =
       "/tmp/test_dir/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus";

@@ -795,19 +795,20 @@ bool Util::PrepareFile(const string &path, const common::HashMethod hash_method,
   attr->path = path;
 
   if (hash_method == common::HashMethod::Hash_BLAKE3) {
-    if (!FileBlake3(path, &attr->hash)) {
+    if (!FileBlake3(path, &attr->file_hash)) {
       LOG(ERROR) << "Calc " << path << " hash error";
       return false;
     }
   }
 
-  FileInfo(path, &attr->update_time, &attr->size, &attr->user, &attr->group);
-  if (attr->size == -1) {
+  FileInfo(path, &attr->update_time, &attr->file_size, &attr->user,
+           &attr->group);
+  if (attr->file_size == -1) {
     LOG(ERROR) << "Get " << path << " size error";
     return false;
   }
 
-  attr->partition_num = FilePartitionNum(attr->size, partition_size);
+  attr->partition_num = FilePartitionNum(attr->file_size, partition_size);
   return true;
 }
 
@@ -1337,7 +1338,8 @@ void Util::PrintFileReq(const proto::FileReq &req) {
   LOG(INFO) << "request_id: " << req.request_id()
             << ", repo_type: " << req.repo_type() << ", op: " << req.op()
             << ", src: " << req.src() << ", dst: " << req.dst()
-            << ", hash: " << req.hash() << ", size: " << req.size()
+            << ", file_hash: " << req.file_hash()
+            << ", file_size: " << req.file_size()
             << ", partition_num: " << req.partition_num()
             << ", repo_uuid: " << req.repo_uuid()
             << ", partition_size: " << req.partition_size()
@@ -1367,9 +1369,10 @@ bool Util::FileReqToJson(const proto::FileReq &req, string *json) {
                      rapidjson::Value().SetString(req.dst().c_str(), allocator),
                      allocator);
   document.AddMember(
-      "hash", rapidjson::Value().SetString(req.hash().c_str(), allocator),
+      "file_hash",
+      rapidjson::Value().SetString(req.file_hash().c_str(), allocator),
       allocator);
-  document.AddMember("size", req.size(), allocator);
+  document.AddMember("file_size", req.file_size(), allocator);
 
   string base64_content;
   Base64Encode(req.content(), &base64_content);
@@ -1421,12 +1424,12 @@ bool Util::JsonToFileReq(const string &json, proto::FileReq *req) {
     req->set_dst(doc["dst"].GetString());
   }
 
-  if (doc.HasMember("hash") && doc["hash"].IsString()) {
-    req->set_hash(doc["hash"].GetString());
+  if (doc.HasMember("file_hash") && doc["file_hash"].IsString()) {
+    req->set_file_hash(doc["file_hash"].GetString());
   }
 
-  if (doc.HasMember("size") && doc["size"].IsInt64()) {
-    req->set_size(doc["size"].GetInt64());
+  if (doc.HasMember("file_size") && doc["file_size"].IsInt64()) {
+    req->set_file_size(doc["file_size"].GetInt64());
   }
 
   if (doc.HasMember("content") && doc["content"].IsString()) {

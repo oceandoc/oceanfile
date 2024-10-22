@@ -57,9 +57,9 @@ struct UploadContext final {
 
 struct FileAttr final {
   std::string path;
-  std::string hash;
-  std::string enc_hash;
-  int64_t size;
+  std::string file_hash;
+  std::string enc_file_hash;
+  int64_t file_size;
   int32_t partition_num;
   int64_t update_time;
   std::string user;
@@ -71,16 +71,16 @@ struct FileAttr final {
     content.append(path);
     content.append(", ");
 
-    content.append("hash: ");
-    content.append(hash);
+    content.append("file_hash: ");
+    content.append(file_hash);
     content.append(", ");
 
-    content.append("enc_hash: ");
-    content.append(enc_hash);
+    content.append("enc_file_hash: ");
+    content.append(enc_file_hash);
     content.append(", ");
 
-    content.append("size: ");
-    content.append(std::to_string(size));
+    content.append("file_size: ");
+    content.append(std::to_string(file_size));
     content.append(", ");
 
     content.append("partition_num: ");
@@ -147,9 +147,9 @@ class SendContext final {
  public:
   std::string src;
   std::string dst;
-  proto::FileType type;
+  proto::FileType file_type;
   std::string content;
-  std::string hash;
+  std::string file_hash;
   proto::FileOp op;
   std::vector<int32_t> mark;
 };

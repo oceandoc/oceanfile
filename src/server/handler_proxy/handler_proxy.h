@@ -60,7 +60,7 @@ class HandlerProxy {
   static int32_t Exists(const proto::FileReq& req, proto::FileRes* res) {
     int32_t ret = Err_Success;
     if (!util::Util::Exists(req.dst())) {
-      if (req.file_type() == proto::FileType::Dir) {
+      if (req.file_type() == proto::FileType::Direcotry) {
         util::Util::Mkdir(req.dst());
         return ret;
       }
@@ -74,7 +74,7 @@ class HandlerProxy {
       if (!std::filesystem::is_regular_file(req.dst())) {
         ret = Err_File_type_mismatch;
       }
-    } else if (req.file_type() == proto::FileType::Dir) {
+    } else if (req.file_type() == proto::FileType::Direcotry) {
       if (!std::filesystem::is_directory(req.dst())) {
         ret = Err_File_type_mismatch;
       }
@@ -137,7 +137,7 @@ class HandlerProxy {
 
     res->set_src(req.src());
     res->set_dst(req.dst());
-    res->set_hash(req.hash());
+    res->set_file_hash(req.file_hash());
     res->set_partition_num(req.partition_num());
     res->set_file_type(req.file_type());
     res->set_request_id(req.request_id());
@@ -167,7 +167,7 @@ class HandlerProxy {
         ret = impl::UserManager::Instance()->UserRegister(
             req.user(), req.password(), res->mutable_token());
         break;
-      case proto::UserOp::UserDel:
+      case proto::UserOp::UserDelete:
         ret = impl::UserManager::Instance()->UserDelete(
             session_user, req.to_delete_user(), req.token());
         break;

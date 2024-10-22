@@ -22,15 +22,15 @@ class RepoClient {
   explicit RepoClient(const std::string& addr, const std::string& port)
       : channel_(grpc::CreateChannel(addr + ":" + port,
                                      grpc::InsecureChannelCredentials())),
-        stub_(oceandoc::proto::OceanFile::NewStub(channel_)) {}
+        stub_(proto::OceanFile::NewStub(channel_)) {}
 
   bool ListUserRepo(
       const std::string& user, const std::string& token,
       google::protobuf::Map<std::string, proto::RepoMeta>* repos) {
-    oceandoc::proto::RepoReq req;
-    oceandoc::proto::RepoRes res;
+    proto::RepoReq req;
+    proto::RepoRes res;
     req.set_request_id(util::Util::UUID());
-    req.set_op(oceandoc::proto::RepoOp::RepoListUserRepo);
+    req.set_op(proto::RepoOp::RepoListUserRepo);
     req.set_user(user);
     req.set_token(token);
 
@@ -53,11 +53,11 @@ class RepoClient {
   }
 
   bool ListServerDir(const std::string& user, const std::string& token,
-                     const std::string& path, proto::DirItem* dir) {
-    oceandoc::proto::RepoReq req;
-    oceandoc::proto::RepoRes res;
+                     const std::string& path, proto::Dir* dir) {
+    proto::RepoReq req;
+    proto::RepoRes res;
     req.set_request_id(util::Util::UUID());
-    req.set_op(oceandoc::proto::RepoOp::RepoListServerDir);
+    req.set_op(proto::RepoOp::RepoListServerDir);
     req.set_user(user);
     req.set_token(token);
     req.set_path(path);
@@ -81,10 +81,10 @@ class RepoClient {
 
   bool CreateServerDir(const std::string& user, const std::string& token,
                        const std::string& path) {
-    oceandoc::proto::RepoReq req;
-    oceandoc::proto::RepoRes res;
+    proto::RepoReq req;
+    proto::RepoRes res;
     req.set_request_id(util::Util::UUID());
-    req.set_op(oceandoc::proto::RepoOp::RepoCreateServerDir);
+    req.set_op(proto::RepoOp::RepoCreateServerDir);
     req.set_user(user);
     req.set_token(token);
     req.set_path(path);
@@ -108,8 +108,8 @@ class RepoClient {
   bool CreateRepo(const std::string& user, const std::string& token,
                   const std::string& repo_name, const std::string& path,
                   proto::RepoMeta* repo) {
-    oceandoc::proto::RepoReq req;
-    oceandoc::proto::RepoRes res;
+    proto::RepoReq req;
+    proto::RepoRes res;
     grpc::ClientContext context;
 
     req.set_request_id(util::Util::UUID());
@@ -138,8 +138,8 @@ class RepoClient {
 
   bool DeleteRepo(const std::string& user, const std::string& token,
                   const std::string& repo_uuid) {
-    oceandoc::proto::RepoReq req;
-    oceandoc::proto::RepoRes res;
+    proto::RepoReq req;
+    proto::RepoRes res;
     grpc::ClientContext context;
 
     req.set_request_id(util::Util::UUID());
@@ -166,7 +166,7 @@ class RepoClient {
 
  private:
   std::shared_ptr<grpc::Channel> channel_;
-  std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
+  std::unique_ptr<proto::OceanFile::Stub> stub_;
 };
 
 }  // namespace client

@@ -14,14 +14,14 @@ namespace oceandoc {
 namespace client {
 
 TEST(UserClient, All) {
-  std::string home_dir = oceandoc::util::Util::HomeDir();
+  std::string home_dir = util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
   util::ConfigManager::Instance()->Init(home_dir +
                                         "/conf/client_base_config.json");
 
   auto addr = util::ConfigManager::Instance()->ServerAddr();
   auto port = std::to_string(util::ConfigManager::Instance()->GrpcServerPort());
-  oceandoc::client::UserClient user_client(addr, port);
+  UserClient user_client(addr, port);
 
   std::string user = "admin";
   std::string plain_passwd = "admin";

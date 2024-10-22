@@ -16,7 +16,7 @@ message Context {
 enum UserOp {
   UserUnused = 0;
   UserCreate = 1;
-  UserDel = 2;
+  UserDelete = 2;
   UserLogin = 3;
   UserLogout = 4;
   UserChangePassword = 5;
@@ -67,8 +67,8 @@ enum RepoOp {
   RepoChangeRepoOwner = 6;
   RepoListRepoDir = 7;
   RepoCreateRepoDir = 8;
-  RepoDelRepoDir = 9;
-  RepoDelRepoFile = 10;
+  RepoDeleteRepoDir = 9;
+  RepoDeleteRepoFile = 10;
 }
 
 message RepoReq {
@@ -85,8 +85,9 @@ message RepoReq {
 message RepoRes {
   ErrCode err_code = 1;
   map<string, RepoMeta> repos = 2;
-  DirItem dir = 3;
-  RepoMeta repo = 4;
+  RepoDir repo_dir = 3;
+  Dir dir = 4;
+  RepoMeta repo = 5;
 }
 
 enum FileOp {
@@ -104,26 +105,26 @@ message FileReq {
   FileOp op = 3;
   string src = 4;
   string dst = 5;
-  string hash = 6;
-  int64 size = 7;
-  bytes content = 8;
-  int32 partition_num = 9;
-  string repo_uuid = 10;
-  int64 partition_size = 11;
-  FileType file_type = 12;
-  string user = 13;
-  string group = 14;
-  int64 update_time = 15;
-  string token = 16;
+  FileType file_type = 6;
+  string file_hash = 7;
+  int64 file_size = 8;
+  bytes content = 9;
+  int64 update_time = 10;
+  int32 partition_num = 11;
+  string repo_uuid = 12;
+  int64 partition_size = 13;
+  string user = 14;
+  string group = 15;
+  string token = 17;
 }
 
 message FileRes {
   ErrCode err_code = 1;
   string src = 2;
   string dst = 3;
-  string hash = 4;
-  int32 partition_num = 5;
-  FileType file_type = 6;
+  FileType file_type = 4;
+  string file_hash = 5;
+  int32 partition_num = 6;
   string request_id = 7;
   FileOp op = 8;
   bool can_skip_upload = 9;

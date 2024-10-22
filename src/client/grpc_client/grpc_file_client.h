@@ -126,7 +126,7 @@ class FileClient
               std::make_shared<common::SendContext>();
           ctx->src = res_.src();
           ctx->dst = res_.dst();
-          ctx->type = res_.file_type();
+          ctx->file_type = res_.file_type();
           ctx->op = proto::FileOp::FilePut;
           Put(ctx);
         } else {
@@ -202,7 +202,7 @@ class FileClient
         LOG(ERROR) << "Empty repo_uuid, this should never happen";
         return false;
       }
-      if (ctx->type == proto::FileType::Dir) {
+      if (ctx->file_type == proto::FileType::Direcotry) {
         LOG(ERROR) << "Cannot upload a dir to Ocean type repo";
         return false;
       }
@@ -219,22 +219,22 @@ class FileClient
     }
     req_.set_repo_type(sync_ctx_->repo_type);
     req_.set_op(ctx->op);
-    req_.set_file_type(ctx->type);
+    req_.set_file_type(ctx->file_type);
 
-    if (ctx->type == proto::FileType::Symlink) {
+    if (ctx->file_type == proto::FileType::Symlink) {
       req_.set_content(ctx->content);
       LOG(INFO) << ctx->src << ", dst: " << req_.dst()
                 << ", target: " << req_.content();
     }
 
     if (ctx->op == proto::FileOp::FilePut &&
-        ctx->type != proto::FileType::Regular) {
+        ctx->file_type != proto::FileType::Regular) {
       LOG(ERROR) << "Op and Type mismatch";
       return false;
     }
 
-    if (ctx->type == proto::FileType::Regular ||
-        ctx->type == proto::FileType::Symlink) {
+    if (ctx->file_type == proto::FileType::Regular ||
+        ctx->file_type == proto::FileType::Symlink) {
       common::FileAttr attr;
       if (!util::Util::PrepareFile(ctx->src, sync_ctx_->hash_method,
                                    sync_ctx_->partition_size, &attr)) {
@@ -243,10 +243,10 @@ class FileClient
       }
 
       if (sync_ctx_->hash_method != common::HashMethod::Hash_NONE) {
-        req_.set_hash(attr.hash);
+        req_.set_file_hash(attr.file_hash);
       }
 
-      req_.set_size(attr.size);
+      req_.set_file_size(attr.file_size);
       req_.set_partition_size(sync_ctx_->partition_size);
       req_.set_update_time(attr.update_time);
       ctx->mark.resize(attr.partition_num, 0);
@@ -287,7 +287,7 @@ class FileClient
       }
 
       if (ctx->op == proto::FileOp::FileExists) {
-        if (ctx->type == proto::FileType::Symlink) {
+        if (ctx->file_type == proto::FileType::Symlink) {
           LOG(INFO) << "Now send symlink: " << ctx->src;
           sync_ctx_->syncd_file_success_cnt.fetch_add(1);
         }
@@ -375,7 +375,7 @@ class FileClient
   common::SyncContext* sync_ctx_;
 
   std::shared_ptr<grpc::Channel> channel_;
-  std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
+  std::unique_ptr<proto::OceanFile::Stub> stub_;
   bool done_ = false;
   grpc::ClientContext context_;
   std::vector<char> buffer_;

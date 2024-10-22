@@ -104,6 +104,7 @@ cc_library(
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        ":repo_manager",
         "//src/client/grpc_client:grpc_clients",
         "//src/common:defs",
         "//src/proto:cc_data",

@@ -20,13 +20,13 @@
 namespace oceandoc {
 namespace client {
 
-using oceandoc::util::ConfigManager;
+using util::ConfigManager;
 class UserClient {
  public:
   explicit UserClient(const std::string& addr, const std::string& port)
       : channel_(grpc::CreateChannel(addr + ":" + port,
                                      grpc::InsecureChannelCredentials())),
-        stub_(oceandoc::proto::OceanFile::NewStub(channel_)) {
+        stub_(proto::OceanFile::NewStub(channel_)) {
     auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(2);
     if (channel_->WaitForConnected(deadline)) {
       LOG(INFO) << "Connect to " << addr << ":" << port << " success";
@@ -37,10 +37,10 @@ class UserClient {
 
   bool Register(const std::string& user, const std::string& password,
                 std::string* token) {
-    oceandoc::proto::UserReq req;
-    oceandoc::proto::UserRes res;
-    req.set_request_id(oceandoc::util::Util::UUID());
-    req.set_op(oceandoc::proto::UserOp::UserCreate);
+    proto::UserReq req;
+    proto::UserRes res;
+    req.set_request_id(util::Util::UUID());
+    req.set_op(proto::UserOp::UserCreate);
     req.set_user(user);
     req.set_password(password);
 
@@ -63,10 +63,10 @@ class UserClient {
 
   bool Login(const std::string& user, const std::string& password,
              std::string* token) {
-    oceandoc::proto::UserReq req;
-    oceandoc::proto::UserRes res;
-    req.set_request_id(oceandoc::util::Util::UUID());
-    req.set_op(oceandoc::proto::UserOp::UserLogin);
+    proto::UserReq req;
+    proto::UserRes res;
+    req.set_request_id(util::Util::UUID());
+    req.set_op(proto::UserOp::UserLogin);
     req.set_user(user);
     req.set_password(password);
 
@@ -90,10 +90,10 @@ class UserClient {
   bool ChangePassword(const std::string& user, const std::string& old_password,
                       const std::string& new_password,
                       const std::string& token) {
-    oceandoc::proto::UserReq req;
-    oceandoc::proto::UserRes res;
-    req.set_request_id(oceandoc::util::Util::UUID());
-    req.set_op(oceandoc::proto::UserOp::UserChangePassword);
+    proto::UserReq req;
+    proto::UserRes res;
+    req.set_request_id(util::Util::UUID());
+    req.set_op(proto::UserOp::UserChangePassword);
     req.set_user(user);
     req.set_old_password(old_password);
     req.set_password(new_password);
@@ -117,7 +117,7 @@ class UserClient {
 
  private:
   std::shared_ptr<grpc::Channel> channel_;
-  std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
+  std::unique_ptr<proto::OceanFile::Stub> stub_;
 };
 
 }  // namespace client

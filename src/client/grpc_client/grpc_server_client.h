@@ -23,7 +23,7 @@ class ServerClient {
   explicit ServerClient(const std::string& addr, const std::string& port)
       : channel_(grpc::CreateChannel(addr + ":" + port,
                                      grpc::InsecureChannelCredentials())),
-        stub_(oceandoc::proto::OceanFile::NewStub(channel_)) {}
+        stub_(proto::OceanFile::NewStub(channel_)) {}
 
   bool Status(const proto::ServerReq& req, proto::ServerRes* res) {
     grpc::ClientContext context;
@@ -37,7 +37,7 @@ class ServerClient {
 
  private:
   std::shared_ptr<grpc::Channel> channel_;
-  std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;
+  std::unique_ptr<proto::OceanFile::Stub> stub_;
 };
 
 }  // namespace client

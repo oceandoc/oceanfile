@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "folly/Singleton.h"
+#include "src/impl/repo_manager.h"
 #include "src/proto/service.pb.h"
 #include "src/util/config_manager.h"
 #include "src/util/thread_pool.h"
@@ -29,6 +30,10 @@ class ReceiveContext final {
   std::set<int32_t> partitions;
   int32_t part_num = 0;
   int64_t file_update_time = 0;
+  proto::RepoType repo_type = proto::RepoType::RT_Unused;
+  std::string repo_uuid;
+  std::string repo_dir;
+  std::string file_hash;
 };
 
 class ReceiveQueueManager final {
@@ -70,7 +75,7 @@ class ReceiveQueueManager final {
       ctx.update_time = util::Util::CurrentTimeMillis();
       ctx.partitions.insert(req.partition_num());
       ctx.part_num =
-          util::Util::FilePartitionNum(req.size(), req.partition_size());
+          util::Util::FilePartitionNum(req.file_size(), req.partition_size());
       ctx.file_update_time = req.update_time();
       queue_.emplace(req.request_id(), ctx);
     }
@@ -106,23 +111,34 @@ class ReceiveQueueManager final {
 
       auto now = util::Util::CurrentTimeMillis();
       auto offset = now - last_time;
-      last_time = now;
       if (GetSize() <= 5 && offset < 1000 * 5) {
         continue;
       }
+      last_time = now;
 
       for (auto it = queue_.begin(); it != queue_.end();) {
+        const auto ctx = it->second;
         if (it->second.part_num == it->second.partitions.size()) {
-          if (!util::Util::SetUpdateTime(it->second.dst,
-                                         it->second.file_update_time)) {
-            LOG(INFO) << "Set update time error: " << it->second.dst;
+          if (!util::Util::SetUpdateTime(ctx.dst, ctx.file_update_time)) {
+            LOG(INFO) << "Set update time error: " << ctx.dst;
             std::unique_lock<std::mutex> lock(mu_);
             to_remove_files_.emplace_back(it->second.dst);
             cv_.notify_all();
+            it = queue_.erase(it);
+            continue;
           } else {
+            if (it->second.repo_type == proto::RepoType::RT_Ocean) {
+              if (RepoManager::Instance()->InsertFileToRepo(
+                      ctx.repo_uuid, ctx.repo_dir, ctx.dst, ctx.file_hash)) {
+                std::unique_lock<std::mutex> lock(mu_);
+                to_remove_files_.emplace_back(it->second.dst);
+                cv_.notify_all();
+                it = queue_.erase(it);
+                continue;
+              }
+            }
             LOG(INFO) << "Store " << it->second.dst << " success";
           }
-          it = queue_.erase(it);
           continue;
         }
         if (now - it->second.update_time <

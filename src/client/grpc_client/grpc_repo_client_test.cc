@@ -15,7 +15,7 @@ namespace oceandoc {
 namespace client {
 
 TEST(RepoClient, ListUserRepo) {
-  std::string home_dir = oceandoc::util::Util::HomeDir();
+  std::string home_dir = util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
   util::ConfigManager::Instance()->Init(home_dir +
                                         "/conf/client_base_config.json");
@@ -36,7 +36,7 @@ TEST(RepoClient, ListUserRepo) {
 
   proto::RepoMeta repo;
   if (repos.empty()) {
-    proto::DirItem dir;
+    proto::Dir dir;
     repo_client.ListServerDir(user, token, "", &dir);
     repo_client.ListServerDir(user, token, "/tmp", &dir);
     repo_client.CreateServerDir(user, token, "/tmp/test_repo");

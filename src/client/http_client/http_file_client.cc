@@ -66,8 +66,8 @@ class FileClient {
     req.mutable_content()->resize(common::NET_BUFFER_SIZE_BYTES);
     req.set_op(proto::FileOp::FilePut);
     req.set_dst(path);
-    req.set_hash(attr.hash);
-    req.set_size(attr.size);
+    req.set_file_hash(attr.file_hash);
+    req.set_file_size(attr.file_size);
     req.set_repo_uuid(repo_uuid);
     std::string serialized;
 
@@ -99,7 +99,8 @@ class FileClient {
         curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &response_string);
 
-        LOG(INFO) << "Now send " << req.hash() << ", part: " << partition_num;
+        LOG(INFO) << "Now send " << req.file_hash()
+                  << ", part: " << partition_num;
         CURLcode ret = curl_easy_perform(curl_);
         curl_slist_free_all(headers);
         if (ret != CURLE_OK) {

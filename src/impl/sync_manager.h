@@ -447,7 +447,7 @@ class SyncManager {
         util::Util::FileInfo(file_dst_path, &update_time, &file_size, nullptr,
                              nullptr);
         if (update_time != -1 && update_time == f.second.update_time() &&
-            file_size == f.second.size()) {
+            file_size == f.second.file_size()) {
           sync_ctx->syncd_file_success_cnt.fetch_add(1);
           sync_ctx->syncd_file_skipped_cnt.fetch_add(1);
           continue;

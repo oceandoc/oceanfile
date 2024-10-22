@@ -402,13 +402,13 @@ TEST(Util, PrepareFile) {
   Util::PrepareFile("test_data/util_test/target",
                     common::HashMethod::Hash_BLAKE3,
                     common::NET_BUFFER_SIZE_BYTES, &attr);
-  EXPECT_EQ(attr.hash,
+  EXPECT_EQ(attr.file_hash,
             "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2");
   EXPECT_EQ(attr.partition_num, 1);
   if (test::Util::IsBazelRunUnitTest()) {
-    EXPECT_EQ(attr.size, 108);
+    EXPECT_EQ(attr.file_size, 108);
   } else {
-    EXPECT_EQ(attr.size, 5);
+    EXPECT_EQ(attr.file_size, 5);
   }
 }
 
@@ -575,8 +575,8 @@ TEST(Util, MessageToJson) {
   proto::FileReq req;
   req.set_op(proto::FileOp::FilePut);
   req.set_src("tesxt");
-  req.set_hash("abbc");
-  req.set_size(50);
+  req.set_file_hash("abbc");
+  req.set_file_size(50);
   req.set_repo_uuid("/tmp/test_repo");
   req.set_content("test");
 

@@ -16,7 +16,7 @@ namespace oceandoc {
 namespace client {
 
 TEST(FileClient, Send) {
-  std::string home_dir = oceandoc::util::Util::HomeDir();
+  std::string home_dir = util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
   util::ConfigManager::Instance()->Init(home_dir +
                                         "/conf/client_base_config.json");
@@ -51,7 +51,7 @@ TEST(FileClient, Send) {
       std::make_shared<common::SendContext>();
   send_ctx->src = path;
   send_ctx->op = proto::FileOp::FilePut;
-  send_ctx->type = proto::FileType::Regular;
+  send_ctx->file_type = proto::FileType::Regular;
 
   file_client.Put(send_ctx);
   file_client.SetFillQueueComplete();

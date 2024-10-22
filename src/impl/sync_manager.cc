@@ -23,7 +23,7 @@ std::shared_ptr<SyncManager> SyncManager::Instance() {
 int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
   static thread_local std::shared_mutex mu;
 
-  if (req.file_type() == proto::FileType::Dir) {
+  if (req.file_type() == proto::FileType::Direcotry) {
     if (!util::Util::Mkdir(req.dst())) {
       return Err_File_mkdir_error;
     }
@@ -41,14 +41,14 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
   util::Util::MkParentDir(req.dst());
 
   auto err_code = Err_Success;
-  err_code = util::Util::CreateFileWithSize(req.dst(), req.size());
+  err_code = util::Util::CreateFileWithSize(req.dst(), req.file_size());
   if (err_code != Err_Success) {
     LOG(ERROR) << "Create file error: " << req.dst();
     return err_code;
   }
 
   int64_t start = 0, end = 0;
-  util::Util::CalcPartitionStart(req.size(), req.partition_num(),
+  util::Util::CalcPartitionStart(req.file_size(), req.partition_num(),
                                  req.partition_size(), &start, &end);
   if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
     LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
@@ -163,7 +163,7 @@ void SyncManager::RecursiveRemoteSyncWorker(const int32_t thread_no,
               std::make_shared<common::SendContext>();
           dir_send_ctx->src = cur_dir;
           dir_send_ctx->dst = dst_dir;
-          dir_send_ctx->type = proto::FileType::Dir;
+          dir_send_ctx->file_type = proto::FileType::Direcotry;
           dir_send_ctx->op = proto::FileOp::FileExists;
           file_client.Put(dir_send_ctx);
           continue;
@@ -181,14 +181,14 @@ void SyncManager::RecursiveRemoteSyncWorker(const int32_t thread_no,
         file_send_ctx->dst = file_dst_path;
         file_send_ctx->op = proto::FileOp::FileExists;
         if (entry.is_symlink()) {
-          file_send_ctx->type = proto::FileType::Symlink;
+          file_send_ctx->file_type = proto::FileType::Symlink;
           if (!util::Util::SyncRemoteSymlink(cur_dir, file_src_path,
                                              &file_send_ctx->content)) {
             LOG(ERROR) << "Get " << file_dst_path << " target error";
             continue;
           }
         } else if (entry.is_regular_file()) {
-          file_send_ctx->type = proto::FileType::Regular;
+          file_send_ctx->file_type = proto::FileType::Regular;
         }
 
         file_client.Put(file_send_ctx);
@@ -305,7 +305,7 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
         std::make_shared<common::SendContext>();
     dir_send_ctx->src = dir_src_path;
     dir_send_ctx->dst = dir_dst_path;
-    dir_send_ctx->type = proto::FileType::Dir;
+    dir_send_ctx->file_type = proto::FileType::Direcotry;
     dir_send_ctx->op = proto::FileOp::FileExists;
     file_client.Put(dir_send_ctx);
 
@@ -322,7 +322,7 @@ void SyncManager::RemoteSyncWorker(const int32_t thread_no,
           std::make_shared<common::SendContext>();
       file_send_ctx->src = file_src_path;
       file_send_ctx->dst = file_dst_path;
-      file_send_ctx->type = f.second.file_type();
+      file_send_ctx->file_type = f.second.file_type();
       file_send_ctx->op = proto::FileOp::FileExists;
       if (f.second.file_type() == proto::FileType::Symlink) {
         if (!util::Util::SyncRemoteSymlink(dir_src_path, file_src_path,
