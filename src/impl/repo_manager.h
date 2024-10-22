@@ -262,13 +262,14 @@ class RepoManager {
     return Err_Repo_flush_repo_config_error;
   }
 
-  std::string RepoPathByUUID(const std::string& uuid) {
+  bool RepoMetaByUUID(const std::string& uuid, proto::RepoMeta* repo_meta) {
     absl::base_internal::SpinLockHolder locker(&lock_);
     auto it = repos_.repos().find(uuid);
     if (it != repos_.repos().end()) {
-      return it->second.repo_path();
+      *repo_meta = it->second;
+      return true;
     }
-    return "";
+    return false;
   }
 
   int32_t LoadRepoData(const std::string& path, proto::RepoData* repo_data) {
@@ -298,11 +299,12 @@ class RepoManager {
         return ret;
       }
     } else {
-      const auto& repo_path = RepoPathByUUID(repo_uuid);
-      if (repo_path.empty()) {
+      proto::RepoMeta repo_meta;
+      if (!RepoMetaByUUID(repo_uuid, &repo_meta)) {
         LOG(ERROR) << "Invalid repo path";
         return Err_Repo_not_exists;
       }
+      const auto& repo_path = repo_meta.repo_path();
       repo_data_file_path = repo_path + "/" + repo_uuid + ".data";
       auto ret = LoadRepoData(repo_data_file_path, &repo_data);
       if (ret) {
@@ -359,11 +361,12 @@ class RepoManager {
 
   int32_t WriteToFile(const proto::FileReq& req) {
     static thread_local std::shared_mutex mu;
-    const auto& repo_path = RepoPathByUUID(req.repo_uuid());
-    if (repo_path.empty()) {
+    proto::RepoMeta repo_meta;
+    if (!RepoMetaByUUID(req.repo_uuid(), &repo_meta)) {
       LOG(ERROR) << "Invalid repo path";
       return Err_Repo_not_exists;
     }
+    const auto& repo_path = repo_meta.repo_path();
 
     const auto& repo_file_path =
         util::Util::RepoFilePath(repo_path, req.file_hash());
@@ -394,27 +397,39 @@ class RepoManager {
     return util::Util::WriteToFile(repo_file_path, req.content(), start);
   }
 
-  int32_t InsertFileToRepo(const std::string& repo_uuid,
-                           const std::string& repo_dir,
-                           const std::string& file_name,
-                           const std::string& file_hash) {
+  int32_t InsertFileToRepo(const common::ReceiveContext& receive_ctx) {
     proto::RepoFile file;
-    file.set_file_name(file_name);
-    file.set_file_hash(file_hash);
+    file.set_file_name(receive_ctx.file_name);
+    file.set_file_hash(receive_ctx.file_hash);
+
+    proto::RepoMeta repo_meta;
+    if (!RepoMetaByUUID(receive_ctx.repo_uuid, &repo_meta)) {
+      LOG(ERROR) << "Cannot find repo meta: " << receive_ctx.repo_uuid;
+      return Err_Repo_meta_not_exists;
+    }
+
     absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = repo_datas_.find(repo_uuid);
+    auto it = repo_datas_.find(receive_ctx.repo_uuid);
     if (it != repo_datas_.end()) {
-      auto dir_it = it->second.mutable_dirs()->find(repo_dir);
+      auto dir_it = it->second.mutable_dirs()->find(repo_meta.repo_path());
       if (dir_it == it->second.dirs().end()) {
         proto::RepoDir dir;
-        dir.set_path(repo_dir);
-        dir.mutable_files()->emplace(file_name, file);
+        dir.set_path(repo_meta.repo_path());
+        dir.mutable_files()->emplace(receive_ctx.file_name, file);
       } else {
+        dir_it->second.mutable_files()->emplace(receive_ctx.file_name, file);
       }
-      dir_it->second.mutable_files()->emplace(file_name, file);
-      return Err_Success;
+    } else {
+      proto::RepoData repo_data;
+      repo_data.set_repo_name(repo_meta.repo_name());
+      repo_data.set_repo_path(repo_meta.repo_path());
+      repo_data.set_repo_uuid(repo_meta.repo_uuid());
+      repo_data.set_repo_location_uuid(repo_meta.repo_location_uuid());
+      proto::RepoDir dir;
+      dir.mutable_files()->emplace(receive_ctx.file_name, file);
+      repo_data.mutable_dirs()->emplace(receive_ctx.repo_dir, dir);
     }
-    return Err_Repo_data_not_exists;
+    return Err_Success;
   }
 
   void Stop() { stop_.store(true); }

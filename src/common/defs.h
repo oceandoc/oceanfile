@@ -233,6 +233,20 @@ class GCEntry final {
   SendContext* p;
 };
 
+class ReceiveContext final {
+ public:
+  std::string dst;
+  int64_t update_time = 0;
+  std::set<int32_t> partitions;
+  int32_t part_num = 0;
+  int64_t file_update_time = 0;
+  proto::RepoType repo_type = proto::RepoType::RT_Unused;
+  std::string repo_uuid;
+  std::string file_hash;
+  std::string file_name;
+  std::string repo_dir;
+};
+
 }  // namespace common
 }  // namespace oceandoc
 

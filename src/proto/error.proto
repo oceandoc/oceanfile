@@ -48,6 +48,7 @@ enum ErrCode {
   Repo_create_repo_error = 13003;
   Repo_restore_repo_error = 13004;
   Repo_data_not_exists = 13005;
+  Repo_meta_not_exists = 13006;
 
   // 15000
   Sync_interrupted = 15000;

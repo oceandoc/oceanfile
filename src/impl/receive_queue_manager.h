@@ -15,26 +15,12 @@
 
 #include "folly/Singleton.h"
 #include "src/impl/repo_manager.h"
-#include "src/proto/service.pb.h"
 #include "src/util/config_manager.h"
 #include "src/util/thread_pool.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
 namespace impl {
-
-class ReceiveContext final {
- public:
-  std::string dst;
-  int64_t update_time = 0;
-  std::set<int32_t> partitions;
-  int32_t part_num = 0;
-  int64_t file_update_time = 0;
-  proto::RepoType repo_type = proto::RepoType::RT_Unused;
-  std::string repo_uuid;
-  std::string repo_dir;
-  std::string file_hash;
-};
 
 class ReceiveQueueManager final {
  private:
@@ -70,7 +56,7 @@ class ReceiveQueueManager final {
       it->second.update_time = util::Util::CurrentTimeMillis();
       it->second.partitions.insert(req.partition_num());
     } else {
-      ReceiveContext ctx;
+      common::ReceiveContext ctx;
       ctx.dst = req.dst();
       ctx.update_time = util::Util::CurrentTimeMillis();
       ctx.partitions.insert(req.partition_num());
@@ -128,8 +114,7 @@ class ReceiveQueueManager final {
             continue;
           } else {
             if (it->second.repo_type == proto::RepoType::RT_Ocean) {
-              if (RepoManager::Instance()->InsertFileToRepo(
-                      ctx.repo_uuid, ctx.repo_dir, ctx.dst, ctx.file_hash)) {
+              if (RepoManager::Instance()->InsertFileToRepo(ctx)) {
                 std::unique_lock<std::mutex> lock(mu_);
                 to_remove_files_.emplace_back(it->second.dst);
                 cv_.notify_all();
@@ -164,7 +149,7 @@ class ReceiveQueueManager final {
 
  private:
   mutable absl::base_internal::SpinLock lock_;
-  std::unordered_map<std::string, ReceiveContext> queue_;
+  std::unordered_map<std::string, common::ReceiveContext> queue_;
   std::atomic<bool> stop_ = false;
   std::mutex mu_;
   std::condition_variable cv_;
