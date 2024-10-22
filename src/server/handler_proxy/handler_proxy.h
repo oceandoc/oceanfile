@@ -192,20 +192,23 @@ class HandlerProxy {
 
     int32_t ret = Err_Success;
     switch (req.op()) {
-      case proto::RepoOp::RepoCreate:
-        ret = impl::RepoManager::Instance()->CreateRepo(
-            req.name(), req.path(), res->mutable_repo_uuid());
-        break;
-      case proto::RepoOp::RepoDelete:
-        ret = impl::RepoManager::Instance()->DeleteRepoByUUID(res->repo_uuid());
-      case proto::RepoOp::RepoServerDir:
-        ret = impl::RepoManager::Instance()->ListServerDir(req, res);
-        break;
-      case proto::RepoOp::RepoRepoDir:
-        ret = impl::RepoManager::Instance()->ListRepoDir(req, res);
-        break;
       case proto::RepoOp::RepoListUserRepo:
         ret = impl::RepoManager::Instance()->ListUserRepo(req, res);
+        break;
+      case proto::RepoOp::RepoListServerDir:
+        ret = impl::RepoManager::Instance()->ListServerDir(req, res);
+        break;
+      case proto::RepoOp::RepoCreateServerDir:
+        ret = impl::RepoManager::Instance()->CreateServerDir(req, res);
+        break;
+      case proto::RepoOp::RepoCreateRepo:
+        ret = impl::RepoManager::Instance()->CreateRepo(req, res);
+        break;
+      case proto::RepoOp::RepoDeleteRepo:
+        ret = impl::RepoManager::Instance()->DeleteRepo(req, res);
+        break;
+      case proto::RepoOp::RepoListRepoDir:
+        ret = impl::RepoManager::Instance()->ListRepoDir(req, res);
         break;
       default:
         ret = Err_Unsupported_op;

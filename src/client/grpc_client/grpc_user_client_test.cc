@@ -13,7 +13,7 @@
 namespace oceandoc {
 namespace client {
 
-TEST(UserClient, ChangeAndRegist) {
+TEST(UserClient, All) {
   std::string home_dir = oceandoc::util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
   util::ConfigManager::Instance()->Init(home_dir +

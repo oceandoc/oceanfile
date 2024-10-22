@@ -59,17 +59,16 @@ message ServerRes {
 
 enum RepoOp {
   RepoUnused = 0;
-  RepoCreate = 1;
-  RepoDelete = 2;
-  RepoChmod = 3;
-  RepoChowner = 4;
-  RepoServerDir = 5;
-  RepoRepoDir = 6;
-  RepoCreateDir = 7;
-  RepoDelDir = 8;
-  RepoDelFile = 9;
-  RepoListUserRepo = 10;
-  RepoServerCreateDir = 11;
+  RepoListServerDir = 1;
+  RepoCreateServerDir = 2;
+  RepoListUserRepo = 3;
+  RepoCreateRepo = 4;
+  RepoDeleteRepo = 5;
+  RepoChangeRepoOwner = 6;
+  RepoListRepoDir = 7;
+  RepoCreateRepoDir = 8;
+  RepoDelRepoDir = 9;
+  RepoDelRepoFile = 10;
 }
 
 message RepoReq {
@@ -78,16 +77,16 @@ message RepoReq {
   RepoType type = 3;
   string path = 4;
   string repo_uuid = 5;
-  string name = 6;
+  string repo_name = 6;
   string token = 7;
   string user = 8;
 }
 
 message RepoRes {
   ErrCode err_code = 1;
-  string repo_uuid = 2;
-  map<string, RepoMeta> repos = 3;
-  DirItem dir = 4;
+  map<string, RepoMeta> repos = 2;
+  DirItem dir = 3;
+  RepoMeta repo = 4;
 }
 
 enum FileOp {

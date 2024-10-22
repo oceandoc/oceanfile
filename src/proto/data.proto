@@ -48,9 +48,9 @@ enum RepoType {
 }
 
 message RepoData {
-  string name = 1;
+  string repo_name = 1;
   string path = 2;
-  string uuid = 3;
+  string repo_uuid = 3;
   string location_uuid = 4;
   uint64 file_num = 5;
   uint64 symlink_num = 6;
@@ -58,12 +58,13 @@ message RepoData {
 }
 
 message RepoMeta {
-  string name = 1;
+  string repo_name = 1;
   string path = 2;
-  string uuid = 3;
+  string repo_uuid = 3;
   string location_uuid = 4;
   string create_time = 5;
-  int64 update_time = 6;
+  string update_time = 6;
+  string owner = 7;
 }
 
 message Repos {

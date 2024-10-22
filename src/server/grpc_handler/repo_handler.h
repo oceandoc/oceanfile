@@ -23,10 +23,7 @@ class RepoHandler : public async_grpc::RpcHandler<RepoOpMethod> {
     Send(std::move(res));
   }
 
-  void OnReadsDone() override {
-    LOG(INFO) << "OnReadsDone";
-    Finish(grpc::Status::OK);
-  }
+  void OnReadsDone() override { Finish(grpc::Status::OK); }
 };
 
 }  // namespace grpc_handler

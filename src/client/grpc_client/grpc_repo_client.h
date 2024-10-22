@@ -6,9 +6,6 @@
 #ifndef BAZEL_TEMPLATE_CLIENT_GRPC_REPO_CLIENT_H
 #define BAZEL_TEMPLATE_CLIENT_GRPC_REPO_CLIENT_H
 
-#include <condition_variable>
-#include <mutex>
-
 #include "glog/logging.h"
 #include "grpcpp/client_context.h"
 #include "grpcpp/grpcpp.h"
@@ -27,34 +24,9 @@ class RepoClient {
                                      grpc::InsecureChannelCredentials())),
         stub_(oceandoc::proto::OceanFile::NewStub(channel_)) {}
 
-  bool CreateRepo(const proto::RepoReq& req, proto::RepoRes* res) {
-    grpc::ClientContext context;
-    bool result;
-    std::mutex mu;
-    std::condition_variable cv;
-    bool done = false;
-    stub_->async()->RepoOp(
-        &context, &req, res,
-        [&result, &mu, &cv, &done, res](grpc::Status status) {
-          bool ret;
-          if (!status.ok()) {
-            ret = false;
-          } else if (res->err_code() == proto::Success) {
-            ret = true;
-          } else {
-            ret = false;
-          }
-          std::lock_guard<std::mutex> lock(mu);
-          result = ret;
-          done = true;
-          cv.notify_one();
-        });
-    std::unique_lock<std::mutex> lock(mu);
-    cv.wait(lock, [&done] { return done; });
-    return result;
-  }
-
-  bool ListUserRepo(const std::string& user, const std::string& token) {
+  bool ListUserRepo(
+      const std::string& user, const std::string& token,
+      google::protobuf::Map<std::string, proto::RepoMeta>* repos) {
     oceandoc::proto::RepoReq req;
     oceandoc::proto::RepoRes res;
     req.set_request_id(util::Util::UUID());
@@ -74,11 +46,121 @@ class RepoClient {
       return false;
     }
 
-    for (const auto& p : res.repos()) {
-      LOG(INFO) << "repo name: " << p.second.name();
+    repos->swap(*res.mutable_repos());
+    LOG(INFO) << "ListUserRepo success, user: " << user
+              << ", num: " << repos->size();
+    return true;
+  }
+
+  bool ListServerDir(const std::string& user, const std::string& token,
+                     const std::string& path, proto::DirItem* dir) {
+    oceandoc::proto::RepoReq req;
+    oceandoc::proto::RepoRes res;
+    req.set_request_id(util::Util::UUID());
+    req.set_op(oceandoc::proto::RepoOp::RepoListServerDir);
+    req.set_user(user);
+    req.set_token(token);
+    req.set_path(path);
+
+    grpc::ClientContext context;
+    auto status = stub_->RepoOp(&context, req, &res);
+    if (!status.ok()) {
+      LOG(ERROR) << "Grpc error";
+      return false;
     }
 
-    LOG(INFO) << "ListUserRepo success, user: " << user;
+    if (res.err_code()) {
+      LOG(ERROR) << "Server error: " << res.err_code();
+      return false;
+    }
+
+    LOG(INFO) << "ListServerDir success, path: " << (path.empty() ? "/" : path);
+    dir->Swap(res.mutable_dir());
+    return true;
+  }
+
+  bool CreateServerDir(const std::string& user, const std::string& token,
+                       const std::string& path) {
+    oceandoc::proto::RepoReq req;
+    oceandoc::proto::RepoRes res;
+    req.set_request_id(util::Util::UUID());
+    req.set_op(oceandoc::proto::RepoOp::RepoCreateServerDir);
+    req.set_user(user);
+    req.set_token(token);
+    req.set_path(path);
+
+    grpc::ClientContext context;
+    auto status = stub_->RepoOp(&context, req, &res);
+    if (!status.ok()) {
+      LOG(ERROR) << "Grpc error";
+      return false;
+    }
+
+    if (res.err_code()) {
+      LOG(ERROR) << "Server error: " << res.err_code();
+      return false;
+    }
+
+    LOG(INFO) << "CreateServerDir success, path: " << path;
+    return true;
+  }
+
+  bool CreateRepo(const std::string& user, const std::string& token,
+                  const std::string& repo_name, const std::string& path,
+                  proto::RepoMeta* repo) {
+    oceandoc::proto::RepoReq req;
+    oceandoc::proto::RepoRes res;
+    grpc::ClientContext context;
+
+    req.set_request_id(util::Util::UUID());
+    req.set_op(proto::RepoOp::RepoCreateRepo);
+    req.set_user(user);
+    req.set_token(token);
+    req.set_repo_name(repo_name);
+    req.set_path(path);
+
+    auto status = stub_->RepoOp(&context, req, &res);
+
+    if (!status.ok()) {
+      LOG(ERROR) << "Grpc error";
+      return false;
+    }
+
+    if (res.err_code()) {
+      LOG(ERROR) << "Server error: " << res.err_code();
+      return false;
+    }
+
+    LOG(INFO) << "Create reop: " << repo_name << " success";
+    repo->Swap(res.mutable_repo());
+    return true;
+  }
+
+  bool DeleteRepo(const std::string& user, const std::string& token,
+                  const std::string& repo_uuid) {
+    oceandoc::proto::RepoReq req;
+    oceandoc::proto::RepoRes res;
+    grpc::ClientContext context;
+
+    req.set_request_id(util::Util::UUID());
+    req.set_op(proto::RepoOp::RepoDeleteRepo);
+    req.set_user(user);
+    req.set_token(token);
+    req.set_repo_uuid(repo_uuid);
+
+    auto status = stub_->RepoOp(&context, req, &res);
+
+    if (!status.ok()) {
+      LOG(ERROR) << "Grpc error";
+      return false;
+    }
+
+    if (res.err_code()) {
+      LOG(ERROR) << "Server error: " << res.err_code();
+      return false;
+    }
+
+    LOG(INFO) << "Delete reop: " << repo_uuid << " success";
     return true;
   }
 
