@@ -32,26 +32,15 @@ namespace client {
 class FileClient
     : public grpc::ClientBidiReactor<proto::FileReq, proto::FileRes> {
  public:
-  explicit FileClient(common::SyncContext* ctx) : sync_ctx(ctx) {
-    task_ = std::thread(&FileClient::Send, this);
-    print_task_ = std::thread(&FileClient::Print, this);
-    // NOTICE: cannot use below code
-    // auto task = std::bind(&FileClient::Send, this);
-    // util::ThreadPool::Instance()->Post(task);
-    // auto print_task = std::bind(&FileClient::Print, this);
-    // util::ThreadPool::Instance()->Post(print_task);
+  explicit FileClient(common::SyncContext* ctx) : sync_ctx_(ctx) {
+    channel_ = grpc::CreateChannel(
+        sync_ctx_->remote_addr + ":" + sync_ctx_->remote_port,
+        grpc::InsecureChannelCredentials());
 
-    grpc::ResourceQuota quota;
-    quota.SetMaxThreads(4);
-    grpc::ChannelArguments channel_args;
-    channel_args.SetResourceQuota(quota);
-    channel_ = grpc::CreateCustomChannel(
-        sync_ctx->remote_addr + ":" + sync_ctx->remote_port,
-        grpc::InsecureChannelCredentials(), channel_args);
+    stub_ = proto::OceanFile::NewStub(channel_);
 
-    stub_ = oceandoc::proto::OceanFile::NewStub(channel_);
-    req_.mutable_content()->resize(sync_ctx->partition_size);
-    buffer_.resize(sync_ctx->partition_size);
+    req_.mutable_content()->resize(sync_ctx_->partition_size);
+    buffer_.resize(sync_ctx_->partition_size);
     stub_->async()->FileOp(&context_, this);
     StartRead(&res_);
     StartCall();
@@ -81,6 +70,13 @@ class FileClient
   }
 
   void Start() {
+    task_ = std::thread(&FileClient::Send, this);
+    print_task_ = std::thread(&FileClient::Print, this);
+    // NOTICE: cannot use below code
+    // auto task = std::bind(&FileClient::Send, this);
+    // util::ThreadPool::Instance()->Post(task);
+    // auto print_task = std::bind(&FileClient::Print, this);
+    // util::ThreadPool::Instance()->Post(print_task);
     Reset();
     auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(10);
     if (channel_->WaitForConnected(deadline)) {
@@ -201,8 +197,8 @@ class FileClient
 
     req_.set_request_id(util::Util::UUID());
     req_.set_src(ctx->src);
-    if (sync_ctx->repo_type == proto::RepoType::RT_Ocean) {
-      if (ctx->repo_uuid.empty()) {
+    if (sync_ctx_->repo_type == proto::RepoType::RT_Ocean) {
+      if (sync_ctx_->repo_uuid.empty()) {
         LOG(ERROR) << "Empty repo_uuid, this should never happen";
         return false;
       }
@@ -211,7 +207,9 @@ class FileClient
         return false;
       }
 
-      req_.set_repo_uuid(ctx->repo_uuid);
+      req_.set_repo_uuid(sync_ctx_->repo_uuid);
+      req_.set_user(sync_ctx_->user);
+      req_.set_token(sync_ctx_->token);
     } else {
       if (ctx->dst.empty()) {
         LOG(ERROR) << "Empty dst, this should never happen";
@@ -219,7 +217,7 @@ class FileClient
       }
       req_.set_dst(ctx->dst);
     }
-    req_.set_repo_type(sync_ctx->repo_type);
+    req_.set_repo_type(sync_ctx_->repo_type);
     req_.set_op(ctx->op);
     req_.set_file_type(ctx->type);
 
@@ -238,18 +236,18 @@ class FileClient
     if (ctx->type == proto::FileType::Regular ||
         ctx->type == proto::FileType::Symlink) {
       common::FileAttr attr;
-      if (!util::Util::PrepareFile(ctx->src, sync_ctx->hash_method,
-                                   sync_ctx->partition_size, &attr)) {
+      if (!util::Util::PrepareFile(ctx->src, sync_ctx_->hash_method,
+                                   sync_ctx_->partition_size, &attr)) {
         LOG(ERROR) << "Prepare error: " << ctx->src;
         return false;
       }
 
-      if (sync_ctx->hash_method != common::HashMethod::Hash_NONE) {
+      if (sync_ctx_->hash_method != common::HashMethod::Hash_NONE) {
         req_.set_hash(attr.hash);
       }
 
       req_.set_size(attr.size);
-      req_.set_partition_size(sync_ctx->partition_size);
+      req_.set_partition_size(sync_ctx_->partition_size);
       req_.set_update_time(attr.update_time);
       ctx->mark.resize(attr.partition_num, 0);
     }
@@ -291,7 +289,7 @@ class FileClient
       if (ctx->op == proto::FileOp::FileExists) {
         if (ctx->type == proto::FileType::Symlink) {
           LOG(INFO) << "Now send symlink: " << ctx->src;
-          sync_ctx->syncd_file_success_cnt.fetch_add(1);
+          sync_ctx_->syncd_file_success_cnt.fetch_add(1);
         }
         write_done_.store(false);
         StartWrite(&req_);
@@ -319,7 +317,7 @@ class FileClient
         write_cv_.wait(l, [this] { return write_done_.load() || done_; });
       };
 
-      while (file.read(buffer_.data(), sync_ctx->partition_size) ||
+      while (file.read(buffer_.data(), sync_ctx_->partition_size) ||
              file.gcount()) {
         BatchSend(partition_num);
         if (done_) {
@@ -351,7 +349,7 @@ class FileClient
       } else {
         LOG(ERROR) << "Send file: " << ctx->src << " error";
       }
-      sync_ctx->syncd_file_success_cnt.fetch_add(1);
+      sync_ctx_->syncd_file_success_cnt.fetch_add(1);
       send_ctx_map_.erase(req_.request_id());
     }
     send_task_stopped_ = true;
@@ -363,18 +361,18 @@ class FileClient
     while (!done_) {
       LOG(INFO) << "Queue size: " << Size()
                 << ", onfly_req_num: " << onfly_req_num_
-                << ", send file num: " << sync_ctx->syncd_file_success_cnt;
+                << ", send file num: " << sync_ctx_->syncd_file_success_cnt;
       util::Util::Sleep(1000);
     }
 
     LOG(INFO) << "Queue size: " << Size()
               << ", onfly_req_num: " << onfly_req_num_
-              << ", send file num: " << sync_ctx->syncd_file_success_cnt;
+              << ", send file num: " << sync_ctx_->syncd_file_success_cnt;
     print_task_stopped_ = true;
   }
 
  private:
-  common::SyncContext* sync_ctx;
+  common::SyncContext* sync_ctx_;
 
   std::shared_ptr<grpc::Channel> channel_;
   std::unique_ptr<oceandoc::proto::OceanFile::Stub> stub_;

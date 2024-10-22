@@ -145,7 +145,6 @@ class ScanContext final {
 
 class SendContext final {
  public:
-  std::string repo_uuid;
   std::string src;
   std::string dst;
   proto::FileType type;
@@ -174,6 +173,9 @@ class SyncContext final {
   bool disable_scan_cache = false;
   bool skip_scan = false;
   std::unordered_set<std::string> ignored_dirs;  // relative to src
+  std::string user;
+  std::string token;
+  std::string repo_uuid;
 
   mutable absl::base_internal::SpinLock lock;
   std::mutex mu;

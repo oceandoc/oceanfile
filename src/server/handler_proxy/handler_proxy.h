@@ -95,12 +95,34 @@ class HandlerProxy {
   }
 
   static void FileOpHandle(const proto::FileReq& req, proto::FileRes* res) {
+    if (req.repo_type() == proto::RepoType::RT_Ocean) {
+      if (req.token().empty()) {
+        res->set_err_code(proto::ErrCode(Err_User_session_error));
+        return;
+      }
+
+      std::string session_user;
+      if (!req.token().empty() &&
+          !impl::SessionManager::Instance()->ValidateSession(req.token(),
+                                                             &session_user)) {
+        res->set_err_code(proto::ErrCode(Err_User_session_error));
+        return;
+      }
+      if (!session_user.empty() && session_user != req.user()) {
+        res->set_err_code(proto::ErrCode(Err_User_session_error));
+        return;
+      }
+    }
+
     int32_t ret = Err_Success;
     switch (req.op()) {
       case proto::FileOp::FilePut:
         ret = SaveFile(req, res);
         break;
       case proto::FileOp::FileExists:
+        ret = Exists(req, res);
+        break;
+      case proto::FileOp::FileDelete:
         ret = Exists(req, res);
         break;
       default:

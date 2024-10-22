@@ -82,14 +82,14 @@ cc_library(
     ],
 )
 
-#cc_test(
-#name = "grpc_file_client_test",
-#srcs = ["grpc_file_client_test.cc"],
-#copts = COPTS,
-#data = ["//conf:base_config.json"],
-#local_defines = LOCAL_DEFINES,
-#deps = [":grpc_clients"],
-#)
+cc_test(
+    name = "grpc_file_client_test",
+    srcs = ["grpc_file_client_test.cc"],
+    copts = COPTS,
+    data = ["//conf:client_base_config.json"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":grpc_clients"],
+)
 
 cc_test(
     name = "grpc_repo_client_test",

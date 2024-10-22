@@ -114,6 +114,7 @@ message FileReq {
   string user = 13;
   string group = 14;
   int64 update_time = 15;
+  string token = 16;
 }
 
 message FileRes {
