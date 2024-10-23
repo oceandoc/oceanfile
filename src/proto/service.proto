@@ -95,8 +95,6 @@ enum FileOp {
   FileExists = 1;
   FilePut = 2;
   FileDelete = 3;
-  FileChmod = 4;
-  FileChowner = 5;
 }
 
 message FileReq {

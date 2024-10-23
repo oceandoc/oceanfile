@@ -24,7 +24,6 @@
 namespace oceandoc {
 namespace impl {
 
-// TODO(xieyz) improve performance
 class RepoManager {
  private:
   friend class folly::Singleton<RepoManager>;

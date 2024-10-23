@@ -26,7 +26,7 @@ class HandlerProxy {
     res->set_err_code(proto::ErrCode::Fail);
   }
 
-  static int32_t SaveFile(const proto::FileReq& req, proto::FileRes* res) {
+  static int32_t Save(const proto::FileReq& req, proto::FileRes* res) {
     int32_t ret = Err_Success;
     if (req.repo_type() == proto::RepoType::RT_Ocean) {
       if (req.repo_uuid().empty()) {
@@ -95,6 +95,11 @@ class HandlerProxy {
     return ret;
   }
 
+  static int32_t Delete(const proto::FileReq& /*req*/,
+                        proto::FileRes* /*res*/) {
+    return Err_Success;
+  }
+
   static void FileOpHandle(const proto::FileReq& req, proto::FileRes* res) {
     if (req.repo_type() == proto::RepoType::RT_Ocean) {
       if (req.token().empty()) {
@@ -118,13 +123,13 @@ class HandlerProxy {
     int32_t ret = Err_Success;
     switch (req.op()) {
       case proto::FileOp::FilePut:
-        ret = SaveFile(req, res);
+        ret = Save(req, res);
         break;
       case proto::FileOp::FileExists:
         ret = Exists(req, res);
         break;
       case proto::FileOp::FileDelete:
-        ret = Exists(req, res);
+        ret = Delete(req, res);
         break;
       default:
         LOG(ERROR) << "Unsupported operation";
