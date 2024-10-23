@@ -52,6 +52,7 @@ class HandlerProxy {
         impl::ReceiveQueueManager::Instance()->Put(req);
       }
     } else {
+      ret = Err_Unsupported_op;
       LOG(ERROR) << "Unsupported repo type";
     }
     return ret;

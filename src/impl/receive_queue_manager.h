@@ -57,12 +57,23 @@ class ReceiveQueueManager final {
       it->second.partitions.insert(req.partition_num());
     } else {
       common::ReceiveContext ctx;
-      ctx.dst = req.dst();
+      if (req.repo_type() == proto::RepoType::RT_Ocean) {
+        ctx.repo_uuid = req.repo_uuid();
+        ctx.file_name = req.src();
+      } else if (req.repo_type() == proto::RepoType::RT_Remote) {
+        ctx.file_update_time = req.update_time();
+      } else {
+        LOG(ERROR) << "Unsupport repo type: " << req.repo_type();
+      }
+
+      ctx.repo_type = req.repo_type();
       ctx.update_time = util::Util::CurrentTimeMillis();
+      ctx.dst = req.dst();  // repo dir
+      ctx.file_hash = req.file_hash();
       ctx.partitions.insert(req.partition_num());
       ctx.part_num =
           util::Util::FilePartitionNum(req.file_size(), req.partition_size());
-      ctx.file_update_time = req.update_time();
+      LOG(INFO) << "Queue size: " << queue_.size();
       queue_.emplace(req.request_id(), ctx);
     }
   }
@@ -102,28 +113,42 @@ class ReceiveQueueManager final {
       }
       last_time = now;
 
+      absl::base_internal::SpinLockHolder locker(&lock_);
       for (auto it = queue_.begin(); it != queue_.end();) {
         const auto ctx = it->second;
         if (it->second.part_num == it->second.partitions.size()) {
-          if (!util::Util::SetUpdateTime(ctx.dst, ctx.file_update_time)) {
-            LOG(INFO) << "Set update time error: " << ctx.dst;
-            std::unique_lock<std::mutex> lock(mu_);
-            to_remove_files_.emplace_back(it->second.dst);
-            cv_.notify_all();
-            it = queue_.erase(it);
-            continue;
-          } else {
-            if (it->second.repo_type == proto::RepoType::RT_Ocean) {
-              if (RepoManager::Instance()->InsertFileToRepo(ctx)) {
+          if (it->second.repo_type == proto::RepoType::RT_Ocean) {
+            if (RepoManager::Instance()->CreateRepoFile(ctx)) {
+              {
                 std::unique_lock<std::mutex> lock(mu_);
                 to_remove_files_.emplace_back(it->second.dst);
-                cv_.notify_all();
-                it = queue_.erase(it);
-                continue;
               }
+              cv_.notify_all();
+              it = queue_.erase(it);
+              continue;
             }
-            LOG(INFO) << "Store " << it->second.dst << " success";
+          } else if (it->second.repo_type == proto::RepoType::RT_Remote) {
+            if (!util::Util::SetUpdateTime(ctx.dst, ctx.file_update_time)) {
+              LOG(INFO) << "Set update time error: " << ctx.dst;
+              {
+                std::unique_lock<std::mutex> lock(mu_);
+                to_remove_files_.emplace_back(it->second.dst);
+              }
+              cv_.notify_all();
+              it = queue_.erase(it);
+              continue;
+            }
+          } else {
+            LOG(ERROR) << "Unsupport repo type: " << it->second.repo_type;
+            continue;
           }
+
+          LOG(INFO) << "Store " << it->second.dst
+                    << (it->second.repo_type == proto::RepoType::RT_Ocean
+                            ? std::string("/") + ctx.file_name
+                            : "")
+                    << " success";
+          it = queue_.erase(it);
           continue;
         }
         if (now - it->second.update_time <
@@ -132,8 +157,10 @@ class ReceiveQueueManager final {
           continue;
         }
 
-        std::unique_lock<std::mutex> lock(mu_);
-        to_remove_files_.emplace_back(it->second.dst);
+        {
+          std::unique_lock<std::mutex> lock(mu_);
+          to_remove_files_.emplace_back(it->second.dst);
+        }
         it = queue_.erase(it);
         cv_.notify_all();
       }

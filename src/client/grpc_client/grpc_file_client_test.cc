@@ -38,9 +38,9 @@ TEST(FileClient, Send) {
   sync_ctx.partition_size = common::NET_BUFFER_SIZE_BYTES;
   sync_ctx.remote_addr = "127.0.0.1";
   sync_ctx.remote_port = "10001";
+  sync_ctx.repo_uuid = "4cb94d47-0d43-4060-8751-647ea78886b6";
   sync_ctx.user = "dev";
   sync_ctx.token = token;
-  sync_ctx.repo_uuid = "7c602a90-3693-46d0-b80c-221fd1737a66";
 
   FileClient file_client(&sync_ctx);
   file_client.Start();
@@ -52,6 +52,7 @@ TEST(FileClient, Send) {
   send_ctx->src = path;
   send_ctx->op = proto::FileOp::FilePut;
   send_ctx->file_type = proto::FileType::Regular;
+  send_ctx->dst = "test_repo_dir1/test_repo_dir2";
 
   file_client.Put(send_ctx);
   file_client.SetFillQueueComplete();

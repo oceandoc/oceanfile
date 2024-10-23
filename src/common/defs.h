@@ -242,9 +242,8 @@ class ReceiveContext final {
   int64_t file_update_time = 0;
   proto::RepoType repo_type = proto::RepoType::RT_Unused;
   std::string repo_uuid;
-  std::string file_hash;
   std::string file_name;
-  std::string repo_dir;
+  std::string file_hash;
 };
 
 }  // namespace common

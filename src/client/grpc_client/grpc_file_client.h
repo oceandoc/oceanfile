@@ -196,7 +196,6 @@ class FileClient
     }
 
     req_.set_request_id(util::Util::UUID());
-    req_.set_src(ctx->src);
     if (sync_ctx_->repo_type == proto::RepoType::RT_Ocean) {
       if (sync_ctx_->repo_uuid.empty()) {
         LOG(ERROR) << "Empty repo_uuid, this should never happen";
@@ -210,13 +209,15 @@ class FileClient
       req_.set_repo_uuid(sync_ctx_->repo_uuid);
       req_.set_user(sync_ctx_->user);
       req_.set_token(sync_ctx_->token);
+      std::filesystem::path src_path(ctx->src);
+      req_.set_src(src_path.stem().string());
     } else {
       if (ctx->dst.empty()) {
         LOG(ERROR) << "Empty dst, this should never happen";
         return false;
       }
-      req_.set_dst(ctx->dst);
     }
+    req_.set_dst(ctx->dst);
     req_.set_repo_type(sync_ctx_->repo_type);
     req_.set_op(ctx->op);
     req_.set_file_type(ctx->file_type);

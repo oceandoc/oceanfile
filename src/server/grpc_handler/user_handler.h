@@ -18,7 +18,6 @@ namespace grpc_handler {
 class UserHandler : public async_grpc::RpcHandler<UserMethod> {
  public:
   void OnRequest(const proto::UserReq& req) override {
-    LOG(INFO) << "qid: " << req.request_id();
     auto res = std::make_unique<proto::UserRes>();
     handler_proxy::HandlerProxy::UserOpHandle(req, res.get());
     Send(std::move(res));
