@@ -38,6 +38,8 @@ git clone git@github.com:oceandoc/oceanfile.git
 cd oceanfile
 bazel build //...                                                   # build all target
 bazel run //:refresh_compile_commands                               # generate compile_commands.json
+bazel test //... --config=cpplint                                   # code style check
+bazel test //...                                                    # run all unit_test
 
 ./bazel-bin/src/server/server                                       # start server
 ./bazel-bin/src/client/grpc_client/grpc_file_client_test            # test repo api
