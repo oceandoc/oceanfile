@@ -154,3 +154,14 @@ cc_test(
     local_defines = LOCAL_DEFINES,
     deps = [":config_manager"],
 )
+
+cc_test(
+    name = "sqlite_manager_test",
+    srcs = [
+        "sqlite_manager_test.cc",
+    ],
+    copts = COPTS,
+    data = ["//data:user.db"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":sqlite_manager"],
+)

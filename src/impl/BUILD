@@ -169,7 +169,10 @@ cc_test(
     name = "user_manager_test",
     srcs = ["user_manager_test.cc"],
     copts = COPTS,
-    data = ["//conf:client_base_config.json"],
+    data = [
+        "//conf:client_base_config.json",
+        "//data:user.db",
+    ],
     local_defines = LOCAL_DEFINES,
     deps = [":user_manager"],
 )
