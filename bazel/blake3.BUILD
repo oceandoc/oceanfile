@@ -26,14 +26,37 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_library(
     name = "blake3",
     srcs = select({
-        "@platforms//os:linux": [
+        "@oceandoc//bazel:linux_x86_64": [
             "c/blake3_avx2_x86-64_unix.S",
             "c/blake3_avx512_x86-64_unix.S",
             "c/blake3_sse2_x86-64_unix.S",
             "c/blake3_sse41_x86-64_unix.S",
         ],
-        "@platforms//os:osx": [],
-        "@platforms//os:windows": [],
+        "@oceandoc//bazel:osx_x86_64": [
+            "c/blake3_avx2_x86-64_unix.S",
+            "c/blake3_avx512_x86-64_unix.S",
+            "c/blake3_sse2_x86-64_unix.S",
+            "c/blake3_sse41_x86-64_unix.S",
+        ],
+        "@oceandoc//bazel:osx_aarch64": [
+            "c/blake3_avx2.c",
+            "c/blake3_avx512.c",
+            "c/blake3_sse2.c",
+            "c/blake3_sse41.c",
+        ],
+        "@oceandoc//bazel:windows_x86_64": [
+            "c/blake3_avx2_x86-64_windows_msvc.asm",
+            "c/blake3_avx512_x86-64_windows_msvc.asm",
+            "c/blake3_sse2_x86-64_windows_msvc.asm",
+            "c/blake3_sse41_x86-64_windows_msvc.asm",
+        ],
+        "@oceandoc//bazel:windows_aarch64": [
+            "c/blake3_avx2.c",
+            "c/blake3_avx512.c",
+            "c/blake3_sse2.c",
+            "c/blake3_sse41.c",
+        ],
+        "//conditions:default": [],
     }) + [
         "c/blake3.c",
         "c/blake3_dispatch.c",
