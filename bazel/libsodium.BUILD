@@ -15,7 +15,7 @@ template_rule(
 )
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/DSODIUM_STATIC",
         "/Dinline=__inline",
         "/D_CRT_SECURE_NO_WARNINGS",
@@ -125,7 +125,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
     "__STDC_WANT_LIB_EXT2__=1",
     "__STDC_WANT_MATH_SPEC_FUNCS__=1",
 ] + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [
         "HAVE_SYS_PARAM_H=1",
         "HAVE_STRINGS_H=1",
@@ -141,7 +141,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
         "HAVE_GCC_MEMORY_FENCES=1",
     ],
 }) + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "@platforms//cpu:aarch64": ["HAVE_ARMCRYPTO=1"],
     "@platforms//cpu:x86_64": [
         "HAVE_EMMINTRIN_H=1",
@@ -330,7 +330,7 @@ cc_library(
         #"src/libsodium/sodium/utils.c",
         #"src/libsodium/sodium/version.c",
     ] + select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+        "@platforms//os:windows": [],
         "//conditions:default": [
             "src/libsodium/crypto_scalarmult/curve25519/sandy2x/sandy2x.S",
             "src/libsodium/crypto_stream/salsa20/xmm6/salsa20_xmm6-asm.S",

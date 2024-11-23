@@ -7,7 +7,7 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LOCAL_DEFINES", "tem
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/std:c11",
         "/Ox",
         "/Iexternal/curl/lib",
@@ -34,7 +34,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
     "HAVE_ZLIB_H",
     #"CURL_STRICTER",
 ] + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [
@@ -1170,7 +1170,7 @@ template_rule(
             "/* #undef _FILE_OFFSET_BITS */": "#define _FILE_OFFSET_BITS 64",
             "/* #undef in_addr_t */": "#define in_addr_t unsigned long",
         },
-        "@oceandoc//bazel:not_cross_compiling_on_windows": {
+        "@platforms//os:windows": {
             "#define CURL_CA_BUNDLE \"/etc/ssl/certs/ca-certificates.crt\"": "/* #undef CURL_CA_BUNDLE */",
             "/* #undef USE_WIN32_CRYPTO */": "#define USE_WIN32_CRYPTO 1",
             "/* #undef USE_WIN32_LDAP */": "#define USE_WIN32_LDAP 1",

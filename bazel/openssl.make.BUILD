@@ -33,7 +33,7 @@ CONFIGURE_OPTIONS = [
     "--with-brotli-include=$$$$EXT_BUILD_DEPS$$$$/include",
     "--with-brotli-lib=$$$$EXT_BUILD_DEPS$$$$/lib",
 ] + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": ["enable-ec_nistp_64_gcc_128"],
 })
 
@@ -57,7 +57,7 @@ alias(
 alias(
     name = "openssl",
     actual = select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": ":openssl_windows",
+        "@platforms//os:windows": ":openssl_windows",
         "//conditions:default": ":openssl_static",
     }),
 )

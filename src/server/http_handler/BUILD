@@ -7,7 +7,7 @@ package(default_visibility = ["//visibility:public"])
 cpplint()
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Iexternal/double-conversion",
         "/Iexternal/folly",
         "/I$(GENDIR)/external/folly",

@@ -7,7 +7,7 @@ package(default_visibility = ["//visibility:public"])
 cpplint()
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Iexternal/double-conversion",
         "/Iexternal/folly",
         "/Iexternal/double-conversion",
@@ -39,7 +39,7 @@ COPTS = GLOBAL_COPTS + select({
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "GLOG_NO_ABBREVIATED_SEVERITIES",
     ],
     "//conditions:default": ["BUILD_TRACING=0"],
@@ -51,7 +51,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [],

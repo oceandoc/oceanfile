@@ -4,7 +4,7 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LINKOPTS", "GLOBAL_L
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/I$(GENDIR)/external/libevent/include",
     ],
     "//conditions:default": [
@@ -15,7 +15,7 @@ COPTS = GLOBAL_COPTS + select({
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "_CRT_SECURE_NO_WARNINGS",
         "_CRT_NONSTDC_NO_DEPRECATE",
         "TINYTEST_LOCAL",
@@ -35,7 +35,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [],
@@ -998,7 +998,7 @@ template_rule(
             "#define EVENT__SIZEOF_SOCKLEN_T 8": "#define EVENT__SIZEOF_SOCKLEN_T 4",
             "#define EVENT__SIZEOF_OFF_T 8": "#define EVENT__SIZEOF_OFF_T 4",
         },
-        "@oceandoc//bazel:not_cross_compiling_on_windows": {
+        "@platforms//os:windows": {
             "#define EVENT__HAVE_UMASK 1": "/* #undef EVENT__HAVE_UMASK */",
             "#define EVENT__HAVE_WCHAR_H 1": "/* #undef EVENT__HAVE_WCHAR_H */",
             "#define EVENT__HAVE_LIBIPHLPAPI 1": "/* EVENT__HAVE_LIBIPHLPAPI */",
@@ -1183,7 +1183,7 @@ template_rule(
         "@oceandoc//bazel:cross_compiling_for_windows_gcc": {
             "/* #undef _FILE_OFFSET_BITS */": "#define _FILE_OFFSET_BITS 64",
         },
-        "@oceandoc//bazel:not_cross_compiling_on_windows": {},
+        "@platforms//os:windows": {},
         "//conditions:default": {},
     }),
 )

@@ -83,7 +83,7 @@ cc_library(
         "include/dwarf2.def",
     ]),
     copts = select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [
+        "@platforms//os:windows": [
             "/I$(GENDIR)/external/libiberty/libiberty",
             "/Iexternal/libiberty/include",
         ],

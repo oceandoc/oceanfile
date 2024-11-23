@@ -4,7 +4,7 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LINKOPTS", "GLOBAL_L
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Ox",
         "/Iexternal/libdwarf/src/lib/libdwarf",
         "/Iexternal/folly",
@@ -66,7 +66,7 @@ COPTS = GLOBAL_COPTS + select({
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
     "HAVE_CONFIG_H",
 ] + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "_CRT_NONSTDC_NO_WARNINGS",
         "_CRT_SECURE_NO_WARNINGS",
         "_SCL_SECURE_NO_WARNINGS",
@@ -277,7 +277,7 @@ cc_library(
         "//conditions:default": [],
     }) + select({
         "@oceandoc//bazel:cross_compiling_for_windows_gcc": ["@libiberty//:iberty"],
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+        "@platforms//os:windows": [],
         "@platforms//os:osx": [
             "@libiberty//:iberty",
         ],
@@ -426,7 +426,7 @@ template_rule(
             "#define FOLLY_HAVE_SWAPCONTEXT 1": "/* #undef FOLLY_HAVE_SWAPCONTEXT */",
             "#define FOLLY_HAVE_BACKTRACE 1": "/* #undef FOLLY_HAVE_BACKTRACE */",
         },
-        "@oceandoc//bazel:not_cross_compiling_on_windows": {
+        "@platforms//os:windows": {
             "#define FOLLY_HAVE_ACCEPT4 1": "/* #undef FOLLY_HAVE_ACCEPT4 */",
             "#define FOLLY_HAVE_GETRANDOM 1": "#define FOLLY_HAVE_GETRANDOM 0",
             "#define FOLLY_HAVE_PIPE2 1": "/* #undef FOLLY_HAVE_PIPE2 */",

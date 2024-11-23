@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 STRICT_C_OPTIONS = select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": ["/Ox"],
+    "@platforms//os:windows": ["/Ox"],
     "//conditions:default": [
         "--pedantic-errors",
         "-Wall",
@@ -82,7 +82,7 @@ cc_library(
     hdrs = [":enc_headers"],
     copts = STRICT_C_OPTIONS,
     linkopts = select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+        "@platforms//os:windows": [],
         "//conditions:default": ["-lm"],
     }),
     deps = [":brotlicommon"],

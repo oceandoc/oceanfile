@@ -115,7 +115,7 @@ BOOST_CTX_ASM_SOURCES = selects.with_or({
     "@oceandoc//bazel:cross_compiling_for_windows_gcc": [
         "@oceandoc//lib:boost_context_lib",
     ],
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "libs/context/src/asm/make_x86_64_ms_pe_masm.asm",
         "libs/context/src/asm/jump_x86_64_ms_pe_masm.asm",
         "libs/context/src/asm/ontop_x86_64_ms_pe_masm.asm",
@@ -150,7 +150,7 @@ boost_library(
         ("@platforms//os:linux", "@platforms//os:android", "@platforms//os:osx", "@platforms//os:ios", "@platforms//os:watchos", "@platforms//os:tvos"): [
             "libs/context/src/posix/stack_traits.cpp",
         ],
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [
+        "@platforms//os:windows": [
             "libs/context/src/windows/stack_traits.cpp",
         ],
         "//conditions:default": [],

@@ -27,7 +27,7 @@ cc_library(
         "@platforms//os:windows": ["ev_win32.c"],
     }),
     local_defines = ["HAVE_CONFIG_H"] + select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [
+        "@platforms//os:windows": [
             "WIN32",
             "_WIN32",
         ],
@@ -82,7 +82,7 @@ template_rule(
             "#define HAVE_SYS_SIGNALFD_H 1": "/* #undef HAVE_SYS_SIGNALFD_H */",
             "#define HAVE_SYS_TIMERFD_H 1": "/* #undef HAVE_SYS_TIMERFD_H */",
         },
-        "@oceandoc//bazel:not_cross_compiling_on_windows": {
+        "@platforms//os:windows": {
             "#define HAVE_DLFCN_H 1": "/* #undef HAVE_DLFCN_H */",
             "#define HAVE_EPOLL_CTL 1": "/* #undef HAVE_EPOLL_CTL */",
             "#define HAVE_EVENTFD 1": "/* #undef HAVE_EVENTFD */",

@@ -13,7 +13,7 @@ COPTS = GLOBAL_COPTS + select({
     ],
     "//conditions:default": [],
 }) + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/std:c11",
         "/Iexternal/jemalloc/include",
         "/I$(GENDIR)/external/jemalloc/include",
@@ -587,7 +587,7 @@ cc_library(
         "//conditions:default": [],
     }),
     copts = COPTS + select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [
+        "@platforms//os:windows": [
             "/Iexternal/jemalloc/include/msvc_compat",
         ],
     }),
@@ -639,7 +639,7 @@ cc_library(
         "//conditions:default": [],
     }),
     copts = COPTS + select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [
+        "@platforms//os:windows": [
             "/Iexternal/jemalloc/include/msvc_compat",
         ],
     }),

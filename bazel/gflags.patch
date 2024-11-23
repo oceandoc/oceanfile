@@ -20,7 +20,7 @@ index 533fd61..1e7ad9c 100644
 +        "@oceandoc//bazel:cross_compiling_for_windows": [
 +            "-DOS_WINDOWS",
 +        ],
-+        "@oceandoc//bazel:not_cross_compiling_on_windows": [
++        "@platforms//os:windows": [
 +            "-DOS_WINDOWS",
 +        ],
          "//:x64_windows": [
@@ -30,7 +30,7 @@ index 533fd61..1e7ad9c 100644
      if threads:
          linkopts += select({
              "//:x64_windows": [],
-+            "@oceandoc//bazel:not_cross_compiling_on_windows": [],
++            "@platforms//os:windows": [],
              "//conditions:default": ["-lpthread"],
          })
      else:

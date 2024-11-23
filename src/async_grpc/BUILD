@@ -21,7 +21,7 @@ licenses(["notice"])  # Apache 2.0
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": ["-Wno-sign-compare"],
 }) + select({
     "@platforms//os:linux": [],
@@ -31,7 +31,7 @@ COPTS = GLOBAL_COPTS + select({
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "BUILD_TRACING=0",
         "GLOG_NO_ABBREVIATED_SEVERITIES",
     ],

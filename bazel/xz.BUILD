@@ -3,7 +3,7 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LINKOPTS", "GLOBAL_L
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/std:c11",
         "/Ox",
         "/Iexternal/xz/src/common",
@@ -161,7 +161,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
         "ENABLE_NLS=1",
         "MYTHREAD_POSIX",
     ],
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "HAVE_IMMINTRIN_H",
         "HAVE_USABLE_CLMUL",
         "MYTHREAD_VISTA",
@@ -173,7 +173,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [],
@@ -390,7 +390,7 @@ cc_binary(
         "src/xz/util.c",
         "src/xz/util.h",
     ] + select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [
+        "@platforms//os:windows": [
             "lib/getopt.c",
             "lib/getopt-cdefs.h",
             "lib/getopt-core.h",

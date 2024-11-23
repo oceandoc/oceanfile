@@ -184,7 +184,7 @@ template_rule(
     src = "src/glog/vlog_is_on.h.in",
     out = "src/glog/vlog_is_on.h",
     substitutions = select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": windows_config,
+        "@platforms//os:windows": windows_config,
         "@oceandoc//bazel:cross_compiling_for_windows": mingw64_config,
         "//conditions:default": posix_config,
     }),
@@ -195,7 +195,7 @@ template_rule(
     src = "src/glog/stl_logging.h.in",
     out = "src/glog/stl_logging.h",
     substitutions = select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": windows_config,
+        "@platforms//os:windows": windows_config,
         "@oceandoc//bazel:cross_compiling_for_windows": mingw64_config,
         "//conditions:default": posix_config,
     }),
@@ -206,7 +206,7 @@ template_rule(
     src = "src/glog/raw_logging.h.in",
     out = "src/glog/raw_logging.h",
     substitutions = select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": windows_config,
+        "@platforms//os:windows": windows_config,
         "@oceandoc//bazel:cross_compiling_for_windows": mingw64_config,
         "//conditions:default": posix_config,
     }),
@@ -217,7 +217,7 @@ template_rule(
     src = "src/glog/logging.h.in",
     out = "src/glog/logging.h",
     substitutions = select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": windows_config,
+        "@platforms//os:windows": windows_config,
         "@oceandoc//bazel:cross_compiling_for_windows": mingw64_config,
         "//conditions:default": posix_config,
     }),
@@ -228,7 +228,7 @@ template_rule(
     src = ":config_h_in",
     out = "glog_internal/config.h",
     substitutions = select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": {
+        "@platforms//os:windows": {
             "#define HAVE_RWLOCK": "/* #undef HAVE_RWLOCK */",
             "#define HAVE_STRINGS_H": "/* #undef HAVE_STRINGS_H */",
             "#define HAVE_SYS_TIME_H": "/* #undef HAVE_SYS_TIME_H */",

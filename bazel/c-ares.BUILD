@@ -4,7 +4,7 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LOCAL_DEFINES", "tem
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/std:c11",
         "/Ox",
         "/Iexternal/c-ares/src/lib",
@@ -25,7 +25,7 @@ COPTS = GLOBAL_COPTS + select({
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [],
@@ -750,7 +750,7 @@ template_rule(
             "#define HAVE_MSG_NOSIGNAL 1": "/* #undef HAVE_MSG_NOSIGNAL */",
             "#define HAVE_GETSERVBYNAME_R 1": "/* #undef HAVE_GETSERVBYNAME_R */",
         },
-        "@oceandoc//bazel:not_cross_compiling_on_windows": {
+        "@platforms//os:windows": {
             "/* #undef GETSERVBYPORT_R_ARGS */": "#define GETSERVBYPORT_R_ARGS",
             "#define GETSERVBYNAME_R_ARGS 6": "#define GETSERVBYNAME_R_ARGS",
             "#define HAVE_CLOCK_GETTIME_MONOTONIC 1": "/* #undef HAVE_CLOCK_GETTIME_MONOTONIC */",
@@ -897,7 +897,7 @@ template_rule(
             "#define CARES_HAVE_ARPA_NAMESER_H 1": "/* #undef CARES_HAVE_ARPA_NAMESER_H */",
             "#define CARES_HAVE_ARPA_NAMESER_COMPAT_H 1": "/* #undef CARES_HAVE_ARPA_NAMESER_COMPAT_H */",
         },
-        "@oceandoc//bazel:not_cross_compiling_on_windows": {
+        "@platforms//os:windows": {
             "/* #undef CARES_HAVE_WINDOWS_H */": "#define CARES_HAVE_WINDOWS_H 1",
             "/* #undef CARES_HAVE_WS2TCPIP_H */": "#define CARES_HAVE_WS2TCPIP_H 1",
             "/* #undef CARES_HAVE_WINSOCK2_H */": "#define CARES_HAVE_WINSOCK2_H 1",
