@@ -137,6 +137,32 @@ platform(
 )
 
 config_setting(
+    name = "cross_compiling",
+    define_values = {"cross_compiling": "true"},
+)
+
+config_setting(
+    name = "not_cross_compiling",
+    define_values = {"cross_compiling": "false"},
+)
+
+selects.config_setting_group(
+    name = "cross_compiling_for_osx",
+    match_all = [
+        ":cross_compiling",
+        "@platforms//os:osx",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_cross_compiling_on_osx",
+    match_all = [
+        ":not_cross_compiling",
+        "@platforms//os:osx",
+    ],
+)
+
+config_setting(
     name = "jemalloc",
     define_values = {"profiling_type": "jemalloc"},
 )

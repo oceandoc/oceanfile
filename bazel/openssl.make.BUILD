@@ -104,12 +104,6 @@ configure_make(
         "@oceandoc//bazel:not_cross_compiling_on_osx": ["-j4"],
         "//conditions:default": ["-j"],
     }),
-    build_data = select({
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": [
-            "@cc_toolchain_repo_x86_64_windows_generic_mingw-w64_gcc//:windres",
-        ],
-        "//conditions:default": [],
-    }),
     configure_command = "Configure",
     configure_in_place = True,
     configure_options = CONFIGURE_OPTIONS + select({
@@ -117,7 +111,7 @@ configure_make(
         "@oceandoc//bazel:cross_compiling_for_osx": [
             "darwin64-x86_64-cc",
         ],
-        "@oceandoc//bazel:cross_compiling_for_windows": [
+        "@platforms//os:windows": [
             "mingw64",
             "no-shared",
         ],
@@ -125,10 +119,6 @@ configure_make(
     }),
     env = select({
         "@platforms//os:osx": {"ARFLAGS": "-static -o"},
-        "@oceandoc//bazel:cross_compiling_for_windows": {
-            "WINDRES": "x86_64-w64-mingw32-windres",
-            "PATH": "$$(dirname $(execpath @cc_toolchain_repo_x86_64_windows_generic_mingw-w64_gcc//:windres)):$$PATH",
-        },
         "//conditions:default": {},
     }),
     lib_name = LIB_NAME,

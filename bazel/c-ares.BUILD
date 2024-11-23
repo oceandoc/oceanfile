@@ -678,7 +678,7 @@ template_rule(
             "/* #undef HAVE_ARC4RANDOM_BUF */": "#define HAVE_ARC4RANDOM_BUF 1",
             "/* #undef HAVE_INET_NET_PTON */": "#define HAVE_INET_NET_PTON 1",
         },
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": {
+        "@platforms//os:windows": {
             "/* #undef HAVE_WINDOWS_H */": "#define HAVE_WINDOWS_H 1",
             "/* #undef HAVE_WINSOCK2_H */": "#define HAVE_WINSOCK2_H 1",
             "/* #undef HAVE_WINSOCK_H */": "#define HAVE_WINSOCK_H 1",
@@ -888,7 +888,7 @@ template_rule(
     src = "include/ares_build.h.in",
     out = "include/ares_build.h",
     substitutions = selects.with_or({
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": {
+        "@platforms//os:windows": {
             "/* #undef CARES_HAVE_WINDOWS_H */": "#define CARES_HAVE_WINDOWS_H 1",
             "/* #undef CARES_HAVE_WS2TCPIP_H */": "#define CARES_HAVE_WS2TCPIP_H 1",
             "/* #undef CARES_HAVE_WINSOCK2_H */": "#define CARES_HAVE_WINSOCK2_H 1",

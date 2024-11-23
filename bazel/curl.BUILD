@@ -1084,7 +1084,7 @@ template_rule(
             "/* #undef HAVE_MACH_ABSOLUTE_TIME */": "#define HAVE_MACH_ABSOLUTE_TIME 1",
             #"#define USE_WEBSOCKETS 1": "/* #undef USE_WEBSOCKETS */",
         },
-        "@oceandoc//bazel:cross_compiling_for_windows": {
+        "@platforms//os:windows": {
             "#define CURL_CA_BUNDLE \"/etc/ssl/certs/ca-certificates.crt\"": "/* #undef CURL_CA_BUNDLE */",
             "#define CURL_CA_PATH \"/etc/ssl/certs\"": "/* #undef CURL_CA_PATH */",
             "#define CURL_DISABLE_LDAP 1": "/* #undef CURL_DISABLE_LDAP */",

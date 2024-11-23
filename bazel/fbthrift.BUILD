@@ -47,7 +47,7 @@ COPTS = GLOBAL_COPTS + select({
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
     "@platforms//os:windows": [],
-    "@oceandoc//bazel:cross_compiling_for_windows": ["_LARGEFILE64_SOURCE"],
+    "@platforms//os:windows": ["_LARGEFILE64_SOURCE"],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": ["_LARGEFILE64_SOURCE"],

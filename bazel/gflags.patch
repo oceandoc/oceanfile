@@ -6,7 +6,7 @@ index 533fd61..1e7ad9c 100644
          "src/mutex.h",
          "src/util.h",
      ] + select({
-+        "@oceandoc//bazel:cross_compiling_for_windows": [
++        "@platforms//os:windows": [
 +            "src/windows_port.cc",
 +            "src/windows_port.h",
 +        ],
@@ -17,7 +17,7 @@ index 533fd61..1e7ad9c 100644
          "-DHAVE_STRTOQ",
          "-DHAVE_RWLOCK",
      ] + select({
-+        "@oceandoc//bazel:cross_compiling_for_windows": [
++        "@platforms//os:windows": [
 +            "-DOS_WINDOWS",
 +        ],
 +        "@platforms//os:windows": [

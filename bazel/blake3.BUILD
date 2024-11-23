@@ -3,19 +3,13 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LINKOPTS", "GLOBAL_L
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@platforms//os:windows": [],
-    "//conditions:default": [],
-}) + select({
-    "@platforms//os:linux": ["-O3"],
-    "@platforms//os:osx": ["-O3"],
+    "@platforms//os:linux": [],
+    "@platforms//os:osx": [],
     "@platforms//os:windows": [],
     "//conditions:default": [],
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@platforms//os:windows": [],
-    "//conditions:default": [],
-}) + select({
     "@platforms//os:linux": [],
     "@platforms//os:osx": [],
     "@platforms//os:windows": [],
@@ -23,9 +17,6 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@platforms//os:windows": [],
-    "//conditions:default": [],
-}) + select({
     "@platforms//os:linux": [],
     "@platforms//os:osx": [],
     "@platforms//os:windows": [],

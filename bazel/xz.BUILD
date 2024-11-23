@@ -146,7 +146,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
         "HAVE_IMMINTRIN_H",
     ],
     "@oceandoc//bazel:linux_aarch64": [],
-    "@oceandoc//bazel:cross_compiling_for_windows_gcc": [
+    "@platforms//os:windows": [
         "HAVE___BUILTIN_BSWAPXX",
         "HAVE_FUNC_ATTRIBUTE_CONSTRUCTOR",
         "HAVE_STRINGS_H",

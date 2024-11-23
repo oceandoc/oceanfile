@@ -63,7 +63,7 @@ template_rule(
         "@platforms//os:linux": {
             "#define HAVE_MEMORY_H 1": "/* #undef HAVE_MEMORY_H */",
         },
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": {
+        "@platforms//os:windows": {
             "#define HAVE_DLFCN_H 1": "/* #undef HAVE_DLFCN_H */",
             "#define HAVE_EPOLL_CTL 1": "/* #undef HAVE_EPOLL_CTL */",
             "#define HAVE_EVENTFD 1": "/* #undef HAVE_EVENTFD */",

@@ -185,7 +185,7 @@ template_rule(
     out = "src/glog/vlog_is_on.h",
     substitutions = select({
         "@platforms//os:windows": windows_config,
-        "@oceandoc//bazel:cross_compiling_for_windows": mingw64_config,
+        "@platforms//os:windows": mingw64_config,
         "//conditions:default": posix_config,
     }),
 )
@@ -196,7 +196,7 @@ template_rule(
     out = "src/glog/stl_logging.h",
     substitutions = select({
         "@platforms//os:windows": windows_config,
-        "@oceandoc//bazel:cross_compiling_for_windows": mingw64_config,
+        "@platforms//os:windows": mingw64_config,
         "//conditions:default": posix_config,
     }),
 )
@@ -207,7 +207,7 @@ template_rule(
     out = "src/glog/raw_logging.h",
     substitutions = select({
         "@platforms//os:windows": windows_config,
-        "@oceandoc//bazel:cross_compiling_for_windows": mingw64_config,
+        "@platforms//os:windows": mingw64_config,
         "//conditions:default": posix_config,
     }),
 )
@@ -218,7 +218,7 @@ template_rule(
     out = "src/glog/logging.h",
     substitutions = select({
         "@platforms//os:windows": windows_config,
-        "@oceandoc//bazel:cross_compiling_for_windows": mingw64_config,
+        "@platforms//os:windows": mingw64_config,
         "//conditions:default": posix_config,
     }),
 )

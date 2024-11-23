@@ -112,7 +112,7 @@ BOOST_CTX_ASM_SOURCES = selects.with_or({
         "libs/context/src/asm/ontop_x86_64_sysv_elf_gas.S",
     ],
     ("@platforms//os:osx", "@platforms//os:ios", "@platforms//os:watchos", "@platforms//os:tvos"): ["apple_ctx_asm_sources"],
-    "@oceandoc//bazel:cross_compiling_for_windows_gcc": [
+    "@platforms//os:windows": [
         "@oceandoc//lib:boost_context_lib",
     ],
     "@platforms//os:windows": [

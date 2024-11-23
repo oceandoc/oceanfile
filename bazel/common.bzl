@@ -78,21 +78,21 @@ GLOBAL_COPTS = select({
     "@oceandoc//bazel:linux_x86_64": [
         "-Wall",
         "-Wextra",
-        "-O2",
+        "-O3",
         "-g",
         "-Wno-sign-compare",
     ],
     "@oceandoc//bazel:linux_aarch64": [
         "-Wall",
         "-Wextra",
-        "-O2",
+        "-O3",
         "-g",
         "-Wno-sign-compare",
     ],
     "@oceandoc//bazel:osx_x86_64": [
         "-Wall",
         "-Wextra",
-        "-O2",
+        "-O3",
         "-g",
         "-stdlib=libc++",
         "-mmacosx-version-min=10.15",
@@ -100,7 +100,7 @@ GLOBAL_COPTS = select({
     "@oceandoc//bazel:osx_aarch64": [
         "-Wall",
         "-Wextra",
-        "-O2",
+        "-O3",
         "-g",
         "-stdlib=libc++",
         "-mmacosx-version-min=10.15",

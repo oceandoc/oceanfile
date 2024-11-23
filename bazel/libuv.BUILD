@@ -93,7 +93,7 @@ cc_library(
             "-pedantic",
             "-O3",
         ],
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": [
+        "@platforms//os:windows": [
             "-Iexternal/libuv/src/win",
             "-O2",
             "-DWIN32_LEAN_AND_MEAN",

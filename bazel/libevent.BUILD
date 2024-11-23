@@ -927,7 +927,7 @@ template_rule(
             "#define EVENT__HAVE_SYS_EPOLL_H 1": "/* #undef EVENT__HAVE_SYS_EPOLL_H */",
             "/* #undef EVENT__HAVE_SYS_EVENT_H */": "#define EVENT__HAVE_SYS_EVENT_H 1",
         },
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": {
+        "@platforms//os:windows": {
             "#define EVENT__HAVE_STRINGS_H 1": "/* #undef EVENT__HAVE_STRINGS_H */",
             "#define EVENT__HAVE_ACCEPT4 1": "/* #undef EVENT__HAVE_ACCEPT4 */",
             "#define EVENT__HAVE_ARPA_INET_H 1": "/* #undef EVENT__HAVE_ARPA_INET_H */",
@@ -1180,7 +1180,7 @@ template_rule(
     out = "include/evconfig-private.h",
     substitutions = select({
         "@platforms//os:osx": {"#define _GNU_SOURCE 1": "/* #undef _GNU_SOURCE */"},
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": {
+        "@platforms//os:windows": {
             "/* #undef _FILE_OFFSET_BITS */": "#define _FILE_OFFSET_BITS 64",
         },
         "@platforms//os:windows": {},

@@ -276,7 +276,7 @@ cc_library(
         "@oceandoc//bazel:tcmalloc": ["@tcmalloc//tcmalloc"],
         "//conditions:default": [],
     }) + select({
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": ["@libiberty//:iberty"],
+        "@platforms//os:windows": ["@libiberty//:iberty"],
         "@platforms//os:windows": [],
         "@platforms//os:osx": [
             "@libiberty//:iberty",
@@ -406,7 +406,7 @@ template_rule(
             "#define FOLLY_HAVE_SHADOW_LOCAL_WARNINGS 1": "/* #undef FOLLY_HAVE_SHADOW_LOCAL_WARNINGS */",
             "#define FOLLY_ELF_NATIVE_CLASS 64": "",
         },
-        "@oceandoc//bazel:cross_compiling_for_windows_gcc": {
+        "@platforms//os:windows": {
             "#define FOLLY_HAVE_ACCEPT4 1": "/* #undef FOLLY_HAVE_ACCEPT4 */",
             "#define FOLLY_HAVE_GETRANDOM 1": "#define FOLLY_HAVE_GETRANDOM 0",
             "#define FOLLY_HAVE_PIPE2 1": "/* #undef FOLLY_HAVE_PIPE2 */",
