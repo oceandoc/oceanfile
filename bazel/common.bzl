@@ -1,36 +1,7 @@
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
 
 GLOBAL_COPTS = select({
-    "@oceandoc//bazel:cross_compiling_for_osx_gcc": [
-        "-Wall",
-        "-Wextra",
-        "-O2",
-        "-g",
-        "-mmacosx-version-min=10.15",
-    ],
-    "@oceandoc//bazel:cross_compiling_for_osx_clang": [
-        "-Wall",
-        "-Wextra",
-        "-O2",
-        "-g",
-        "-stdlib=libc++",
-        "-mmacosx-version-min=10.15",
-    ],
-    "@oceandoc//bazel:not_cross_compiling_on_osx": [
-        "-Wall",
-        "-Wextra",
-        "-O2",
-        "-g",
-        "-stdlib=libc++",
-        "-mmacosx-version-min=10.15",
-    ],
-    "@oceandoc//bazel:cross_compiling_for_windows_gcc": [
-        "-Wall",
-        "-Wextra",
-        "-O2",
-        "-g",
-    ],
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@oceandoc//bazel:windows_x86_64": [
         "/GS",  #enable buffer security checks
         "/Gy",  #enables function-level linking
         "/Wall",
@@ -67,21 +38,90 @@ GLOBAL_COPTS = select({
         #"/errorReport:prompt",  #permission to send error reports to Microsoft
         "/showIncludes",  #
     ],
-    "//conditions:default": [
+    "@oceandoc//bazel:windows_aarch64": [
+        "/GS",  #enable buffer security checks
+        "/Gy",  #enables function-level linking
+        "/Wall",
+        "/Qpar",  #enables automatic parallelization of loops
+        "/O2",  #enables full optimization for speed
+        "/Ob2",  #enables aggressive inlining of functions.
+        "/Oi",  #enables the use of intrinsic functions
+        "/Ot",  #optimizes code for speed by favoring fast execution over smaller code size
+        "/WX-",  #Disable Treat Warnings as Errors:
+        "/FC",  #displays the full path of source file names in diagnostic messages
+        "/GR",  #Enable Run-Time Type Information (RTTI):
+        "/EHs",  #enables C++ exception handling and assumes that functions declared with throw() do not throw exceptions
+        "/permissive-",  #enable standards-conforming behavior in the compiler
+        "/fp:precise",
+        "/GF",  #Enable String Pooling
+        "/Zc:referenceBinding",  #Ensures that temporary object lifetimes are correctly extended in reference binding scenarios according to the C++ standard
+        "/Zc:implicitNoexcept",  #Treats move constructors and move assignment operators as noexcept by default if they do not explicitly throw
+        "/Zc:strictStrings",  # Enforces const-correctness for string literals, preventing accidental modification
+        "/Zc:threadSafeInit",
+        "/Zc:throwingNew",
+        "/favor:blend",
+        "/Gw",  #Enables data-level optimization across multiple translation units, improving runtime performance.
+        "/Zc:rvalueCast",  #enforces standard behavior for rvalue casts
+        "/Zc:wchar_t",
+        #"/Zi",
+        "/Zc:forScope",  #Enforce Standard for Loop Scope
+        "/Zc:inline",  #enforces standard C++ behavior for inline functions
+        "/Gd",  #__cdecl Calling Convention
+        "/Gm-",  #disables minimal rebuild
+        "/diagnostics:column",
+        "/nologo",  #suppresses the display of the startup banner and informational messages during compilation
+        #"/MD",
+        "/MP",
+        #"/errorReport:prompt",  #permission to send error reports to Microsoft
+        "/showIncludes",  #
+    ],
+    "@oceandoc//bazel:linux_x86_64": [
         "-Wall",
         "-Wextra",
         "-O2",
         "-g",
         "-Wno-sign-compare",
     ],
+    "@oceandoc//bazel:linux_aarch64": [
+        "-Wall",
+        "-Wextra",
+        "-O2",
+        "-g",
+        "-Wno-sign-compare",
+    ],
+    "@oceandoc//bazel:osx_x86_64": [
+        "-Wall",
+        "-Wextra",
+        "-O2",
+        "-g",
+        "-stdlib=libc++",
+        "-mmacosx-version-min=10.15",
+    ],
+    "@oceandoc//bazel:osx_aarch64": [
+        "-Wall",
+        "-Wextra",
+        "-O2",
+        "-g",
+        "-stdlib=libc++",
+        "-mmacosx-version-min=10.15",
+    ],
+    "//conditions:default": [],
 })
 
 GLOBAL_LOCAL_DEFINES = select({
-    "@oceandoc//bazel:cross_compiling_for_osx_gcc": [],
-    "@oceandoc//bazel:cross_compiling_for_osx_clang": [],
-    "@oceandoc//bazel:not_cross_compiling_on_osx": [],
-    "@oceandoc//bazel:cross_compiling_for_windows_gcc": [],
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@oceandoc//bazel:windows_x86_64": [
+        "_MBCS",
+        "WIN32",
+        "_WIN32",
+        "_WINDOWS",
+        "NDEBUG",
+        "_MSC_VER=1941",
+        "WIN64",
+        "_WIN64",
+        #"_UNICODE",
+        #"UNICODE",
+    ],
+    "@oceandoc//bazel:windows_aarch64": [
         "_MBCS",
         "WIN32",
         "_WIN32",
@@ -97,18 +137,7 @@ GLOBAL_LOCAL_DEFINES = select({
 })
 
 GLOBAL_LINKOPTS = select({
-    "@oceandoc//bazel:cross_compiling_for_osx_gcc": [
-        "-mmacosx-version-min=10.15",
-    ],
-    "@oceandoc//bazel:cross_compiling_for_osx_clang": [
-        "-mmacosx-version-min=10.15",
-    ],
-    "@oceandoc//bazel:not_cross_compiling_on_osx": [
-        "-lc++abi",
-        "-mmacosx-version-min=10.15",
-    ],
-    "@oceandoc//bazel:cross_compiling_for_windows_gcc": [],
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@oceandoc//bazel:windows_x86_64": [
         "/MACHINE:X64",
         "Ws2_32.Lib",
         "Crypt32.Lib",
@@ -124,6 +153,31 @@ GLOBAL_LINKOPTS = select({
         "oleaut32.lib",
         "uuid.lib",
         "comdlg32.lib",
+    ],
+    "@oceandoc//bazel:windows_aarch64": [
+        "/MACHINE:X64",
+        "Ws2_32.Lib",
+        "Crypt32.Lib",
+        "User32.lib",
+        "kernel32.lib",
+        "shell32.lib",
+        "advapi32.lib",
+        "bcrypt.lib",
+        "iphlpapi.lib",
+        "gdi32.lib",
+        "winspool.lib",
+        "ole32.lib",
+        "oleaut32.lib",
+        "uuid.lib",
+        "comdlg32.lib",
+    ],
+    "@oceandoc//bazel:osx_x86_64": [
+        "-lc++abi",
+        "-mmacosx-version-min=10.15",
+    ],
+    "@oceandoc//bazel:osx_aarch64": [
+        "-lc++abi",
+        "-mmacosx-version-min=10.15",
     ],
     "//conditions:default": [],
 })
