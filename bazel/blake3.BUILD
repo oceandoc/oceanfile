@@ -38,23 +38,11 @@ cc_library(
             "c/blake3_sse2_x86-64_unix.S",
             "c/blake3_sse41_x86-64_unix.S",
         ],
-        "@oceandoc//bazel:osx_aarch64": [
-            "c/blake3_avx2.c",
-            "c/blake3_avx512.c",
-            "c/blake3_sse2.c",
-            "c/blake3_sse41.c",
-        ],
         "@oceandoc//bazel:windows_x86_64": [
             "c/blake3_avx2_x86-64_windows_msvc.asm",
             "c/blake3_avx512_x86-64_windows_msvc.asm",
             "c/blake3_sse2_x86-64_windows_msvc.asm",
             "c/blake3_sse41_x86-64_windows_msvc.asm",
-        ],
-        "@oceandoc//bazel:windows_aarch64": [
-            "c/blake3_avx2.c",
-            "c/blake3_avx512.c",
-            "c/blake3_sse2.c",
-            "c/blake3_sse41.c",
         ],
         "//conditions:default": [],
     }) + [

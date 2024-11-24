@@ -14,7 +14,7 @@ def cc_toolchains_register():
                         "url": "https://code.xiamu.com/files/gcc14.2.0-x86_64-unknown-linux-gnu.tar.gz",
                         "strip_prefix": "gcc14.2.0-x86_64-unknown-linux-gnu",
                         "sha256sum": "5300d26766abf134dec08edc52950257193d1d1a20a19bfdc4345598947a1d91",
-                        "sysroot": "@cc_toolchain_repo_gcc_x86_64_unknown_linux_gnu",
+                        "sysroot": "@linux-x86_64-gnu_sysroot",
                         "tool_names": {
                             "ar": "x86_64-unknown-linux-gnu-ar",
                             "as": "x86_64-unknown-linux-gnu-as",
@@ -31,30 +31,36 @@ def cc_toolchains_register():
                             "strip": "x86_64-unknown-linux-gnu-strip",
                         },
                         "cxx_builtin_include_directories": [
-                            "x86_64-unknown-linux-gnu/sysroot/usr/include",
                             "x86_64-unknown-linux-gnu/include/c++/14.2.0/x86_64-unknown-linux-gnu",
                             "x86_64-unknown-linux-gnu/include/c++/14.2.0",
                             "x86_64-unknown-linux-gnu/include/c++/14.2.0/backward",
                             "lib/gcc/x86_64-unknown-linux-gnu/14.2.0/include",
                             "lib/gcc/x86_64-unknown-linux-gnu/14.2.0/include-fixed",
                         ],
-                        "lib_directories": [
-                            "lib64",
-                            "lib/gcc/x86_64-unknown-linux-gnu/14.2.0",
-                            "x86_64-unknown-linux-gnu/sysroot/usr/lib",
+                        "sysroot_include_directories": [
+                            "usr/include",
                         ],
+                        "lib_directories": [
+                            "lib",
+                            "lib/gcc/x86_64-unknown-linux-gnu/14.2.0",
+                        ],
+                        "sysroot_lib_directories": [
+                            "lib",
+                            "usr/lib",
+                        ],
+                        "link_libs": [],
                         "supports_start_end_lib": True,
                         "debug": True,
                     },
                     {
-                        "vendor": "generic",
-                        "libc": "glibc",
+                        "vendor": "unknown",
+                        "libc": "gnu",
                         "compiler": "clang",
                         "triple": "x86_64-unknown-linux-gnu",
                         "url": "https://code.xiamu.com/files/clang18.1.8-linux-x86_64_toolchain.tar.gz",
                         "strip_prefix": "clang18.1.8-linux-x86_64_toolchain",
                         "sha256sum": "be64a29251dd2b7ae6e8e783f99ab395b4bf2a75f98d8a6e03bf855e9d811434",
-                        "sysroot": "@cc_toolchain_repo_x86_64_linux_generic_glibc_clang",
+                        "sysroot": "@cc_toolchain_repo_clang_x86_64_unknown_linux_gnu",
                         "tool_names": {
                             "ar": "llvm-ar",
                             "as": "llvm-as",

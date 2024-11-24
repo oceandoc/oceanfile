@@ -728,8 +728,32 @@ register_toolchains(
 )
 
 http_archive(
+    name = "linux-x86_64-gnu_sysroot",
+    build_file = "//bazel:toolchains.BUILD",
+    sha256 = "5cd48e80eb0f5ce0bc20079719c80928bf66967343c6f457d30d082e92a895b6",
+    strip_prefix = "linux-x86_64-gnu_sysroot",
+    urls = ["https://code.xiamu.com/files/linux-x86_64-gnu_sysroot.tar.gz"],
+)
+
+http_archive(
+    name = "linux-aarch64-gnu_sysroot",
+    build_file = "//bazel:toolchains.BUILD",
+    sha256 = "e724edb3349951da434386e4bd0bbffb7bf9a583f7894d15c9abc587509ff0f9",
+    strip_prefix = "linux-aarch64-gnu_sysroot",
+    urls = ["https://code.xiamu.com/files/linux-aarch64-gnu_sysroot.tar.gz"],
+)
+
+http_archive(
+    name = "linux-aarch64-musl_sysroot",
+    build_file = "//bazel:toolchains.BUILD",
+    sha256 = "5f6112ae6301e610426a51aaccd5f5987a75b6af8699407b9e69f0ae7678608c",
+    strip_prefix = "linux-aarch64-musl_sysroot",
+    urls = ["https://code.xiamu.com/files/linux-aarch64-musl_sysroot.tar.gz"],
+)
+
+http_archive(
     name = "clang18.1.8-aarch64_sysroot",
-    build_file = "//bazel:cc_toolchain.BUILD",
+    build_file = "//bazel:toolchains.BUILD",
     sha256 = "95e32680f2f439773edd85640e5072bab099c399506008298cd1251be2d2df39",
     strip_prefix = "clang18.1.8-linux-aarch64_sysroot",
     urls = ["https://code.xiamu.com/files/clang18.1.8-linux-aarch64_sysroot.tar.gz"],
@@ -737,7 +761,7 @@ http_archive(
 
 http_archive(
     name = "macosx14.2-x86_64_sysroot",
-    build_file = "//bazel:cc_toolchain.BUILD",
+    build_file = "//bazel:toolchains.BUILD",
     sha256 = "d75e540388ade4056c0c91a5623b927f884bfc3f622b96e23ed31aacf226535d",
     strip_prefix = "macosx14.2-x86_64_sysroot",
     urls = ["https://code.xiamu.com/files/macosx14.2-x86_64_sysroot.tar.gz"],
