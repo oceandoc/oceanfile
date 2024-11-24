@@ -156,7 +156,7 @@ def cc_toolchains_register():
                         "url": "https://code.xiamu.com/files/gcc14.2.0-aarch64-unknown-linux-gnu.tar.gz",
                         "strip_prefix": "gcc14.2.0-aarch64-unknown-linux-gnu",
                         "sha256sum": "9dc69b3a46e5e9a9654abcf44391415e164097ecb1191eafd30689c834181f00",
-                        "sysroot": "@cc_toolchain_repo_gcc_aarch64_unknown_linux_gnu",
+                        "sysroot": "@linux-aarch64-gnu_sysroot",
                         "tool_names": {
                             "ar": "aarch64-unknown-linux-gnu-ar",
                             "as": "aarch64-unknown-linux-gnu-as",
@@ -173,20 +173,24 @@ def cc_toolchains_register():
                             "strip": "aarch64-unknown-linux-gnu-strip",
                         },
                         "cxx_builtin_include_directories": [
-                            "aarch64-unknown-linux-gnu/sysroot/usr/include",
                             "aarch64-unknown-linux-gnu/include/c++/14.2.0/aarch64-unknown-linux-gnu",
                             "aarch64-unknown-linux-gnu/include/c++/14.2.0",
                             "aarch64-unknown-linux-gnu/include/c++/14.2.0/backward",
                             "lib/gcc/aarch64-unknown-linux-gnu/14.2.0/include",
                             "lib/gcc/aarch64-unknown-linux-gnu/14.2.0/include-fixed",
                         ],
+                        "sysroot_include_directories": [
+                            "usr/include",
+                        ],
                         "lib_directories": [
                             "lib",
                             "lib/gcc/aarch64-unknown-linux-gnu/14.2.0",
-                            "aarch64-unknown-linux-gnu/sysroot/lib",
-                            "aarch64-unknown-linux-gnu/sysroot/usr/lib",
-                            "aarch64-unknown-linux-gnu/sysroot/usr/lib64",
                         ],
+                        "sysroot_lib_directories": [
+                            "lib",
+                            "usr/lib",
+                        ],
+                        "link_libs": [],
                         "supports_start_end_lib": True,
                         "debug": True,
                     },
@@ -198,7 +202,7 @@ def cc_toolchains_register():
                         "url": "https://code.xiamu.com/files/gcc14.2.0-aarch64-unknown-linux-musl.tar.gz",
                         "strip_prefix": "gcc14.2.0-aarch64-unknown-linux-musl",
                         "sha256sum": "2dd12401fb08fa41bceac94e6f343071a7e91630b2b8290d21d1ffc4c02f7519",
-                        "sysroot": "@cc_toolchain_repo_gcc_aarch64_unknown_linux_musl",
+                        "sysroot": "@linux-aarch64-musl_sysroot",
                         "tool_names": {
                             "ar": "aarch64-unknown-linux-musl-ar",
                             "as": "aarch64-unknown-linux-musl-as",
@@ -215,18 +219,24 @@ def cc_toolchains_register():
                             "strip": "aarch64-unknown-linux-musl-strip",
                         },
                         "cxx_builtin_include_directories": [
-                            "aarch64-unknown-linux-musl/sysroot/usr/include",
                             "aarch64-unknown-linux-musl/include/c++/14.2.0/aarch64-unknown-linux-musl",
                             "aarch64-unknown-linux-musl/include/c++/14.2.0",
                             "aarch64-unknown-linux-musl/include/c++/14.2.0/backward",
                             "lib/gcc/aarch64-unknown-linux-musl/14.2.0/include",
                             "lib/gcc/aarch64-unknown-linux-musl/14.2.0/include-fixed",
                         ],
-                        "lib_directories": [
-                            "lib64",
-                            "lib/gcc/aarch64-unknown-linux-musl/14.2.0",
-                            "/usr/lib/aarch64-linux-musl",
+                        "sysroot_include_directories": [
+                            "usr/include",
                         ],
+                        "lib_directories": [
+                            "lib",
+                            "lib/gcc/x86_64-unknown-linux-gnu/14.2.0",
+                        ],
+                        "sysroot_lib_directories": [
+                            "lib",
+                            "usr/lib",
+                        ],
+                        "link_libs": [],
                         "supports_start_end_lib": True,
                         "debug": True,
                     },
