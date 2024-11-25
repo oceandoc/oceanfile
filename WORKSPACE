@@ -145,8 +145,6 @@ new_git_repository(
     name = "xz",
     build_file = "//bazel:xz.BUILD",
     commit = "bf901dee5d4c46609645e50311c0cb2dfdcf9738",
-    patch_args = ["-p1"],
-    patches = ["//bazel:xz.patch"],
     remote = "git@code.xiamu.com:tukaani-project/xz.git",
 )
 
@@ -179,9 +177,9 @@ new_git_repository(
     tag = "v1.5.6",
 )
 
-new_git_repository(
+git_repository(
     name = "brotli",
-    build_file = "//bazel:brotli.BUILD",
+    #build_file = "//bazel:brotli.BUILD",
     remote = "git@code.xiamu.com:google/brotli.git",
     tag = "v1.1.0",
 )
@@ -331,7 +329,7 @@ git_repository(
 
 http_archive(
     name = "boost",
-    build_file = "//bazel:boost.BUILD",
+    build_file = "@com_github_nelhage_rules_boost//:boost.BUILD",
     patch_cmds = ["rm -f doc/pdf/BUILD"],
     patch_cmds_win = ["Remove-Item -Force doc/pdf/BUILD"],
     repo_mapping = {
@@ -707,6 +705,10 @@ rules_closure_dependencies()
 rules_closure_toolchains()
 
 rules_proto_toolchains()
+
+load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
+
+boost_deps()
 
 #################### hedron_compile_commands ####################
 load("@hedron_compile_commands//:workspace_setup.bzl", "hedron_compile_commands_setup")

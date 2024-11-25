@@ -94,7 +94,6 @@ GLOBAL_COPTS = select({
         "-Wextra",
         "-O3",
         "-g",
-        "-stdlib=libc++",
         "-mmacosx-version-min=10.15",
     ],
     "@oceandoc//bazel:osx_aarch64": [
@@ -102,7 +101,6 @@ GLOBAL_COPTS = select({
         "-Wextra",
         "-O3",
         "-g",
-        "-stdlib=libc++",
         "-mmacosx-version-min=10.15",
     ],
     "//conditions:default": [],

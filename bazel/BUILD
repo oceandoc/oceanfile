@@ -147,10 +147,29 @@ config_setting(
 )
 
 selects.config_setting_group(
-    name = "cross_compiling_for_osx",
+    name = "cross_compiling_for_linux_aarch64",
+    match_all = [
+        ":cross_compiling",
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "cross_compiling_for_osx_x86_64",
     match_all = [
         ":cross_compiling",
         "@platforms//os:osx",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "cross_compiling_for_osx_aarch64",
+    match_all = [
+        ":cross_compiling",
+        "@platforms//os:osx",
+        "@platforms//cpu:aarch64",
     ],
 )
 

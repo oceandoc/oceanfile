@@ -107,13 +107,12 @@ configure_make(
     configure_command = "Configure",
     configure_in_place = True,
     configure_options = CONFIGURE_OPTIONS + select({
-        "@oceandoc//bazel:linux_aarch64": ["linux-aarch64"],
-        "@oceandoc//bazel:cross_compiling_for_osx": [
+        "@oceandoc//bazel:cross_compiling_for_linux_aarch64": ["linux-aarch64"],
+        "@oceandoc//bazel:cross_compiling_for_osx_x86_64": [
             "darwin64-x86_64-cc",
         ],
-        "@platforms//os:windows": [
-            "mingw64",
-            "no-shared",
+        "@oceandoc//bazel:cross_compiling_for_osx_aarch64": [
+            "darwin64-arm64-cc",
         ],
         "//conditions:default": [],
     }),

@@ -339,7 +339,7 @@ def cc_toolchains_register():
                             "usr/lib",
                             "System/Library/Frameworks",
                         ],
-                        "supports_start_end_lib": True,
+                        "supports_start_end_lib": False,
                         "debug": True,
                     },
                 ],
