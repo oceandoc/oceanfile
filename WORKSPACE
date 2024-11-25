@@ -752,19 +752,11 @@ http_archive(
 )
 
 http_archive(
-    name = "clang18.1.8-aarch64_sysroot",
+    name = "macosx14.2_sysroot",
     build_file = "//bazel:toolchains.BUILD",
-    sha256 = "95e32680f2f439773edd85640e5072bab099c399506008298cd1251be2d2df39",
-    strip_prefix = "clang18.1.8-linux-aarch64_sysroot",
-    urls = ["https://code.xiamu.com/files/clang18.1.8-linux-aarch64_sysroot.tar.gz"],
-)
-
-http_archive(
-    name = "macosx14.2-x86_64_sysroot",
-    build_file = "//bazel:toolchains.BUILD",
-    sha256 = "d75e540388ade4056c0c91a5623b927f884bfc3f622b96e23ed31aacf226535d",
-    strip_prefix = "macosx14.2-x86_64_sysroot",
-    urls = ["https://code.xiamu.com/files/macosx14.2-x86_64_sysroot.tar.gz"],
+    sha256 = "dfda4d0f437035242c865fb10c3e183f348fab41251847e2f9c6930cf7772768",
+    strip_prefix = "macosx14.2_sysroot",
+    urls = ["https://code.xiamu.com/files/macosx14.2_sysroot.tar.gz"],
 )
 
 new_git_repository(
@@ -774,16 +766,16 @@ new_git_repository(
     tag = "1.5.4",
 )
 
-#new_git_repository(
-#name = "cc_toolchains",
-#commit = "d52a3974b37e01ab7774694d5cd8ed8ae120f16e",
-#remote = "git@code.xiamu.com:xiedeacc/cc_toolchains.git",
-#)
-
-local_repository(
+new_git_repository(
     name = "cc_toolchains",
-    path = "../cc_toolchains",
+    commit = "f7fe27f1d918162893bd9a24be27b0f11699b362",
+    remote = "git@github.com:xiedeacc/cc_toolchains.git",
 )
+
+#local_repository(
+#name = "cc_toolchains",
+#path = "../cc_toolchains",
+#)
 
 load("//bazel:toolchains.bzl", "cc_toolchains_register")
 

@@ -203,22 +203,22 @@ build:clang_aarch64_linux_gnu --build_tag_filters='-ignore'
 
 #use clang to support musl need compile libc++.so and libc++abi.so and libunwind.so use musl
 
-build:clang_macosx_x86_64 --platforms='//bazel:osx_x86_64_platform'
-build:clang_macosx_x86_64 --toolchain_resolution_debug='@bazel_tools//tools/jdk:runtime_toolchain_type'
-build:clang_macosx_x86_64 --extra_toolchains='@cc_toolchain_config_clang_x86_64_unknown_osx_macosx//:toolchain-clang_x86_64_unknown_osx_macosx'
-build:clang_macosx_x86_64 --extra_toolchains='@remotejdk21_linux_toolchain_config_repo//:toolchain'
-build:clang_macosx_x86_64 --cpu='x86_64'
-build:clang_macosx_x86_64 --compiler='clang'
-build:clang_macosx_x86_64 --copt='-mmacosx-version-min=10.15'
-build:clang_macosx_x86_64 --define cross_compiling=true
-build:clang_macosx_x86_64 --build_tag_filters='-ignore'
+build:clang_x86_64_macosx --platforms='//bazel:osx_x86_64_platform'
+build:clang_x86_64_macosx --toolchain_resolution_debug='@bazel_tools//tools/jdk:runtime_toolchain_type'
+build:clang_x86_64_macosx --extra_toolchains='@cc_toolchain_config_clang_x86_64_unknown_osx_macosx//:toolchain-clang_x86_64_unknown_osx_macosx'
+build:clang_x86_64_macosx --extra_toolchains='@remotejdk21_linux_toolchain_config_repo//:toolchain'
+build:clang_x86_64_macosx --cpu='x86_64'
+build:clang_x86_64_macosx --compiler='clang'
+build:clang_x86_64_macosx --copt='-mmacosx-version-min=10.15'
+build:clang_x86_64_macosx --define cross_compiling=true
+build:clang_x86_64_macosx --build_tag_filters='-ignore'
 
-build:clang_macosx_aarch64 --platforms='//bazel:osx_aarch64_platform'
-build:clang_macosx_aarch64 --toolchain_resolution_debug='@bazel_tools//tools/jdk:runtime_toolchain_type'
-build:clang_macosx_aarch64 --extra_toolchains='@cc_toolchain_config_aarch64_osx_generic_macosx_clang//:toolchain-aarch64_osx_generic_macosx_clang'
-build:clang_macosx_aarch64 --extra_toolchains='@remotejdk21_linux_toolchain_config_repo//:toolchain'
-build:clang_macosx_aarch64 --cpu='aarch64'
-build:clang_macosx_aarch64 --compiler='clang'
-build:clang_macosx_aarch64 --copt='-mmacosx-version-min=10.15'
-build:clang_macosx_aarch64 --define cross_compiling=true
-build:clang_macosx_aarch64 --build_tag_filters='-ignore'
+build:clang_aarch64_macosx --platforms='//bazel:osx_aarch64_platform'
+build:clang_aarch64_macosx --toolchain_resolution_debug='@bazel_tools//tools/jdk:runtime_toolchain_type'
+build:clang_aarch64_macosx --extra_toolchains='@cc_toolchain_config_clang_aarch64_unknown_osx_macosx//:toolchain-clang_aarch64_unknown_osx_macosx'
+build:clang_aarch64_macosx --extra_toolchains='@remotejdk21_linux_toolchain_config_repo//:toolchain'
+build:clang_aarch64_macosx --cpu='aarch64'
+build:clang_aarch64_macosx --compiler='clang'
+build:clang_aarch64_macosx --copt='-mmacosx-version-min=10.15'
+build:clang_aarch64_macosx --define cross_compiling=true
+build:clang_aarch64_macosx --build_tag_filters='-ignore'
