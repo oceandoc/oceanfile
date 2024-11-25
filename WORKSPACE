@@ -250,15 +250,12 @@ git_repository(
 
 new_git_repository(
     name = "com_github_gflags_gflags",
-    patch_args = ["-p1"],
-    patches = ["//bazel:gflags.patch"],
     remote = "git@code.xiamu.com:gflags/gflags.git",
     tag = "v2.2.2",
 )
 
 new_git_repository(
     name = "com_github_glog_glog",
-    build_file = "//bazel:glog.BUILD",
     remote = "git@code.xiamu.com:google/glog.git",
     repo_mapping = {
         "@gflags": "@com_github_gflags_gflags",
@@ -376,11 +373,9 @@ new_git_repository(
 http_archive(
     name = "libev",
     build_file = "//bazel:libev.BUILD",
-    patch_args = ["-p1"],
-    patches = ["//bazel:libev.patch"],
     sha256 = "507eb7b8d1015fbec5b935f34ebed15bf346bed04a11ab82b8eee848c4205aea",
     strip_prefix = "libev-4.33",
-    url = "http://dist.schmorp.de/libev/libev-4.33.tar.gz",
+    url = "https://dist.schmorp.de/libev/libev-4.33.tar.gz",
 )
 
 new_git_repository(
@@ -428,8 +423,6 @@ new_git_repository(
 new_git_repository(
     name = "folly",
     build_file = "//bazel:folly.BUILD",
-    patch_args = ["-p1"],
-    patches = ["//bazel:folly.patch"],
     remote = "git@code.xiamu.com:facebook/folly.git",
     tag = "v2024.07.08.00",
 )

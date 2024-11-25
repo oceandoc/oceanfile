@@ -590,6 +590,7 @@ cc_library(
         "@platforms//os:windows": [
             "/Iexternal/jemalloc/include/msvc_compat",
         ],
+        "//conditions:default": [],
     }),
     linkopts = ["-lpthread"],
     local_defines = [
@@ -642,6 +643,7 @@ cc_library(
         "@platforms//os:windows": [
             "/Iexternal/jemalloc/include/msvc_compat",
         ],
+        "//conditions:default": [],
     }),
     linkopts = ["-lpthread"],
     local_defines = LOCAL_DEFINES,

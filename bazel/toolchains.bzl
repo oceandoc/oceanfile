@@ -59,7 +59,7 @@ def cc_toolchains_register():
                         "triple": "x86_64-unknown-linux-gnu",
                         "url": "https://code.xiamu.com/files/clang18.1.8-x86_64-unknown-linux-gnu.tar.gz",
                         "strip_prefix": "clang18.1.8-x86_64-unknown-linux-gnu",
-                        "sha256sum": "8682fb861e4e025477a3fc1eda203072738846ad90bc533dcbd7a2c3963f167c",
+                        "sha256sum": "1e323bccdfb57a89cfb901e5330a880d460c9209afd21c69d2af74d60fe355ab",
                         "sysroot": "@linux-x86_64-gnu_sysroot",
                         #"url": "/usr/local/llvm/clang18.1.8-x86_64-unknown-linux-gnu",
                         "tool_names": {
@@ -109,7 +109,7 @@ def cc_toolchains_register():
                         "triple": "x86_64-apple-darwin",
                         "url": "https://code.xiamu.com/files/clang18.1.8-x86_64-unknown-linux-gnu.tar.gz",
                         "strip_prefix": "clang18.1.8-x86_64-unknown-linux-gnu",
-                        "sha256sum": "8682fb861e4e025477a3fc1eda203072738846ad90bc533dcbd7a2c3963f167c",
+                        "sha256sum": "1e323bccdfb57a89cfb901e5330a880d460c9209afd21c69d2af74d60fe355ab",
                         "sysroot": "@macosx14.2_sysroot",
                         #"url": "/usr/local/llvm/clang18.1.8-x86_64-unknown-linux-gnu",
                         #"sysroot": "/zfs/www/files/macosx14.2_sysroot",
@@ -129,6 +129,7 @@ def cc_toolchains_register():
                             "strip": "x86_64-apple-darwin23.2-strip",
                         },
                         "cxx_builtin_include_directories": [
+                            "include/darwin/c++/v1",
                             "include/c++/v1",
                             "lib/clang/18/include",
                             "lib/clang/18/share",
@@ -252,7 +253,7 @@ def cc_toolchains_register():
                         "triple": "aarch64-unknown-linux-gnu",
                         "url": "https://code.xiamu.com/files/clang18.1.8-x86_64-unknown-linux-gnu.tar.gz",
                         "strip_prefix": "clang18.1.8-x86_64-unknown-linux-gnu",
-                        "sha256sum": "8682fb861e4e025477a3fc1eda203072738846ad90bc533dcbd7a2c3963f167c",
+                        "sha256sum": "1e323bccdfb57a89cfb901e5330a880d460c9209afd21c69d2af74d60fe355ab",
                         "sysroot": "@linux-aarch64-gnu_sysroot",
                         #"url": "/usr/local/llvm/clang18.1.8-x86_64-unknown-linux-gnu",
                         "tool_names": {
@@ -302,7 +303,7 @@ def cc_toolchains_register():
                         "triple": "aarch64-apple-darwin",
                         "url": "https://code.xiamu.com/files/clang18.1.8-x86_64-unknown-linux-gnu.tar.gz",
                         "strip_prefix": "clang18.1.8-x86_64-unknown-linux-gnu",
-                        "sha256sum": "8682fb861e4e025477a3fc1eda203072738846ad90bc533dcbd7a2c3963f167c",
+                        "sha256sum": "1e323bccdfb57a89cfb901e5330a880d460c9209afd21c69d2af74d60fe355ab",
                         "sysroot": "@macosx14.2_sysroot",
                         #"url": "/usr/local/llvm/clang18.1.8-x86_64-unknown-linux-gnu",
                         #"sysroot": "/zfs/www/files/macosx14.2_sysroot",
@@ -322,6 +323,7 @@ def cc_toolchains_register():
                             "strip": "x86_64-apple-darwin23.2-strip",
                         },
                         "cxx_builtin_include_directories": [
+                            "include/darwin/c++/v1",
                             "include/c++/v1",
                             "lib/clang/18/include",
                             "lib/clang/18/share",
