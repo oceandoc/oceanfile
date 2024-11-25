@@ -47,7 +47,6 @@ COPTS = GLOBAL_COPTS + select({
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
     "@platforms//os:windows": [],
-    "@platforms//os:windows": ["_LARGEFILE64_SOURCE"],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": ["_LARGEFILE64_SOURCE"],

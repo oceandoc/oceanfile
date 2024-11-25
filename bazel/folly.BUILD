@@ -156,7 +156,7 @@ cc_library(
             "folly/memcpy.S",
             #"folly/memset.S",
         ],
-        "@platforms//cpu:aarch64": [
+        "@oceandoc//bazel:linux_aarch64": [
             "folly/external/aor/memcpy-advsimd.S",
             "folly/external/aor/memcpy-armv8.S",
             "folly/external/aor/memcpy_sve.S",
