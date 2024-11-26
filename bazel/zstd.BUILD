@@ -76,9 +76,8 @@ cc_library(
             "lib/legacy/zstd_v02.c",
             "lib/legacy/zstd_v03.c",
         ],
-    ) + select({
-        "@platforms//os:windows": [],
-        "@platforms//cpu:x86_64": ["lib/decompress/huf_decompress_amd64.S"],
+    ) + selects.with_or({
+        ("@oceandoc//bazel:linux_x86_64", "@oceandoc//bazel:osx_x86_64"): ["lib/decompress/huf_decompress_amd64.S"],
         "//conditions:default": [],
     }),
     hdrs = [

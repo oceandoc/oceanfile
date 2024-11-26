@@ -1,3 +1,4 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LOCAL_DEFINES", "template_rule")
 
 package(default_visibility = ["//visibility:public"])
@@ -140,10 +141,9 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
         "HAVE_C_VARARRAYS=1",
         "HAVE_GCC_MEMORY_FENCES=1",
     ],
-}) + select({
-    "@platforms//os:windows": [],
+}) + selects.with_or({
     "@platforms//cpu:aarch64": ["HAVE_ARMCRYPTO=1"],
-    "@platforms//cpu:x86_64": [
+    ("@oceandoc//bazel:linux_x86_64", "@oceandoc//bazel:osx_x86_64"): [
         "HAVE_EMMINTRIN_H=1",
         "HAVE_MMINTRIN_H=1",
         "HAVE_PMMINTRIN_H=1",
@@ -163,6 +163,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
         "HAVE_CATCHABLE_ABRT=1",
         "HAVE_CPUID=1",
     ],
+    "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [
         "HAVE_SYS_AUXV_H=1",

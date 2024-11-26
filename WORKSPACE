@@ -179,7 +179,7 @@ new_git_repository(
 
 git_repository(
     name = "brotli",
-    #build_file = "//bazel:brotli.BUILD",
+    build_file = "//bazel:brotli.BUILD",
     remote = "git@code.xiamu.com:google/brotli.git",
     tag = "v1.1.0",
 )
