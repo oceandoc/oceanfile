@@ -363,7 +363,7 @@ TEST(Util, WriteToFile) {
   EXPECT_EQ(Util::Exists(path), false);
   EXPECT_EQ(Util::CreateFileWithSize(path, 200), proto::ErrCode::Success);
   EXPECT_EQ(Util::Exists(path), true);
-  EXPECT_EQ(Util::WriteToFile(path, "test", 100L), proto::ErrCode::Success);
+  EXPECT_EQ(Util::WriteToFile(path, "test", 100L), Err_Success);
   std::string sha256;
   EXPECT_EQ(Util::SmallFileSHA256(path, &sha256), true);
   EXPECT_EQ(sha256,

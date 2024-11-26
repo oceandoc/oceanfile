@@ -37,6 +37,21 @@ GLOBAL_COPTS = select({
         "/MP",
         #"/errorReport:prompt",  #permission to send error reports to Microsoft
         "/showIncludes",  #
+        "/wd4996",  # Disable warning C4996
+        "/wd4018",  # Disable warning C4018
+        "/wd4710",
+        "/wd4711",
+        "/wd4626",
+        "/wd5027",
+        "/wd4623",
+        "/wd4365",
+        "/wd4388",
+        "/wd4577",
+        "/wd4800",
+        "/wd4820",
+        "/wd4625",
+        "/wd4626",
+        "/wd5026",
     ],
     "@oceandoc//bazel:windows_aarch64": [
         "/GS",  #enable buffer security checks
