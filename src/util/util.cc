@@ -261,7 +261,7 @@ int64_t Util::UpdateTime(const string &path) {
   struct stat attr;
   if (lstat(path.c_str(), &attr) == 0) {
 #ifdef __APPLE__
-    return attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
+    return attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000;
 #else
     return attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
 #endif

@@ -253,7 +253,7 @@ genrule(
         "#define EVENT__HAVE_ARC4RANDOM 1",
         "",
         "/* Define to 1 if you have the 'arc4random_addrandom' function. */",
-        "/* #undef EVENT__HAVE_ARC4RANDOM_ADDRANDOM */",
+        "#define EVENT__HAVE_ARC4RANDOM_ADDRANDOM 1",
         "",
         "/* Define to 1 if you have the 'arc4random_buf' function. */",
         "#define EVENT__HAVE_ARC4RANDOM_BUF 1",
@@ -1023,15 +1023,10 @@ template_rule(
         "//conditions:default": {
         },
     }) | selects.with_or({
-        "@oceandoc//bazel:osx_x86_64": {
-            "/* #undef EVENT__HAVE_ARC4RANDOM */": "#define EVENT__HAVE_ARC4RANDOM 1",
-            "/* #undef EVENT__HAVE_ARC4RANDOM_BUF */": "#define EVENT__HAVE_ARC4RANDOM_BUF 1",
-            "/* #undef EVENT__HAVE_ARC4RANDOM_ADDRANDOM */": "#define EVENT__HAVE_ARC4RANDOM_ADDRANDOM 1",
-        },
-        "@oceandoc//bazel:linux_aarch64": {
-            "/* #undef EVENT__HAVE_ARC4RANDOM */": "#define EVENT__HAVE_ARC4RANDOM 1",
-            "/* #undef EVENT__HAVE_ARC4RANDOM_BUF */": "#define EVENT__HAVE_ARC4RANDOM_BUF 1",
-            #"/* #undef EVENT__HAVE_ARC4RANDOM_ADDRANDOM */": "#define EVENT__HAVE_ARC4RANDOM_ADDRANDOM 1",
+        "@platforms//os:windows": {
+            "#define EVENT__HAVE_ARC4RANDOM 1": "/* #undef EVENT__HAVE_ARC4RANDOM */",
+            "#define EVENT__HAVE_ARC4RANDOM_BUF 1": "/* #undef EVENT__HAVE_ARC4RANDOM_BUF */",
+            "#define EVENT__HAVE_ARC4RANDOM_ADDRANDOM 1": "/* #undef EVENT__HAVE_ARC4RANDOM_ADDRANDOM */",
         },
         "//conditions:default": {
         },
