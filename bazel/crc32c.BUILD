@@ -66,6 +66,9 @@ crc32c_copts = select({
     ":macos_sse42": ["-msse4.2"],
     ":windows_sse42": ["/arch:AVX"],
     # No special flags are needed for ARM64+CRC32C.
+    "@platforms//cpu:aarch64": [
+        "-march=armv8-a+crc+crypto",
+    ],
     "//conditions:default": [],
 })
 
@@ -88,7 +91,7 @@ template_rule(
             " HAVE_ARM64_CRC32C": " HAVE_ARM64_CRC32C 0",
             " HAVE_MM_PREFETCH": " HAVE_MM_PREFETCH 1",
         },
-        "@platforms//cpu:arm64": {
+        "@platforms//cpu:aarch64": {
             " HAVE_SSE42": " HAVE_SSE42 0",
             " HAVE_ARM64_CRC32C": " HAVE_ARM64_CRC32C 1",
         },

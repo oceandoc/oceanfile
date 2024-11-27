@@ -1,4 +1,4 @@
-#startup --output_base=D:/x --windows_enable_symlinks
+startup --output_base=/data/bazel_cache --windows_enable_symlinks
 common --noenable_bzlmod
 common --experimental_downloader_config=.bazel_downloader.cfg
 common --enable_platform_specific_config

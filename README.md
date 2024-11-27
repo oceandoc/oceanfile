@@ -1,4 +1,6 @@
 # TODO
+1. jemalloc on macosx arm64
+2. windows build problem
 
 1. 多平台支持
 clear && bazel build @blake3//:all --config=gcc_x86_64_linux_gnu

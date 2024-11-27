@@ -44,6 +44,7 @@ cc_library(
             "c/blake3_sse2_x86-64_windows_msvc.asm",
             "c/blake3_sse41_x86-64_windows_msvc.asm",
         ],
+        "@platforms//cpu:aarch64": ["c/blake3_neon.c"],
         "//conditions:default": [],
     }) + [
         "c/blake3.c",
