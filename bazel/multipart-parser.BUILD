@@ -39,7 +39,7 @@ cc_library(
         "MultipartParser.h",
         "MultipartReader.h",
     ],
-    copts = COPTS + ["-Wno-implicit-fallthrough"],
+    copts = COPTS,
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
 )

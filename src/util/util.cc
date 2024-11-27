@@ -197,21 +197,21 @@ bool Util::IsAbsolute(const string &src) {
 
 bool Util::SetUpdateTime(const string &path, int64_t ts) {
 #if defined(_WIN32)
-  HANDLE hFile = CreateFileA(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
-                             FILE_ATTRIBUTE_NORMAL, NULL);
+  // HANDLE hFile = CreateFileA(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+  //                            FILE_ATTRIBUTE_NORMAL, NULL);
 
-  if (hFile == INVALID_HANDLE_VALUE) {
-    std::cerr << "Failed to open file.\n";
-    return false;
-  }
+  // if (hFile == INVALID_HANDLE_VALUE) {
+  //   std::cerr << "Failed to open file.\n";
+  //   return false;
+  // }
 
-  if (!SetFileTime(hFile, NULL, NULL, &newTime)) {
-    std::cerr << "Failed to set file time.\n";
-    CloseHandle(hFile);
-    return false;
-  }
+  // if (!SetFileTime(hFile, NULL, NULL, &newTime)) {
+  //   std::cerr << "Failed to set file time.\n";
+  //   CloseHandle(hFile);
+  //   return false;
+  // }
 
-  CloseHandle(hFile);
+  // CloseHandle(hFile);
 #else
   struct timespec times[2];
   struct timespec time = ToTimeSpec(ts);
@@ -250,13 +250,13 @@ bool Util::SetUpdateTime(const string &path, int64_t ts) {
 
 int64_t Util::UpdateTime(const string &path) {
 #if defined(_WIN32)
-  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
-    ULARGE_INTEGER ull;
-    ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
-    ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
-    return ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
-  }
+  // WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+  //   ULARGE_INTEGER ull;
+  //   ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+  //   ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+  //   return ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+  // }
 #else
   struct stat attr;
   if (lstat(path.c_str(), &attr) == 0) {
@@ -272,13 +272,13 @@ int64_t Util::UpdateTime(const string &path) {
 
 int64_t Util::FileSize(const string &path) {
 #if defined(_WIN32)
-  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
-    LARGE_INTEGER size;
-    size.LowPart = fileInfo.nFileSizeLow;
-    size.HighPart = fileInfo.nFileSizeHigh;
-    return size.QuadPart;
-  }
+  // WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+  //   LARGE_INTEGER size;
+  //   size.LowPart = fileInfo.nFileSizeLow;
+  //   size.HighPart = fileInfo.nFileSizeHigh;
+  //   return size.QuadPart;
+  // }
 #else
   struct stat attr;
   if (lstat(path.c_str(), &attr) == 0) {
@@ -289,6 +289,7 @@ int64_t Util::FileSize(const string &path) {
 }
 
 void Username(int64_t uid, int64_t gid, string *user, string *group) {
+#if defined(__linux__)
   struct passwd *pw = getpwuid(uid);
   if (pw == nullptr) {
     pw = getpwuid(getuid());
@@ -304,27 +305,28 @@ void Username(int64_t uid, int64_t gid, string *user, string *group) {
   if (gr != nullptr) {
     *group = string(gr->gr_name);
   }
+#endif
 }
 
 bool Util::FileInfo(const string &path, int64_t *update_time, int64_t *size,
                     string *user, string *group) {
 #if defined(_WIN32)
-  WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
-    ULARGE_INTEGER ull;
-    ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
-    ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
-    *create_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+  // WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+  //   ULARGE_INTEGER ull;
+  //   ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
+  //   ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
+  //   *create_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
 
-    ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
-    ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
-    *update_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
+  //   ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
+  //   ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
+  //   *update_time = ((ull.QuadPart / 10000ULL) - 11644473600000ULL);
 
-    ull.LowPart = fileInfo.nFileSizeLow;
-    ull.HighPart = fileInfo.nFileSizeHigh;
-    *size = ull.QuadPart;
-    return true;
-  }
+  //   ull.LowPart = fileInfo.nFileSizeLow;
+  //   ull.HighPart = fileInfo.nFileSizeHigh;
+  //   *size = ull.QuadPart;
+  //   return true;
+  // }
 #else
   struct stat attr;
   if (lstat(path.c_str(), &attr) == 0) {
@@ -424,12 +426,12 @@ bool Util::Create(const string &path) {
     }
 
 #if defined(_WIN32)
-    HANDLE hFile = CreateFile(path.c_str(), GENERIC_WRITE, 0, nullptr,
-                              CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile == INVALID_HANDLE_VALUE) {
-      return false;
-    }
-    CloseHandle(hFile);
+    // HANDLE hFile = CreateFile(path.c_str(), GENERIC_WRITE, 0, nullptr,
+    //                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    // if (hFile == INVALID_HANDLE_VALUE) {
+    //   return false;
+    // }
+    // CloseHandle(hFile);
 #else
     int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
     if (fd == -1) {
@@ -463,29 +465,29 @@ int32_t Util::CreateFileWithSize(const string &path, const int64_t size) {
   }
 
 #if defined(_WIN32)
-  HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
-                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  // HANDLE hFile = CreateFileA(path.c_str(), GENERIC_WRITE, 0, nullptr,
+  //                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 
-  if (hFile == INVALID_HANDLE_VALUE) {
-    DWORD errorCode = GetLastError();
-    if (errorCode == ERROR_ACCESS_DENIED) {
-      return Err_Permission;
-    } else if (errorCode == ERROR_DISK_FULL) {
-      return Err_Disk_full;
-    }
-    return Err_Fail;
-  }
+  // if (hFile == INVALID_HANDLE_VALUE) {
+  //   DWORD errorCode = GetLastError();
+  //   if (errorCode == ERROR_ACCESS_DENIED) {
+  //     return Err_Permission;
+  //   } else if (errorCode == ERROR_DISK_FULL) {
+  //     return Err_Disk_full;
+  //   }
+  //   return Err_Fail;
+  // }
 
-  LARGE_INTEGER liSize;
-  liSize.QuadPart = size;
+  // LARGE_INTEGER liSize;
+  // liSize.QuadPart = size;
 
-  if (!SetFilePointerEx(hFile, liSize, nullptr, FILE_BEGIN) ||
-      !SetEndOfFile(hFile)) {
-    CloseHandle(hFile);
-    return Fail;
-  }
+  // if (!SetFilePointerEx(hFile, liSize, nullptr, FILE_BEGIN) ||
+  //     !SetEndOfFile(hFile)) {
+  //   CloseHandle(hFile);
+  //   return Fail;
+  // }
 
-  CloseHandle(hFile);
+  // CloseHandle(hFile);
 #else
   int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
   if (fd == -1) {
@@ -752,7 +754,7 @@ bool Util::SyncRemoteSymlink(const string &src, const string &src_symlink,
       return false;
     }
 
-    *target = std::filesystem::read_symlink(src_symlink);
+    *target = std::filesystem::read_symlink(src_symlink).string();
     return true;
   } catch (std::filesystem::filesystem_error &e) {
     LOG(ERROR) << e.what();
@@ -1508,6 +1510,7 @@ int64_t Util::MemUsage() {
   long pageSize = sysconf(_SC_PAGESIZE);  // in bytes
   return resident * pageSize / 1024 / 1024;
 #endif
+  return -1;
 }
 
 // TODO(xieyz) detect mount point
@@ -1557,6 +1560,7 @@ string Util::ExecutablePath() {
 #elif defined(__APPLE__)
 
 #endif
+  return "";
 }
 
 string Util::HomeDir() {

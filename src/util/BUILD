@@ -94,6 +94,13 @@ cc_library(
     hdrs = ["util.h"],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
+    defines = select({
+        "@platforms//os:windows": [
+            "WIN32",
+            "_WIN32",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/common:defs",
         "//src/common:error_code",
@@ -138,6 +145,13 @@ cc_test(
         "//test_data/util_test",
     ],
     local_defines = LOCAL_DEFINES,
+    defines = select({
+        "@platforms//os:windows": [
+            "WIN32",
+            "_WIN32",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":util",
         "//src/test:test_util",

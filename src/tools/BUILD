@@ -63,10 +63,7 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_binary(
     name = "scan_status_prettier",
     srcs = ["scan_status_prettier.cc"],
-    copts = COPTS + [
-        "-Wno-implicit-fallthrough",
-        "-Wno-unused-parameter",
-    ],
+    copts = COPTS ,
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
@@ -78,10 +75,7 @@ cc_binary(
 cc_binary(
     name = "scan_status_validator",
     srcs = ["scan_status_validator.cc"],
-    copts = COPTS + [
-        "-Wno-implicit-fallthrough",
-        "-Wno-unused-parameter",
-    ],
+    copts = COPTS,
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
@@ -93,10 +87,7 @@ cc_binary(
 cc_binary(
     name = "scan",
     srcs = ["scan.cc"],
-    copts = COPTS + [
-        "-Wno-implicit-fallthrough",
-        "-Wno-unused-parameter",
-    ],
+    copts = COPTS,
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
