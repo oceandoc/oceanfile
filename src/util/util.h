@@ -12,6 +12,10 @@
 #include <string_view>
 #include <vector>
 
+// clang-format off
+#include "src/common/fix_header_order.h" // NOLINT
+// clang-format on
+
 #include "boost/algorithm/string/replace.hpp"
 #include "folly/IPAddress.h"
 #include "google/protobuf/message.h"

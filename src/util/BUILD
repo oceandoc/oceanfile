@@ -93,7 +93,6 @@ cc_library(
     srcs = ["util.cc"],
     hdrs = ["util.h"],
     copts = COPTS,
-    local_defines = LOCAL_DEFINES,
     defines = select({
         "@platforms//os:windows": [
             "WIN32",
@@ -101,9 +100,11 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    local_defines = LOCAL_DEFINES,
     deps = [
         "//src/common:defs",
         "//src/common:error_code",
+        "//src/common:fix_header_order",
         "//src/proto:cc_service",
         "@blake3",
         "@boost//:algorithm",
@@ -144,7 +145,6 @@ cc_test(
         "//conf:client_base_config.json",
         "//test_data/util_test",
     ],
-    local_defines = LOCAL_DEFINES,
     defines = select({
         "@platforms//os:windows": [
             "WIN32",
@@ -152,6 +152,7 @@ cc_test(
         ],
         "//conditions:default": [],
     }),
+    local_defines = LOCAL_DEFINES,
     deps = [
         ":util",
         "//src/test:test_util",
