@@ -26,31 +26,13 @@ COPTS = GLOBAL_COPTS + select({
     "//conditions:default": [],
 })
 
-LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@platforms//os:windows": [
-        "GLOG_NO_ABBREVIATED_SEVERITIES",
-        "_CRT_DECLARE_NONSTDC_NAMES=1",
-    ],
-    "//conditions:default": ["BUILD_TRACING=0"],
-}) + select({
-    "@platforms//os:linux": [],
-    "@platforms//os:osx": [],
-    "@platforms//os:windows": [],
-    "//conditions:default": [],
-})
+LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + ["BUILD_TRACING=0"]
 
 cc_library(
     name = "debug",
     srcs = ["debug.cc"],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
-    defines = select({
-        "@platforms//os:windows": [
-            "WIN32",
-            "_WIN32",
-        ],
-        "//conditions:default": [],
-    }),
     deps = [
         "@com_github_gflags_gflags//:gflags",
         "@com_github_glog_glog//:glog",
@@ -62,13 +44,6 @@ cc_library(
     hdrs = ["test_util.h"],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
-    defines = select({
-        "@platforms//os:windows": [
-            "WIN32",
-            "_WIN32",
-        ],
-        "//conditions:default": [],
-    }),
     deps = [
         "//src/util",
     ],
@@ -79,14 +54,6 @@ cc_library(
     srcs = ["test_main.cc"],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
-    defines = select({
-        "@platforms//os:windows": [
-            "WIN32",
-            "_WIN32",
-            "_CRT_DECLARE_NONSTDC_NAMES=1",
-        ],
-        "//conditions:default": [],
-    }),
     deps = [
         "@com_github_gflags_gflags//:gflags",
         "@com_github_glog_glog//:glog",

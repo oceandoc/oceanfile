@@ -141,11 +141,9 @@ GLOBAL_LINKOPTS = select({
         "comdlg32.lib",
     ],
     "@oceandoc//bazel:osx_x86_64": [
-        "-lc++abi",
         "-mmacosx-version-min=10.15",
     ],
     "@oceandoc//bazel:osx_aarch64": [
-        "-lc++abi",
         "-mmacosx-version-min=10.15",
     ],
     "//conditions:default": [],
