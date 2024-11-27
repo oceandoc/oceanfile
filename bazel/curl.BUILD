@@ -1058,6 +1058,7 @@ template_rule(
     out = "curl_config.h",
     substitutions = select({
         "@platforms//os:linux": {
+            "/* #undef HAVE_ARC4RANDOM */": "#define HAVE_ARC4RANDOM 1",
         },
         "@platforms//os:osx": {
             "#define CURL_CA_BUNDLE \"/etc/ssl/certs/ca-certificates.crt\"": "#define CURL_CA_BUNDLE \"/etc/ssl/cert.pem\"",

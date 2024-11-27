@@ -658,6 +658,7 @@ template_rule(
     out = "src/lib/ares_config.h",
     substitutions = select({
         "@platforms//os:linux": {
+            "/* #undef HAVE_ARC4RANDOM_BUF */": "#define HAVE_ARC4RANDOM_BUF 1",
         },
         "@platforms//os:osx": {
             "#define GETSERVBYPORT_R_ARGS 6": "#define GETSERVBYPORT_R_ARGS",
