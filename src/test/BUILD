@@ -29,6 +29,7 @@ COPTS = GLOBAL_COPTS + select({
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
     "@platforms//os:windows": [
         "GLOG_NO_ABBREVIATED_SEVERITIES",
+        "_CRT_DECLARE_NONSTDC_NAMES=1",
     ],
     "//conditions:default": ["BUILD_TRACING=0"],
 }) + select({
@@ -82,6 +83,7 @@ cc_library(
         "@platforms//os:windows": [
             "WIN32",
             "_WIN32",
+            "_CRT_DECLARE_NONSTDC_NAMES=1",
         ],
         "//conditions:default": [],
     }),

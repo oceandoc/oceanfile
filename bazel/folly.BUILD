@@ -243,7 +243,6 @@ cc_library(
     }),
     copts = COPTS,
     linkopts = GLOBAL_LINKOPTS,
-    linkstatic = True,
     local_defines = LOCAL_DEFINES,
     deps = [
         "@boost//:algorithm",
@@ -292,7 +291,6 @@ cc_library(
 
 cc_library(
     name = "folly",
-    linkstatic = True,
     deps = [
         ":MathOperation",
         ":MathOperation_AVX2",

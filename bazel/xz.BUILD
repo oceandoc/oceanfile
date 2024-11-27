@@ -336,10 +336,6 @@ cc_library(
         "@platforms//os:windows": ["LZMA_API_STATIC"],
         "//conditions:default": [],
     }),
-    # alwayslink = select({
-    #     "@platforms//os:windows": True,
-    #     "//conditions:default": False,
-    # }),
 )
 
 genrule(

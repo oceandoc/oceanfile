@@ -653,7 +653,6 @@ cc_library(
         "@platforms//os:osx": [],
         "//conditions:default": [],
     }),
-    alwayslink = True,
 )
 
 cc_library(
@@ -677,7 +676,6 @@ cc_library(
     ],
     local_defines = LOCAL_DEFINES,
     deps = [":jemalloc_private"],
-    alwayslink = True,
 )
 
 cc_library(
@@ -686,5 +684,4 @@ cc_library(
         ":jemalloc_cpp",
         ":jemalloc_private",
     ],
-    alwayslink = True,
 )

@@ -12,7 +12,6 @@ cc_binary(
         "pb_code_generator.cc",
         "pb_code_generator.h",
     ],
-    linkstatic = True,
     deps = [
         "@boost//:algorithm",
         "@com_github_glog_glog//:glog",

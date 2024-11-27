@@ -41,6 +41,8 @@ COPTS = GLOBAL_COPTS + select({
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
     "@platforms//os:windows": [
         "GLOG_NO_ABBREVIATED_SEVERITIES",
+        "_CRT_DECLARE_NONSTDC_NAMES=1",
+        "_CRT_USE_WINAPI_FAMILY_DESKTOP_APP",
     ],
     "//conditions:default": ["BUILD_TRACING=0"],
 }) + select({
@@ -70,7 +72,13 @@ cc_library(
     ],
     copts = COPTS,
     linkopts = LINKOPTS,
-    local_defines = LOCAL_DEFINES,
+    local_defines = LOCAL_DEFINES + select({
+        "@platforms//os:windows": [
+            "_CRT_SECURE_NO_DEPRECATE",
+            "_CRT_NONSTDC_NO_DEPRECATE",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/async_grpc",
         "//src/common:blocking_queue",

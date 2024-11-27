@@ -25,7 +25,6 @@ COPTS = GLOBAL_COPTS + select({
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
-    "CURL_STATICLIB",
     "BUILDING_LIBCURL",
     "HAVE_CONFIG_H",
     "CURL_DISABLE_FTP",
@@ -34,9 +33,6 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
     "HAVE_ZLIB_H",
     #"CURL_STRICTER",
 ] + select({
-    "@platforms//os:windows": [],
-    "//conditions:default": [],
-}) + select({
     "@platforms//os:linux": [
         "_GNU_SOURCE",
         "CURL_MAX_WRITE_SIZE=65536",
@@ -45,7 +41,11 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
         "_GNU_SOURCE",
         "CURL_MAX_WRITE_SIZE=65536",
     ],
-    "@platforms//os:windows": ["CURL_MAX_WRITE_SIZE=16384"],
+    "@platforms//os:windows": [
+        "CURL_MAX_WRITE_SIZE=16384",
+        "_CRT_NONSTDC_NO_DEPRECATE",
+        "_CRT_SECURE_NO_DEPRECATE",
+    ],
     "//conditions:default": [],
 })
 
@@ -243,6 +243,10 @@ cc_library(
     copts = COPTS,
     includes = ["include"],
     local_defines = LOCAL_DEFINES,
+    defines = select({
+        "@platforms//os:windows": ["CURL_STATICLIB"],
+        "//conditions:default": [],
+    }),
     deps = [
         "@c-ares",
         "@openssl//:crypto",
@@ -607,7 +611,7 @@ write_file(
         "/* #undef HAVE_BROTLI */",
         "",
         "/* if zstd is available */",
-        "/* #undef HAVE_ZSTD */",
+        "#define HAVE_ZSTD 1",
         "",
         "/* Define to 1 if you have the <locale.h> header file. */",
         "#define HAVE_LOCALE_H 1",
@@ -904,7 +908,7 @@ write_file(
         "#define STDC_HEADERS 1",
         "",
         "/* Define if you want to enable c-ares support */",
-        "/* #undef USE_ARES */",
+        "#define USE_ARES 1",
         "",
         "/* Define if you want to enable POSIX threaded DNS lookup */",
         "#define USE_THREADS_POSIX 1",

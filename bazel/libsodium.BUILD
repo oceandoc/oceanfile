@@ -345,7 +345,6 @@ cc_library(
     defines = ["SODIUM_STATIC"],
     local_defines = LOCAL_DEFINES,
     deps = [":utils"],
-    alwayslink = True,
 )
 
 cc_library(
@@ -384,7 +383,6 @@ cc_library(
         ],
     }) + COPTS,
     local_defines = LOCAL_DEFINES,
-    alwayslink = True,
 )
 
 cc_library(
@@ -406,7 +404,6 @@ cc_library(
     }) + COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [":common"],
-    alwayslink = True,
 )
 
 cc_library(
@@ -428,7 +425,6 @@ cc_library(
     }) + COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [":common"],
-    alwayslink = True,
 )
 
 cc_library(
@@ -453,7 +449,6 @@ cc_library(
     }) + COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [":common"],
-    alwayslink = True,
 )
 
 cc_library(
@@ -474,7 +469,6 @@ cc_library(
     }) + COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [":common"],
-    alwayslink = True,
 )
 
 cc_library(
@@ -500,7 +494,6 @@ cc_library(
     }) + COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [":common"],
-    alwayslink = True,
 )
 
 cc_library(
@@ -524,7 +517,6 @@ cc_library(
     }) + COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [":common"],
-    alwayslink = True,
 )
 
 cc_library(
@@ -545,7 +537,6 @@ cc_library(
             "-mssse3",
         ],
     }) + COPTS,
-    linkstatic = True,
     local_defines = LOCAL_DEFINES,
     deps = [
         ":aesni",

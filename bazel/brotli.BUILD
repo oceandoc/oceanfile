@@ -64,8 +64,8 @@ cc_library(
     srcs = [":common_sources"],
     hdrs = [":common_headers"],
     copts = STRICT_C_OPTIONS,
-    linkstatic = 1,
     deps = [":brotli_inc"],
+    linkstatic = True,
 )
 
 cc_library(
@@ -74,6 +74,7 @@ cc_library(
     hdrs = [":dec_headers"],
     copts = STRICT_C_OPTIONS,
     deps = [":brotlicommon"],
+    linkstatic = True,
 )
 
 cc_library(
@@ -86,13 +87,13 @@ cc_library(
         "//conditions:default": ["-lm"],
     }),
     deps = [":brotlicommon"],
+    linkstatic = True,
 )
 
 cc_binary(
     name = "brotli",
     srcs = ["c/tools/brotli.c"],
     copts = STRICT_C_OPTIONS,
-    linkstatic = 1,
     deps = [
         ":brotlidec",
         ":brotlienc",

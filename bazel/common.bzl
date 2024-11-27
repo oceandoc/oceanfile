@@ -117,6 +117,7 @@ GLOBAL_LOCAL_DEFINES = select({
         # "STRICT",
         "WIN32_LEAN_AND_MEAN",
         "_HAS_EXCEPTIONS=1",
+        "_WIN32_WINNT=0x0601",
     ],
     "//conditions:default": [],
 })

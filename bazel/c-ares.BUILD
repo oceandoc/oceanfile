@@ -137,14 +137,10 @@ cc_library(
         "src/lib/*.h",
     ]),
     copts = COPTS,
-    defines = ["CARES_STATICLIB"],
     includes = ["include"],
-    linkstatic = True,
     local_defines = LOCAL_DEFINES + [
         "CARES_BUILDING_LIBRARY",
         "HAVE_CONFIG_H=1",
-        "CARES_STATICLIB",
-        #"c_ares_EXPORTS",
     ] + select({
         "@platforms//os:linux": [
             "_XOPEN_SOURCE=700",
@@ -157,15 +153,16 @@ cc_library(
             "_DARWIN_C_SOURCE",
         ],
         "@platforms//os:windows": [
-            "_WIN32_WINNT=0x0601",
-            "WIN32_LEAN_AND_MEAN",
-            "_CRT_NONSTDC_NO_DEPRECATE",
             "CARES_NO_DEPRECATED",
+            "_CRT_NONSTDC_NO_DEPRECATE",
             "_CRT_SECURE_NO_DEPRECATE",
         ],
         "//conditions:default": [],
     }),
-    alwayslink = True,
+    defines = select({
+        "@platforms//os:windows": ["CARES_STATICLIB"],
+        "//conditions:default": [],
+    }),
 )
 
 genrule(
