@@ -84,10 +84,13 @@ int main(int argc, char **argv) {
       std::make_shared<oceandoc::server::ServerContext>();
 
   oceandoc::server::GrpcServer grpc_server(server_context);
-  ::grpc_server_ptr = &grpc_server;
-
   oceandoc::server::HttpServer http_server(server_context);
+
+
+#if !defined(_WIN32)
+  ::grpc_server_ptr = &grpc_server;
   ::http_server_ptr = &http_server;
+#endif
 
   grpc_server.Start();
   http_server.Start();

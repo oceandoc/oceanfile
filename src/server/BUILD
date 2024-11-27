@@ -63,10 +63,7 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_binary(
     name = "server",
     srcs = ["server.cc"],
-    copts = COPTS + [
-        "-Wno-implicit-fallthrough",
-        "-Wno-unused-parameter",
-    ],
+    copts = COPTS,
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
@@ -80,6 +77,7 @@ cc_binary(
         ":http_server_impl",
         #"@jemalloc",
         "@openssl//:ssl",
+        "@xz//:lzma",
     ],
 )
 

@@ -66,7 +66,6 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
     "PACKAGE_URL=\\\"https://tukaani.org/xz/\\\"",
     "TUKLIB_PHYSMEM_SYSCONF",
     "TUKLIB_SYMBOL_PREFIX=lzma_",
-    "HAVE_VISIBILITY=1",
 ] + select({
     "@platforms//os:linux": [
         "HAVE___BUILTIN_BSWAPXX",
@@ -84,6 +83,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
         "_GNU_SOURCE",
         "MYTHREAD_POSIX",
         "HAVE_PTHREAD_CONDATTR_SETCLOCK",
+        "HAVE_VISIBILITY=1",
     ],
     "@platforms//os:osx": [
         "HAVE___BUILTIN_BSWAPXX",
@@ -125,12 +125,14 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
         "__STDC_WANT_IEC_60559_TYPES_EXT__=1",
         "__STDC_WANT_LIB_EXT2__=1",
         "__STDC_WANT_MATH_SPEC_FUNCS__=1",
+        "HAVE_VISIBILITY=1",
     ],
     "@platforms//os:windows": [
         "MYTHREAD_VISTA",
         "HAVE_MBRTOWC",
         "HAVE__FUTIME",
         "__GETOPT_PREFIX=rpl_",
+        "HAVE_VISIBILITY=0",
     ],
     "//conditions:default": [],
 }) + select({
@@ -325,12 +327,19 @@ cc_library(
     ],
     copts = COPTS,
     includes = ["src/liblzma/api"],
-    linkopts = LINKOPTS,
-    local_defines = LOCAL_DEFINES,
-    alwayslink = select({
-        "@platforms//os:windows": True,
-        "//conditions:default": False,
+    linkopts = LINKOPTS + select({
+        "@platforms//os:windows": ["/machine:x64"],
+        "//conditions:default": [],
     }),
+    local_defines = LOCAL_DEFINES,
+    defines = select({
+        "@platforms//os:windows": ["LZMA_API_STATIC"],
+        "//conditions:default": [],
+    }),
+    # alwayslink = select({
+    #     "@platforms//os:windows": True,
+    #     "//conditions:default": False,
+    # }),
 )
 
 genrule(
