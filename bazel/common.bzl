@@ -112,12 +112,10 @@ GLOBAL_LOCAL_DEFINES = select({
         "_MSC_VER=1941",
         "WIN64",
         "_WIN64",
-        # "_UNICODE",
-        # "UNICODE",
-        # "STRICT",
         "WIN32_LEAN_AND_MEAN",
         "_HAS_EXCEPTIONS=1",
         "_WIN32_WINNT=0x0601",
+        "GLOG_NO_ABBREVIATED_SEVERITIES",
     ],
     "//conditions:default": [],
 })
