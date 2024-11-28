@@ -181,6 +181,7 @@ build:gcc_aarch64_linux_musl --cpu='aarch64'
 build:gcc_aarch64_linux_musl --compiler='gcc'
 build:gcc_aarch64_linux_musl --copt='-g'
 build:gcc_aarch64_linux_musl --host_copt='-g'
+build:gcc_aarch64_linux_musl --define abi='musl'
 build:gcc_aarch64_linux_musl --define cross_compiling=true
 build:gcc_aarch64_linux_musl --build_tag_filters='-ignore'
 

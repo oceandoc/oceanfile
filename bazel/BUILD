@@ -146,6 +146,11 @@ config_setting(
     define_values = {"cross_compiling": "false"},
 )
 
+config_setting(
+    name = "musl-abi",
+    define_values = {"abi": "musl"},
+)
+
 selects.config_setting_group(
     name = "cross_compiling_for_linux_aarch64",
     match_all = [

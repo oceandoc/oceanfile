@@ -107,7 +107,9 @@ configure_make(
     configure_command = "Configure",
     configure_in_place = True,
     configure_options = CONFIGURE_OPTIONS + select({
-        "@oceandoc//bazel:cross_compiling_for_linux_aarch64": ["linux-aarch64"],
+        "@oceandoc//bazel:cross_compiling_for_linux_aarch64": [
+            "linux-aarch64",
+        ],
         "@oceandoc//bazel:cross_compiling_for_osx_x86_64": [
             "darwin64-x86_64-cc",
         ],
@@ -115,7 +117,7 @@ configure_make(
             "darwin64-arm64-cc",
         ],
         "//conditions:default": [],
-    }),
+    }) + ["no-shared"],
     env = select({
         "@platforms//os:osx": {"ARFLAGS": "-static -o"},
         "//conditions:default": {},

@@ -1,6 +1,6 @@
+load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LOCAL_DEFINES")
 load("//bazel:build.bzl", "cc_test")
 load("//bazel:cpplint.bzl", "cpplint")
-load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LOCAL_DEFINES")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -32,6 +32,7 @@ cc_library(
     name = "debug",
     srcs = ["debug.cc"],
     copts = COPTS,
+    linkstatic = True,
     local_defines = LOCAL_DEFINES,
     deps = [
         "@com_github_gflags_gflags//:gflags",

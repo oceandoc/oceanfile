@@ -1031,8 +1031,12 @@ template_rule(
         "@platforms//os:linux": {
             "#define EVENT__HAVE_ARC4RANDOM_ADDRANDOM 1": "/* #undef EVENT__HAVE_ARC4RANDOM_ADDRANDOM */",
         },
-        "//conditions:default": {
+        "//conditions:default": {},
+    }) | select({
+        "@oceandoc//bazel:musl-abi": {
+            "#define EVENT__HAVE_SYS_QUEUE_H 1": "/* #undef EVENT__HAVE_SYS_QUEUE_H */",
         },
+        "//conditions:default": {},
     }),
 )
 
