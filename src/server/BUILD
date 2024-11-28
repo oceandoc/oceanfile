@@ -38,7 +38,7 @@ COPTS = GLOBAL_COPTS + select({
     "//conditions:default": [],
 })
 
-LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES +  select({
+LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
     "@platforms//os:linux": [],
     "@platforms//os:osx": [],
     "@platforms//os:windows": [],
@@ -59,7 +59,10 @@ cc_binary(
     name = "server",
     srcs = ["server.cc"],
     copts = COPTS,
-    linkopts = LINKOPTS,
+    linkopts = LINKOPTS + select({
+        "@oceandoc//bazel:cross_compiling_for_linux_aarch64_musl": ["-static"],
+        "//conditions:default": [],
+    }),
     local_defines = LOCAL_DEFINES,
     deps = [
         ":server_context",

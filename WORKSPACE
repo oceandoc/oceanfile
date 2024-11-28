@@ -763,16 +763,16 @@ new_git_repository(
     tag = "1.5.4",
 )
 
-#new_git_repository(
-#name = "cc_toolchains",
-#commit = "f7fe27f1d918162893bd9a24be27b0f11699b362",
-#remote = "git@github.com:xiedeacc/cc_toolchains.git",
-#)
-
-local_repository(
+new_git_repository(
     name = "cc_toolchains",
-    path = "../cc_toolchains",
+    commit = "23ee72aaa8fb759ec88901dd1a81613782f8e906",
+    remote = "git@github.com:xiedeacc/cc_toolchains.git",
 )
+
+#local_repository(
+#name = "cc_toolchains",
+#path = "../cc_toolchains",
+#)
 
 load("//bazel:toolchains.bzl", "cc_toolchains_register")
 

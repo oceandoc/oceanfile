@@ -28,10 +28,11 @@ COPTS = GLOBAL_COPTS + select({
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + ["BUILD_TRACING=0"]
 
-cc_library(
+cc_binary(
     name = "debug",
     srcs = ["debug.cc"],
     copts = COPTS,
+    linkopts = ["-static"],
     linkstatic = True,
     local_defines = LOCAL_DEFINES,
     deps = [
