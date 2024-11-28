@@ -1028,6 +1028,9 @@ template_rule(
             "#define EVENT__HAVE_ARC4RANDOM_BUF 1": "/* #undef EVENT__HAVE_ARC4RANDOM_BUF */",
             "#define EVENT__HAVE_ARC4RANDOM_ADDRANDOM 1": "/* #undef EVENT__HAVE_ARC4RANDOM_ADDRANDOM */",
         },
+        "@platforms//os:linux": {
+            "#define EVENT__HAVE_ARC4RANDOM_ADDRANDOM 1": "/* #undef EVENT__HAVE_ARC4RANDOM_ADDRANDOM */",
+        },
         "//conditions:default": {
         },
     }),
