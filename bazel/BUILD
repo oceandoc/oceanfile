@@ -176,6 +176,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "linux_gnu",
+    match_all = [
+        ":gnu-abi",
+        "@platforms//os:linux",
+    ],
+)
+
+selects.config_setting_group(
     name = "cross_compiling_for_osx_x86_64",
     match_all = [
         ":cross_compiling",

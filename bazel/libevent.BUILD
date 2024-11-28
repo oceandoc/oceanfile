@@ -88,7 +88,6 @@ cc_library(
         ],
         "@platforms//os:linux": [
             "epoll.c",
-            "epoll_sub.c",
             "epolltable-internal.h",
             "evthread_pthread.c",
             "poll.c",
@@ -96,6 +95,12 @@ cc_library(
             "signalfd.c",
         ],
         "//conditions:default": [],
+        #}) + select({
+        #"@oceandoc//bazel:cross_compiling_for_linux_aarch64_musl": [],
+        #"@oceandoc//bazel:linux_gnu": [
+        #"epoll_sub.c",
+        #],
+        #"//conditions:default": [],
     }),
     hdrs = [
         "arc4random.c",

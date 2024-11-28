@@ -60,7 +60,8 @@ cc_binary(
     srcs = ["server.cc"],
     copts = COPTS,
     linkopts = LINKOPTS + select({
-        "@oceandoc//bazel:cross_compiling_for_linux_aarch64_musl": ["-static"],
+        #"@oceandoc//bazel:cross_compiling_for_linux_aarch64_musl": ["-static"],
+        "@oceandoc//bazel:cross_compiling_for_linux_aarch64_musl": [],
         "//conditions:default": [],
     }),
     local_defines = LOCAL_DEFINES,
