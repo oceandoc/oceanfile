@@ -727,7 +727,7 @@ register_toolchains(
 http_archive(
     name = "linux-x86_64-gnu_sysroot",
     build_file = "//bazel:toolchains.BUILD",
-    sha256 = "5cd48e80eb0f5ce0bc20079719c80928bf66967343c6f457d30d082e92a895b6",
+    sha256 = "30546f20d6a16bf5de3a15eb63418a488f5317402b4907484b1521a7a4e2bc7c",
     strip_prefix = "linux-x86_64-gnu_sysroot",
     urls = ["https://code.xiamu.com/files/linux-x86_64-gnu_sysroot.tar.gz"],
 )
@@ -735,7 +735,7 @@ http_archive(
 http_archive(
     name = "linux-aarch64-gnu_sysroot",
     build_file = "//bazel:toolchains.BUILD",
-    sha256 = "e724edb3349951da434386e4bd0bbffb7bf9a583f7894d15c9abc587509ff0f9",
+    sha256 = "16bfff2c7306118f2bebc6d8d35188768bf312e60cf3fc363e2ab8d96f53240e",
     strip_prefix = "linux-aarch64-gnu_sysroot",
     urls = ["https://code.xiamu.com/files/linux-aarch64-gnu_sysroot.tar.gz"],
 )
@@ -743,7 +743,7 @@ http_archive(
 http_archive(
     name = "linux-aarch64-musl_sysroot",
     build_file = "//bazel:toolchains.BUILD",
-    sha256 = "5f6112ae6301e610426a51aaccd5f5987a75b6af8699407b9e69f0ae7678608c",
+    sha256 = "a76ef46d1815d465cb2079825104aca507a230bc973477f4ce1e9d94a325d7e8",
     strip_prefix = "linux-aarch64-musl_sysroot",
     urls = ["https://code.xiamu.com/files/linux-aarch64-musl_sysroot.tar.gz"],
 )
