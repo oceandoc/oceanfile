@@ -137,6 +137,10 @@ cc_library(
         "src/lib/*.h",
     ]),
     copts = COPTS,
+    defines = select({
+        "@platforms//os:windows": ["CARES_STATICLIB"],
+        "//conditions:default": [],
+    }),
     includes = ["include"],
     local_defines = LOCAL_DEFINES + [
         "CARES_BUILDING_LIBRARY",
@@ -157,10 +161,6 @@ cc_library(
             "_CRT_NONSTDC_NO_DEPRECATE",
             "_CRT_SECURE_NO_DEPRECATE",
         ],
-        "//conditions:default": [],
-    }),
-    defines = select({
-        "@platforms//os:windows": ["CARES_STATICLIB"],
         "//conditions:default": [],
     }),
 )
@@ -755,6 +755,13 @@ template_rule(
             "/* #undef HAVE_WS2TCPIP_H */": "#define HAVE_WS2TCPIP_H 1",
             "#define HAVE_GETIFADDRS 1": "/* #undef HAVE_GETIFADDRS */",
             "#define HAVE_WRITEV 1": "/* #undef HAVE_WRITEV */",
+        },
+        "//conditions:default": {},
+    }) | select({
+        "@oceandoc//bazel:musl-abi": {
+            "#define EVENT__HAVE_SYS_QUEUE_H 1": "#define EVENT__HAVE_SYS_QUEUE_H 0",
+            "/* #undef HAVE_ARC4RANDOM_BUF */": "/* #undef HAVE_ARC4RANDOM_BUF */",
+            "#define EVENT__HAVE_MMAP64 1": "/* #undef EVENT__HAVE_MMAP64 */",
         },
         "//conditions:default": {},
     }),

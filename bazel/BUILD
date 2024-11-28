@@ -147,6 +147,11 @@ config_setting(
 )
 
 config_setting(
+    name = "gnu-abi",
+    define_values = {"abi": "gnu"},
+)
+
+config_setting(
     name = "musl-abi",
     define_values = {"abi": "musl"},
 )
@@ -154,6 +159,16 @@ config_setting(
 selects.config_setting_group(
     name = "cross_compiling_for_linux_aarch64",
     match_all = [
+        ":cross_compiling",
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "cross_compiling_for_linux_aarch64_musl",
+    match_all = [
+        ":musl-abi",
         ":cross_compiling",
         "@platforms//os:linux",
         "@platforms//cpu:aarch64",

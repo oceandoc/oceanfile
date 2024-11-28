@@ -102,6 +102,7 @@ build --strip='never'
 build --output_filter='^//(?!external)'
 build -c opt
 build --define cross_compiling=false
+build --define abi='gnu'
 build --features=-module_maps
 build --host_features=-module_maps
 #build --features=-layering_check

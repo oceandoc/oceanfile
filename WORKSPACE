@@ -423,6 +423,8 @@ new_git_repository(
 new_git_repository(
     name = "folly",
     build_file = "//bazel:folly.BUILD",
+    patch_args = ["-p1"],
+    patches = ["//bazel:folly.patch"],
     remote = "git@code.xiamu.com:facebook/folly.git",
     tag = "v2024.07.08.00",
 )
