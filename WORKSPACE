@@ -769,11 +769,6 @@ new_git_repository(
     remote = "git@github.com:xiedeacc/cc_toolchains.git",
 )
 
-#local_repository(
-#name = "cc_toolchains",
-#path = "../cc_toolchains",
-#)
-
 load("//bazel:toolchains.bzl", "cc_toolchains_register")
 
 cc_toolchains_register()
