@@ -251,7 +251,8 @@ bool Util::SetUpdateTime(const string &path, int64_t ts) {
 int64_t Util::UpdateTime(const string &path) {
 #if defined(_WIN32)
   // WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard,
+  // &fileInfo)) {
   //   ULARGE_INTEGER ull;
   //   ull.LowPart = fileInfo.ftLastWriteTime.dwLowDateTime;
   //   ull.HighPart = fileInfo.ftLastWriteTime.dwHighDateTime;
@@ -273,7 +274,8 @@ int64_t Util::UpdateTime(const string &path) {
 int64_t Util::FileSize(const string &path) {
 #if defined(_WIN32)
   // WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard,
+  // &fileInfo)) {
   //   LARGE_INTEGER size;
   //   size.LowPart = fileInfo.nFileSizeLow;
   //   size.HighPart = fileInfo.nFileSizeHigh;
@@ -312,7 +314,8 @@ bool Util::FileInfo(const string &path, int64_t *update_time, int64_t *size,
                     string *user, string *group) {
 #if defined(_WIN32)
   // WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard, &fileInfo)) {
+  // if (GetFileAttributesEx(filePath.c_str(), GetFileExInfoStandard,
+  // &fileInfo)) {
   //   ULARGE_INTEGER ull;
   //   ull.LowPart = fileInfo.ftCreationTime.dwLowDateTime;
   //   ull.HighPart = fileInfo.ftCreationTime.dwHighDateTime;
@@ -334,7 +337,7 @@ bool Util::FileInfo(const string &path, int64_t *update_time, int64_t *size,
 #ifdef __linux__
     *update_time = attr.st_mtime * 1000 + attr.st_mtim.tv_nsec / 1000000;
 #elif __APPLE__
-    *update_time = attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000
+    *update_time = attr.st_mtime * 1000 + attr.st_mtimespec.tv_nsec / 1000000;
 #endif
     if (user && group) {
       Username(attr.st_uid, attr.st_gid, user, group);
@@ -1522,7 +1525,7 @@ bool IsMountPoint(const string &path) {
 }
 
 void Util::ListAllIPAddresses(std::vector<folly::IPAddress> *ip_addrs) {
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__linux__)
   struct ifaddrs *ifAddrStruct = nullptr;
   struct ifaddrs *ifa = nullptr;
   void *addr_ptr = nullptr;

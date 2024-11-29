@@ -765,7 +765,7 @@ new_git_repository(
 
 new_git_repository(
     name = "cc_toolchains",
-    commit = "23ee72aaa8fb759ec88901dd1a81613782f8e906",
+    commit = "2a194c24161d9488bbfbb2bd9f486967edcc7170",
     remote = "git@github.com:xiedeacc/cc_toolchains.git",
 )
 
