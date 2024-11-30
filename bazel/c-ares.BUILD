@@ -139,7 +139,7 @@ cc_library(
         "src/lib/*.h",
     ]),
     copts = COPTS,
-    defines = DEFINES + select({
+    defines = select({
         "@platforms//os:windows": ["CARES_STATICLIB"],
         "//conditions:default": [],
     }),

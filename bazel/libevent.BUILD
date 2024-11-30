@@ -24,6 +24,12 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
         "LITTLE_ENDIAN",
         "HAVE_CONFIG_H",
     ],
+    "@platforms//os:linux": [
+        "_GNU_SOURCE",
+        "HAVE_CONFIG_H",
+        "NDEBUG",
+        "LITTLE_ENDIAN",
+    ],
     "//conditions:default": [
         "HAVE_CONFIG_H",
         "NDEBUG",
@@ -257,6 +263,7 @@ genrule(
         "/* config.h.  Generated from config.h.in by configure.  */",
         "/* config.h.in.  Generated from configure.ac by autoheader.  */",
         "",
+        "#include <features.h>",
         "/* Define if building universal (internal helper macro) */",
         "/* #undef EVENT__AC_APPLE_UNIVERSAL_BUILD */",
         "",
