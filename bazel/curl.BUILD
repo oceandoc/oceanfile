@@ -2,7 +2,7 @@
 #https://github.com/googleapis/google-cloud-cpp/blob/main/bazel/curl.BUILD
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LOCAL_DEFINES", "template_rule")
+load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_DEFINES", "GLOBAL_LOCAL_DEFINES", "template_rule")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -23,6 +23,8 @@ COPTS = GLOBAL_COPTS + select({
     "@platforms//os:windows": [],
     "//conditions:default": [],
 })
+
+DEFINES = GLOBAL_DEFINES
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
     "BUILDING_LIBCURL",
@@ -241,12 +243,12 @@ cc_library(
         "include/curl/websockets.h",
     ],
     copts = COPTS,
-    includes = ["include"],
-    local_defines = LOCAL_DEFINES,
-    defines = select({
+    defines = DEFINES + select({
         "@platforms//os:windows": ["CURL_STATICLIB"],
         "//conditions:default": [],
     }),
+    includes = ["include"],
+    local_defines = LOCAL_DEFINES,
     deps = [
         "@c-ares",
         "@openssl//:crypto",
@@ -405,7 +407,17 @@ write_file(
         "#define HAVE_ALARM 1",
         "",
         "/* Define to 1 if you have the arc4random function. */",
+        "#if defined(__GLIBC__ )",
+        "#if __GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 36)",
+        "#define HAVE_ARC4RANDOM 1",
+        "#else",
         "/* #undef HAVE_ARC4RANDOM */",
+        "#endif",
+        "#elif defined(__APPLE__)",
+        "#define HAVE_ARC4RANDOM 1",
+        "#else",
+        "/* #undef HAVE_ARC4RANDOM */",
+        "#endif",
         "",
         "/* Define to 1 if you have the <arpa/inet.h> header file. */",
         "#define HAVE_ARPA_INET_H 1",
@@ -1062,13 +1074,11 @@ template_rule(
     out = "curl_config.h",
     substitutions = select({
         "@platforms//os:linux": {
-            "/* #undef HAVE_ARC4RANDOM */": "#define HAVE_ARC4RANDOM 1",
         },
         "@platforms//os:osx": {
             "#define CURL_CA_BUNDLE \"/etc/ssl/certs/ca-certificates.crt\"": "#define CURL_CA_BUNDLE \"/etc/ssl/cert.pem\"",
             "/* #define CURL_DISABLE_LDAP 1 */": "/* #undef CURL_DISABLE_LDAP */",
             "/* #define CURL_DISABLE_LDAPS 1 */": "/* #undef CURL_DISABLE_LDAPS */",
-            "/* #undef HAVE_ARC4RANDOM */": "#define HAVE_ARC4RANDOM 1",
             "#define HAVE_GETHOSTBYNAME_R 1": "/* #undef HAVE_GETHOSTBYNAME_R */",
             "#define HAVE_GETHOSTBYNAME_R_6 1": "/* #undef HAVE_GETHOSTBYNAME_R_6 */",
             "/* #undef HAVE_LIBIDN2 */": "#define HAVE_LIBIDN2 1",

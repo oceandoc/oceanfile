@@ -172,6 +172,9 @@ build:gcc_aarch64_linux_gnu --compiler='gcc'
 build:gcc_aarch64_linux_gnu --copt='-g'
 build:gcc_aarch64_linux_gnu --host_copt='-g'
 build:gcc_aarch64_linux_gnu --define cross_compiling=true
+build:gcc_aarch64_linux_gnu --define distro='debian'
+build:gcc_aarch64_linux_gnu --define distro_version='ubuntu22.04'
+build:gcc_aarch64_linux_gnu --define cross_compiling=true
 build:gcc_aarch64_linux_gnu --build_tag_filters='-ignore'
 
 build:gcc_aarch64_linux_musl --platforms='//bazel:linux_aarch64_platform'

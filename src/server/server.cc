@@ -58,10 +58,14 @@ int main(int argc, char **argv) {
   std::string home_dir = oceandoc::util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
 
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  FLAGS_log_dir = "./log";
+  FLAGS_stop_logging_if_full_disk = true;
+
   folly::Init init(&argc, &argv, false);
+  google::EnableLogCleaner(7);
   // google::InitGoogleLogging(argv[0]); // already called in folly::Init
   google::SetStderrLogging(google::GLOG_INFO);
-  gflags::ParseCommandLineFlags(&argc, &argv, false);
   LOG(INFO) << "CommandLine: " << google::GetArgv();
 
   oceandoc::util::ConfigManager::Instance()->Init(
@@ -85,7 +89,6 @@ int main(int argc, char **argv) {
 
   oceandoc::server::GrpcServer grpc_server(server_context);
   oceandoc::server::HttpServer http_server(server_context);
-
 
 #if !defined(_WIN32)
   ::grpc_server_ptr = &grpc_server;

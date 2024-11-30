@@ -120,6 +120,16 @@ GLOBAL_LOCAL_DEFINES = select({
     "//conditions:default": [],
 })
 
+GLOBAL_DEFINES = select({
+    "@oceandoc//bazel:on_ubuntu22.04": [
+        "__GLIBC_MINOR__=35",
+    ],
+    "@oceandoc//bazel:on_ubuntu24.04": [
+        "__GLIBC_MINOR__=39",
+    ],
+    "//conditions:default": [],
+})
+
 GLOBAL_LINKOPTS = select({
     "@platforms//os:windows": [
         "/machine:x64",

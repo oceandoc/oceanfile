@@ -553,7 +553,17 @@ genrule(
         "/* #undef HAVE___SYSTEM_PROPERTY_GET */",
         "",
         "/* Define if have arc4random_buf() */",
+        "#if defined(__GLIBC__ )",
+        "#if __GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 36)",
+        "#define HAVE_ARC4RANDOM_BUF 1",
+        "#else",
         "/* #undef HAVE_ARC4RANDOM_BUF */",
+        "#endif",
+        "#elif defined(__APPLE__)",
+        "#define HAVE_ARC4RANDOM_BUF 1",
+        "#else",
+        "/* #undef HAVE_ARC4RANDOM_BUF */",
+        "#endif",
         "",
         "/* Define if have getifaddrs() */",
         "#define HAVE_GETIFADDRS 1",
@@ -654,9 +664,7 @@ template_rule(
     src = ":ares_config_h_in",
     out = "src/lib/ares_config.h",
     substitutions = select({
-        "@platforms//os:linux": {
-            "/* #undef HAVE_ARC4RANDOM_BUF */": "#define HAVE_ARC4RANDOM_BUF 1",
-        },
+        "@platforms//os:linux": {},
         "@platforms//os:osx": {
             "#define GETSERVBYPORT_R_ARGS 6": "#define GETSERVBYPORT_R_ARGS",
             "#define GETSERVBYNAME_R_ARGS 6": "#define GETSERVBYNAME_R_ARGS",
@@ -673,7 +681,6 @@ template_rule(
             "/* #undef HAVE_AVAILABILITYMACROS_H */": "#define HAVE_AVAILABILITYMACROS_H 1",
             "/* #undef HAVE_SYS_EVENT_H */": "#define HAVE_SYS_EVENT_H 1",
             "#define HAVE_SYS_EPOLL_H 1": "/* #undef HAVE_SYS_EPOLL_H */",
-            "/* #undef HAVE_ARC4RANDOM_BUF */": "#define HAVE_ARC4RANDOM_BUF 1",
             "/* #undef HAVE_INET_NET_PTON */": "#define HAVE_INET_NET_PTON 1",
         },
         "@platforms//os:windows": {
@@ -760,7 +767,6 @@ template_rule(
     }) | select({
         "@oceandoc//bazel:musl-abi": {
             "#define EVENT__HAVE_SYS_QUEUE_H 1": "#define EVENT__HAVE_SYS_QUEUE_H 0",
-            "/* #undef HAVE_ARC4RANDOM_BUF */": "/* #undef HAVE_ARC4RANDOM_BUF */",
             "#define EVENT__HAVE_MMAP64 1": "/* #undef EVENT__HAVE_MMAP64 */",
         },
         "//conditions:default": {},
