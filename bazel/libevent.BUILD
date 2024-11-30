@@ -1,5 +1,5 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LINKOPTS", "GLOBAL_LOCAL_DEFINES", "template_rule")
+load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_DEFINES", "GLOBAL_LINKOPTS", "GLOBAL_LOCAL_DEFINES", "template_rule")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -13,6 +13,8 @@ COPTS = GLOBAL_COPTS + select({
         "-I$(GENDIR)/external/libevent/include",
     ],
 })
+
+DEFINES = GLOBAL_DEFINES
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
     "@platforms//os:windows": [
@@ -132,6 +134,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    defines = DEFINES,
     includes = ["include"],
     linkopts = LINKOPTS + [
     ],

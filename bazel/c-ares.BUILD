@@ -1,5 +1,5 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LOCAL_DEFINES", "template_rule")
+load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_DEFINES", "GLOBAL_LOCAL_DEFINES", "template_rule")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -23,6 +23,8 @@ COPTS = GLOBAL_COPTS + select({
     "@platforms//os:windows": [],
     "//conditions:default": [],
 })
+
+DEFINES = GLOBAL_DEFINES
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
     "@platforms//os:windows": [],
@@ -137,7 +139,7 @@ cc_library(
         "src/lib/*.h",
     ]),
     copts = COPTS,
-    defines = select({
+    defines = DEFINES + select({
         "@platforms//os:windows": ["CARES_STATICLIB"],
         "//conditions:default": [],
     }),
