@@ -121,12 +121,6 @@ GLOBAL_LOCAL_DEFINES = select({
 })
 
 GLOBAL_DEFINES = select({
-    "@oceandoc//bazel:on_ubuntu22.04": [
-        "__GLIBC_MINOR__=35",
-    ],
-    "@oceandoc//bazel:on_ubuntu24.04": [
-        "__GLIBC_MINOR__=39",
-    ],
     "//conditions:default": [],
 })
 

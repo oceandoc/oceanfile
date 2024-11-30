@@ -407,7 +407,7 @@ write_file(
         "#define HAVE_ALARM 1",
         "",
         "/* Define to 1 if you have the arc4random function. */",
-        "#if defined(__GLIBC__ )",
+        "#if defined(__GLIBC__)",
         "#if __GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 36)",
         "#define HAVE_ARC4RANDOM 1",
         "#else",

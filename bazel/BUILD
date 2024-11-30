@@ -41,16 +41,6 @@ config_setting(
 )
 
 config_setting(
-    name = "ubuntu22.04",
-    define_values = {"distro_version": "ubuntu22.04"},
-)
-
-config_setting(
-    name = "ubuntu24.04",
-    define_values = {"distro_version": "ubuntu24.04"},
-)
-
-config_setting(
     name = "windows_x86_64",
     constraint_values = [
         "@platforms//os:windows",
@@ -216,24 +206,6 @@ selects.config_setting_group(
     match_all = [
         ":not_cross_compiling",
         "@platforms//os:osx",
-    ],
-)
-
-selects.config_setting_group(
-    name = "on_ubuntu22.04",
-    match_all = [
-        ":ubuntu22.04",
-        ":debian",
-        "@platforms//os:linux",
-    ],
-)
-
-selects.config_setting_group(
-    name = "on_ubuntu24.04",
-    match_all = [
-        ":ubuntu24.04",
-        ":debian",
-        "@platforms//os:linux",
     ],
 )
 
