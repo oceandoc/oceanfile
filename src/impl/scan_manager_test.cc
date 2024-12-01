@@ -14,7 +14,7 @@ namespace oceandoc {
 namespace impl {
 
 TEST(ScanManager, GenFileName) {
-  util::ConfigManager::Instance()->Init("./conf/base_config.json");
+  util::ConfigManager::Instance()->Init("./conf/client_base_config.json");
   util::ThreadPool::Instance()->Init();
   EXPECT_EQ(ScanManager::Instance()->GenFileName("/usr/local/test_src"),
             "/usr/local/test_src/.Dr.Q.config/"
@@ -54,7 +54,7 @@ std::string PrintScanStatus(const proto::ScanStatus& status) {
 }
 
 TEST(ScanManager, ParallelScan) {
-  util::ConfigManager::Instance()->Init("./conf/base_config.json");
+  util::ConfigManager::Instance()->Init("./conf/client_base_config.json");
   util::ThreadPool::Instance()->Init();
 
   std::string path = "test_data/util_test/test_scan";

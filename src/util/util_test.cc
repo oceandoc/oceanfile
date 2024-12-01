@@ -102,6 +102,8 @@ TEST(Util, ToTimeStr) {
 
   // local time, bazel sandbox use UTC time, but this project used
   // --test_env=TZ=Asia/Shanghai
+  // localtime is up to /etc/localtime link
+  // --set env with command: sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
   time = "2024-09-24T21:36:44.000+08:00";
   format = "%Y-%m-%d %H:%M:%S";
   EXPECT_EQ(Util::ToTimeStr(ts), time);

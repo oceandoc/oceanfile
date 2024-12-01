@@ -16,7 +16,7 @@ std::mutex mu;
 std::condition_variable cond_var;
 
 TEST(ThreadPool, Lambda) {
-  ConfigManager::Instance()->Init("./conf/base_config.json");
+  ConfigManager::Instance()->Init("./conf/client_base_config.json");
   ThreadPool::Instance()->Init();
 
   auto callable = std::bind([](int a) -> int { return a + 5; }, 6);
