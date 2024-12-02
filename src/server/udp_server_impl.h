@@ -6,11 +6,12 @@
 #ifndef BAZEL_TEMPLATE_SERVER_UDP_SERVER_IMPL_H
 #define BAZEL_TEMPLATE_SERVER_UDP_SERVER_IMPL_H
 
-#include <boost/asio.hpp>
+#include <array>
 #include <memory>
 #include <string>
-#include <array>
 
+#include "boost/asio/io_context.hpp"
+#include "boost/asio/ip/udp.hpp"
 #include "glog/logging.h"
 #include "src/server/server_context.h"
 #include "src/util/config_manager.h"
@@ -21,18 +22,16 @@ namespace server {
 class UdpServer final {
  public:
   UdpServer(std::shared_ptr<ServerContext> server_context)
-      : server_context_(server_context),
-        io_context_(),
-        socket_(io_context_) {
+      : server_context_(server_context), io_context_(), socket_(io_context_) {
     std::string addr = util::ConfigManager::Instance()->ServerAddr();
     int32_t port = util::ConfigManager::Instance()->UdpServerPort();
-    
+
     try {
       boost::asio::ip::udp::endpoint endpoint(
           boost::asio::ip::make_address(addr), port);
       socket_.open(endpoint.protocol());
       socket_.bind(endpoint);
-      
+
       LOG(INFO) << "UDP server listening on " << addr << ":" << port;
       StartReceive();
     } catch (const boost::system::system_error& e) {
@@ -76,18 +75,7 @@ class UdpServer final {
         });
   }
 
-  void HandleMessage(std::size_t length) {
-    std::string message(recv_buffer_.data(), length);
-    LOG(INFO) << "Received " << length << " bytes from "
-              << remote_endpoint_.address() << ":" << remote_endpoint_.port()
-              << ": " << message;
-
-    // Add your message handling logic here
-    // For example, you might want to:
-    // 1. Parse the message
-    // 2. Process it
-    // 3. Send a response if needed
-  }
+  void HandleMessage(std::size_t length);
 
  private:
   std::shared_ptr<ServerContext> server_context_;

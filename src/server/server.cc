@@ -19,6 +19,7 @@
 #include "src/server/grpc_server_impl.h"
 #include "src/server/http_server_impl.h"
 #include "src/server/server_context.h"
+#include "src/server/udp_server_impl.h"
 #include "src/util/config_manager.h"
 #include "src/util/thread_pool.h"
 

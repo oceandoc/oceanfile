@@ -74,6 +74,7 @@ cc_binary(
         "@openssl//:crypto",
         ":grpc_server_impl",
         ":http_server_impl",
+        ":udp_server_impl",
         #"@jemalloc",
         "@openssl//:ssl",
         "@xz//:lzma",
@@ -86,7 +87,7 @@ cc_library(
     copts = COPTS,
     defines = [
         "BOOST_BIND_GLOBAL_PLACEHOLDERS",
-        "BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
+        #"BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
         "BOOST_THREAD_PROVIDES_EXECUTORS",
         "BOOST_THREAD_BUILD_LIB=1",
         "BOOST_THREAD_USES_CHRONO",
@@ -117,7 +118,7 @@ cc_library(
     copts = COPTS,
     defines = [
         "BOOST_BIND_GLOBAL_PLACEHOLDERS",
-        "BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
+        #"BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
         "BOOST_THREAD_PROVIDES_EXECUTORS",
         "BOOST_THREAD_BUILD_LIB=1",
         "BOOST_THREAD_USES_CHRONO",
@@ -172,11 +173,14 @@ cc_test(
 
 cc_library(
     name = "udp_server_impl",
+    srcs = ["udp_server_impl.cc"],
     hdrs = ["udp_server_impl.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
     deps = [
         ":server_context",
         "//src/util:config_manager",
         "@boost//:asio",
-        "@com_github_google_glog//:glog",
+        "@com_github_glog_glog//:glog",
     ],
 )
