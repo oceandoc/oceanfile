@@ -60,8 +60,9 @@ int main(int argc, char **argv) {
   LOG(INFO) << "Home dir: " << home_dir;
 
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-  FLAGS_log_dir = "./log";
+  FLAGS_log_dir = home_dir + "/log";
   FLAGS_stop_logging_if_full_disk = true;
+  FLAGS_logbufsecs = 0;
 
   folly::Init init(&argc, &argv, false);
   google::EnableLogCleaner(7);
@@ -97,9 +98,9 @@ int main(int argc, char **argv) {
   ::http_server_ptr = &http_server;
 #endif
 
+  grpc_server.Start();
   udp_server.Start();
   http_server.Start();
-  grpc_server.Start();
 
   grpc_server.WaitForShutdown();
   http_server.Shutdown();
