@@ -169,3 +169,14 @@ cc_test(
     srcs = ["version_info_test.cc"],
     deps = [":version_info"],
 )
+
+cc_library(
+    name = "udp_server_impl",
+    hdrs = ["udp_server_impl.h"],
+    deps = [
+        ":server_context",
+        "//src/util:config_manager",
+        "@boost//:asio",
+        "@com_github_google_glog//:glog",
+    ],
+)
