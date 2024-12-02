@@ -44,6 +44,7 @@ enum ServerOp {
   ServerShutdown = 3;
   ServerFullScan = 4;
   ServerHandShake = 5;
+  ServerFindingServer = 6;
 }
 
 message ServerReq {

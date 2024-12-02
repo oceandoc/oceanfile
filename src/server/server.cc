@@ -90,6 +90,7 @@ int main(int argc, char **argv) {
 
   oceandoc::server::GrpcServer grpc_server(server_context);
   oceandoc::server::HttpServer http_server(server_context);
+  oceandoc::server::UdpServer udp_server(server_context);
 
 #if !defined(_WIN32)
   ::grpc_server_ptr = &grpc_server;
@@ -98,8 +99,11 @@ int main(int argc, char **argv) {
 
   grpc_server.Start();
   http_server.Start();
+  udp_server.Start();
 
   grpc_server.WaitForShutdown();
+  http_server.Shutdown();
+  udp_server.Shutdown();
 
   LOG(INFO) << "Now stopped grpc server";
   LOG(INFO) << "Now stopped http server";

@@ -60,7 +60,7 @@ class UdpServer final {
   }
 
  private:
-  static constexpr size_t MAX_BUFFER_SIZE = 65507; // Max UDP packet size
+  static constexpr size_t MAX_BUFFER_SIZE = 65507;  // Max UDP packet size
 
   void StartReceive() {
     socket_.async_receive_from(
@@ -69,7 +69,7 @@ class UdpServer final {
           if (!ec) {
             if (bytes_recvd == MAX_BUFFER_SIZE) {
               LOG(WARNING) << "Received UDP packet may have been truncated - "
-                          << "size equals buffer size of " << MAX_BUFFER_SIZE;
+                           << "size equals buffer size of " << MAX_BUFFER_SIZE;
             }
             HandleMessage(bytes_recvd);
             StartReceive();
@@ -80,6 +80,7 @@ class UdpServer final {
   }
 
   void HandleMessage(std::size_t length);
+  void SendResponse(const google::protobuf::Message& msg);
 
  private:
   std::shared_ptr<ServerContext> server_context_;
