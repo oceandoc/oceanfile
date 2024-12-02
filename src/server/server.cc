@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
   std::string home_dir = oceandoc::util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
 
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::ParseCommandLineFlags(&argc, &argv, false);
   FLAGS_log_dir = "./log";
   FLAGS_stop_logging_if_full_disk = true;
 
@@ -88,18 +88,18 @@ int main(int argc, char **argv) {
   std::shared_ptr<oceandoc::server::ServerContext> server_context =
       std::make_shared<oceandoc::server::ServerContext>();
 
+  oceandoc::server::UdpServer udp_server(server_context);
   oceandoc::server::GrpcServer grpc_server(server_context);
   oceandoc::server::HttpServer http_server(server_context);
-  oceandoc::server::UdpServer udp_server(server_context);
 
 #if !defined(_WIN32)
   ::grpc_server_ptr = &grpc_server;
   ::http_server_ptr = &http_server;
 #endif
 
-  grpc_server.Start();
-  http_server.Start();
   udp_server.Start();
+  http_server.Start();
+  grpc_server.Start();
 
   grpc_server.WaitForShutdown();
   http_server.Shutdown();

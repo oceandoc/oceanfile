@@ -32,7 +32,6 @@ class UdpServer final {
       socket_.open(endpoint.protocol());
       socket_.bind(endpoint);
 
-      LOG(INFO) << "UDP server listening on " << addr << ":" << port;
       StartReceive();
     } catch (const boost::system::system_error& e) {
       LOG(ERROR) << "Failed to start UDP server: " << e.what();
@@ -42,8 +41,8 @@ class UdpServer final {
 
   void Start() {
     try {
-      io_context_.run();
       server_context_->MarkedUdpServerInitedDone();
+      io_context_.run();
     } catch (const std::exception& e) {
       LOG(ERROR) << "Error running UDP server: " << e.what();
       throw;

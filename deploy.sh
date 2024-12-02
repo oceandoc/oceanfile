@@ -3,6 +3,7 @@
 deploy_local() {
     echo "Building and stripping binary for local deployment..."
     bazel build  //...
+    systemctl stop fstation
     rm /usr/local/fstation/bin/server
     cp bazel-bin/src/server/server /usr/local/fstation/bin
     cp -r conf /usr/local/fstation
