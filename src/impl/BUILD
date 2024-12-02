@@ -88,6 +88,32 @@ cc_library(
 )
 
 cc_library(
+    name = "server_manager",
+    srcs = ["server_manager.cc"],
+    hdrs = ["server_manager.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        "//src/common:defs",
+        "//src/proto:cc_data",
+        "//src/proto:cc_grpc_service",
+        "//src/util",
+        "//src/util:thread_pool",
+        "@com_github_grpc_grpc//:grpc++",
+        "@folly",
+    ],
+)
+
+cc_test(
+    name = "server_manager_test",
+    srcs = ["server_manager_test.cc"],
+    copts = COPTS,
+    data = ["//conf:client_base_config.json"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":server_manager"],
+)
+
+cc_library(
     name = "receive_queue_manager",
     srcs = ["receive_queue_manager.cc"],
     hdrs = ["receive_queue_manager.h"],

@@ -43,6 +43,7 @@ enum ServerOp {
   ServerRestart = 2;
   ServerShutdown = 3;
   ServerFullScan = 4;
+  ServerHandShake = 5;
 }
 
 message ServerReq {
@@ -55,6 +56,7 @@ message ServerReq {
 message ServerRes {
   ErrCode err_code = 1;
   string status = 2;
+  string handshake_msg = 3;
 }
 
 enum RepoOp {

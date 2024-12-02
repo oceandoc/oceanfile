@@ -66,6 +66,7 @@ cc_library(
         "//src/async_grpc",
         "//src/impl:receive_queue_manager",
         "//src/impl:repo_manager",
+        "//src/impl:server_manager",
         "//src/impl:session_manager",
         "//src/impl:sync_manager",
         "//src/impl:user_manager",
