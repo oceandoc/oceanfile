@@ -1,5 +1,5 @@
 [Unit]
-Description=shadowsocks-rust server
+Description=fstation server
 After=network-online.target
 
 [Service]
@@ -7,9 +7,8 @@ Type=simple
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 User=dev
-ExecStart=/usr/local/fstation
+ExecStart=/usr/local/fstation/bin/server
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 [Install]
 WantedBy=multi-user.target
-
