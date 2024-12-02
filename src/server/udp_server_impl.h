@@ -60,14 +60,18 @@ class UdpServer final {
   }
 
  private:
+  static constexpr size_t MAX_BUFFER_SIZE = 65507; // Max UDP packet size
+
   void StartReceive() {
     socket_.async_receive_from(
         boost::asio::buffer(recv_buffer_), remote_endpoint_,
         [this](boost::system::error_code ec, std::size_t bytes_recvd) {
           if (!ec) {
-            // Handle received data
+            if (bytes_recvd == MAX_BUFFER_SIZE) {
+              LOG(WARNING) << "Received UDP packet may have been truncated - "
+                          << "size equals buffer size of " << MAX_BUFFER_SIZE;
+            }
             HandleMessage(bytes_recvd);
-            // Continue receiving
             StartReceive();
           } else {
             LOG(ERROR) << "Receive error: " << ec.message();
@@ -82,7 +86,7 @@ class UdpServer final {
   boost::asio::io_context io_context_;
   boost::asio::ip::udp::socket socket_;
   boost::asio::ip::udp::endpoint remote_endpoint_;
-  std::array<char, 1024> recv_buffer_;
+  std::array<char, MAX_BUFFER_SIZE> recv_buffer_;
 };
 
 }  // namespace server
