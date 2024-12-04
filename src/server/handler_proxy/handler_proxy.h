@@ -10,6 +10,7 @@
 
 #include "src/impl/receive_queue_manager.h"
 #include "src/impl/repo_manager.h"
+#include "src/impl/server_manager.h"
 #include "src/impl/session_manager.h"
 #include "src/impl/sync_manager.h"
 #include "src/impl/user_manager.h"
@@ -151,6 +152,9 @@ class HandlerProxy {
   }
 
   static void UserOpHandle(const proto::UserReq& req, proto::UserRes* res) {
+    std::string json;
+    util::Util::MessageToJson(req, &json);
+    LOG(INFO) << json;
     std::string session_user;
     if (req.token().empty() && req.op() != proto::UserOp::UserCreate &&
         req.op() != proto::UserOp::UserLogin) {
@@ -237,6 +241,24 @@ class HandlerProxy {
         break;
       case proto::RepoOp::RepoListRepoDir:
         ret = impl::RepoManager::Instance()->ListRepoDir(req, res);
+        break;
+      default:
+        ret = Err_Unsupported_op;
+        LOG(ERROR) << "Unsupported operation";
+    }
+    if (ret) {
+      res->set_err_code(proto::ErrCode(ret));
+    } else {
+      res->set_err_code(proto::ErrCode::Success);
+    }
+  }
+
+  static void ServerOpHandle(const proto::ServerReq& req,
+                             proto::ServerRes* res) {
+    int32_t ret = Err_Success;
+    switch (req.op()) {
+      case proto::ServerOp::ServerHandShake:
+        ret = impl::ServerManager::Instance()->HandShake(req, res);
         break;
       default:
         ret = Err_Unsupported_op;

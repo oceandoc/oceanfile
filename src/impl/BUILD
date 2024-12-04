@@ -4,8 +4,10 @@ load("//bazel:cpplint.bzl", "cpplint")
 
 package(default_visibility = ["//visibility:public"])
 
+cpplint()
+
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Iexternal/double-conversion",
         "/Iexternal/folly",
         "/Iexternal/libsodium/src/libsodium/include",
@@ -24,19 +26,7 @@ COPTS = GLOBAL_COPTS + select({
     "//conditions:default": [],
 })
 
-LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
-        "GLOG_NO_ABBREVIATED_SEVERITIES",
-    ],
-    "//conditions:default": ["BUILD_TRACING=0"],
-}) + select({
-    "@platforms//os:linux": [],
-    "@platforms//os:osx": [],
-    "@platforms//os:windows": [],
-    "//conditions:default": [],
-})
-
-cpplint()
+LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES
 
 cc_library(
     name = "repo_manager",
@@ -95,6 +85,32 @@ cc_library(
         "@com_github_grpc_grpc//:grpc++",
         "@folly",
     ],
+)
+
+cc_library(
+    name = "server_manager",
+    srcs = ["server_manager.cc"],
+    hdrs = ["server_manager.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        "//src/common:defs",
+        "//src/proto:cc_data",
+        "//src/proto:cc_grpc_service",
+        "//src/util",
+        "//src/util:thread_pool",
+        "@com_github_grpc_grpc//:grpc++",
+        "@folly",
+    ],
+)
+
+cc_test(
+    name = "server_manager_test",
+    srcs = ["server_manager_test.cc"],
+    copts = COPTS,
+    data = ["//conf:client_base_config.json"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":server_manager"],
 )
 
 cc_library(

@@ -7,7 +7,7 @@ package(default_visibility = ["//visibility:public"])
 cpplint()
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Iexternal/double-conversion",
         "/Iexternal/folly",
         "/Iexternal/libsodium/src/libsodium/include",
@@ -26,17 +26,7 @@ COPTS = GLOBAL_COPTS + select({
     "//conditions:default": [],
 })
 
-LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
-        "GLOG_NO_ABBREVIATED_SEVERITIES",
-    ],
-    "//conditions:default": ["BUILD_TRACING=0"],
-}) + select({
-    "@platforms//os:linux": [],
-    "@platforms//os:osx": [],
-    "@platforms//os:windows": [],
-    "//conditions:default": [],
-})
+LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES
 
 cc_library(
     name = "config_manager",
@@ -112,6 +102,7 @@ cc_library(
     deps = [
         "//src/common:defs",
         "//src/common:error_code",
+        "//src/common:fix_header_order",
         "//src/proto:cc_service",
         "@blake3",
         "@boost//:algorithm",
@@ -152,6 +143,13 @@ cc_test(
         "//conf:client_base_config.json",
         "//test_data/util_test",
     ],
+    defines = select({
+        "@platforms//os:windows": [
+            "WIN32",
+            "_WIN32",
+        ],
+        "//conditions:default": [],
+    }),
     local_defines = LOCAL_DEFINES,
     deps = [
         ":util",

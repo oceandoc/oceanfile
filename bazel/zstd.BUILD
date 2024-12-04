@@ -1,9 +1,10 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LINKOPTS", "GLOBAL_LOCAL_DEFINES")
 
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Ox",
         "/Iexternal/zstd/lib",
         "/Iexternal/lz4/lib",
@@ -34,7 +35,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
     "DEBUGLEVEL=0",
     "ZSTD_MULTITHREAD",
 ] + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [
     ],
 }) + select({
@@ -45,7 +46,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [],
@@ -76,9 +77,8 @@ cc_library(
             "lib/legacy/zstd_v02.c",
             "lib/legacy/zstd_v03.c",
         ],
-    ) + select({
-        "@oceandoc//bazel:not_cross_compiling_on_windows": [],
-        "@platforms//cpu:x86_64": ["lib/decompress/huf_decompress_amd64.S"],
+    ) + selects.with_or({
+        ("@oceandoc//bazel:linux_x86_64", "@oceandoc//bazel:osx_x86_64"): ["lib/decompress/huf_decompress_amd64.S"],
         "//conditions:default": [],
     }),
     hdrs = [

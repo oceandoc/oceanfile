@@ -39,6 +39,7 @@ class ConfigManager {
 
   std::string ServerAddr() { return base_config_.server_addr(); }
   uint32_t GrpcServerPort() { return base_config_.grpc_server_port(); }
+  uint32_t UdpServerPort() { return base_config_.grpc_server_port(); }
   uint32_t HttpServerPort() { return base_config_.http_server_port(); }
   uint32_t MetricRatio() { return base_config_.metric_ratio(); }
   uint32_t MetricIntervalSec() { return base_config_.metric_interval_sec(); }

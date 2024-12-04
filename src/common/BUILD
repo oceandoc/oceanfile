@@ -7,6 +7,14 @@ package(default_visibility = ["//visibility:public"])
 cpplint()
 
 cc_library(
+    name = "fix_header_order",
+    hdrs = ["fix_header_order.h"],
+    deps = [
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+cc_library(
     name = "defs",
     hdrs = ["defs.h"],
     deps = [

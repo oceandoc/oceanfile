@@ -29,5 +29,4 @@ cc_library(
         "-Iexternal/libudev/src/libudev",
     ],
     includes = ["src"],
-    linkstatic = True,
 )

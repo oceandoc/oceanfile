@@ -1,4 +1,16 @@
 # TODO
+1. jemalloc on macosx arm64
+2. windows build problem
+
+1. 多平台支持
+clear && bazel build @blake3//:all --config=gcc_x86_64_linux_gnu
+clear && bazel build @blake3//:all --config=gcc_aarch64_linux_gnu
+clear && bazel build @blake3//:all --config=gcc_aarch64_linux_musl
+clear && bazel build @blake3//:all --config=clang_x86_64_linux_gnu
+clear && bazel build @blake3//:all --config=clang_aarch64_linux_gnu
+clear && bazel build @blake3//:all --config=clang_x86_64_macosx
+clear && bazel build @blake3//:all --config=clang_aarch64_macosx
+
 
 ## repo manager:
 * // TODO(xieyz) complete all repo api                                                                p1

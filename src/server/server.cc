@@ -19,6 +19,7 @@
 #include "src/server/grpc_server_impl.h"
 #include "src/server/http_server_impl.h"
 #include "src/server/server_context.h"
+#include "src/server/udp_server_impl.h"
 #include "src/util/config_manager.h"
 #include "src/util/thread_pool.h"
 
@@ -58,10 +59,15 @@ int main(int argc, char **argv) {
   std::string home_dir = oceandoc::util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
 
+  gflags::ParseCommandLineFlags(&argc, &argv, false);
+  FLAGS_log_dir = home_dir + "/log";
+  FLAGS_stop_logging_if_full_disk = true;
+  FLAGS_logbufsecs = 0;
+
   folly::Init init(&argc, &argv, false);
+  google::EnableLogCleaner(7);
   // google::InitGoogleLogging(argv[0]); // already called in folly::Init
   google::SetStderrLogging(google::GLOG_INFO);
-  gflags::ParseCommandLineFlags(&argc, &argv, false);
   LOG(INFO) << "CommandLine: " << google::GetArgv();
 
   oceandoc::util::ConfigManager::Instance()->Init(
@@ -83,16 +89,22 @@ int main(int argc, char **argv) {
   std::shared_ptr<oceandoc::server::ServerContext> server_context =
       std::make_shared<oceandoc::server::ServerContext>();
 
+  oceandoc::server::UdpServer udp_server(server_context);
   oceandoc::server::GrpcServer grpc_server(server_context);
-  ::grpc_server_ptr = &grpc_server;
-
   oceandoc::server::HttpServer http_server(server_context);
+
+#if !defined(_WIN32)
+  ::grpc_server_ptr = &grpc_server;
   ::http_server_ptr = &http_server;
+#endif
 
   grpc_server.Start();
+  udp_server.Start();
   http_server.Start();
 
   grpc_server.WaitForShutdown();
+  http_server.Shutdown();
+  udp_server.Shutdown();
 
   LOG(INFO) << "Now stopped grpc server";
   LOG(INFO) << "Now stopped http server";

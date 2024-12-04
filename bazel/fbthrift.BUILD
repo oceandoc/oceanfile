@@ -4,7 +4,7 @@ load("@oceandoc//bazel:rules_fbthrift.bzl", "fbthrift_cpp_gen")
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Iexternal/libsodium/src/libsodium/include",
         "/Iexternal/fbthrift",
         "/I$(GENDIR)/external/fbthrift",
@@ -46,8 +46,7 @@ COPTS = GLOBAL_COPTS + select({
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
-    "@oceandoc//bazel:cross_compiling_for_windows": ["_LARGEFILE64_SOURCE"],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": ["_LARGEFILE64_SOURCE"],
@@ -57,7 +56,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [],

@@ -3,7 +3,7 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS")
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": ["/Ox"],
+    "@platforms//os:windows": ["/Ox"],
     "//conditions:default": ["-O3"],
 }) + select({
     "@platforms//os:linux": [],

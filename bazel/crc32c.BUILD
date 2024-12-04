@@ -66,6 +66,9 @@ crc32c_copts = select({
     ":macos_sse42": ["-msse4.2"],
     ":windows_sse42": ["/arch:AVX"],
     # No special flags are needed for ARM64+CRC32C.
+    "@platforms//cpu:aarch64": [
+        "-march=armv8-a+crc+crypto",
+    ],
     "//conditions:default": [],
 })
 
@@ -81,16 +84,21 @@ template_rule(
         " HAVE_STRONG_GETAUXVAL": " HAVE_STRONG_GETAUXVAL 0",
         " HAVE_WEAK_GETAUXVAL": " HAVE_WEAK_GETAUXVAL 0",
         " CRC32C_TESTS_BUILT_WITH_GLOG": " CRC32C_TESTS_BUILT_WITH_GLOG 0",
-    } | select({
+    } | selects.with_or({
+        #("@oceandoc//bazel:linux_x86_64", "@oceandoc//bazel:osx_x86_64"): {
         "@platforms//cpu:x86_64": {
             " HAVE_SSE42": " HAVE_SSE42 1",
             " HAVE_ARM64_CRC32C": " HAVE_ARM64_CRC32C 0",
             " HAVE_MM_PREFETCH": " HAVE_MM_PREFETCH 1",
-            " HAVE_BUILTIN_PREFETCH": " HAVE_BUILTIN_PREFETCH 1",
         },
-        "@platforms//cpu:arm64": {
+        "@platforms//cpu:aarch64": {
             " HAVE_SSE42": " HAVE_SSE42 0",
             " HAVE_ARM64_CRC32C": " HAVE_ARM64_CRC32C 1",
+        },
+        "//conditions:default": {},
+    }) | selects.with_or({
+        ("@oceandoc//bazel:clang", "@oceandoc//bazel:gcc"): {
+            " HAVE_BUILTIN_PREFETCH": " HAVE_BUILTIN_PREFETCH 1",
         },
         "//conditions:default": {},
     }),

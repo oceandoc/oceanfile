@@ -145,8 +145,6 @@ new_git_repository(
     name = "xz",
     build_file = "//bazel:xz.BUILD",
     commit = "bf901dee5d4c46609645e50311c0cb2dfdcf9738",
-    patch_args = ["-p1"],
-    patches = ["//bazel:xz.patch"],
     remote = "git@github.com:tukaani-project/xz.git",
 )
 
@@ -162,7 +160,7 @@ new_git_repository(
     build_file = "//bazel:bzip2.BUILD",
     commit = "66c46b8c9436613fd81bc5d03f63a61933a4dcc3",
     remote = "https://gitlab.com/bzip2/bzip2.git",
-    # remote = "git@github.com:bzip2/bzip2.git",
+    #remote = "git@github.com:bzip2/bzip2.git",
 )
 
 new_git_repository(
@@ -179,7 +177,7 @@ new_git_repository(
     tag = "v1.5.6",
 )
 
-new_git_repository(
+git_repository(
     name = "brotli",
     build_file = "//bazel:brotli.BUILD",
     remote = "git@github.com:google/brotli.git",
@@ -252,15 +250,12 @@ git_repository(
 
 new_git_repository(
     name = "com_github_gflags_gflags",
-    patch_args = ["-p1"],
-    patches = ["//bazel:gflags.patch"],
     remote = "git@github.com:gflags/gflags.git",
     tag = "v2.2.2",
 )
 
 new_git_repository(
     name = "com_github_glog_glog",
-    build_file = "//bazel:glog.BUILD",
     remote = "git@github.com:google/glog.git",
     repo_mapping = {
         "@gflags": "@com_github_gflags_gflags",
@@ -331,7 +326,7 @@ git_repository(
 
 http_archive(
     name = "boost",
-    build_file = "//bazel:boost.BUILD",
+    build_file = "@com_github_nelhage_rules_boost//:boost.BUILD",
     patch_cmds = ["rm -f doc/pdf/BUILD"],
     patch_cmds_win = ["Remove-Item -Force doc/pdf/BUILD"],
     repo_mapping = {
@@ -378,11 +373,9 @@ new_git_repository(
 http_archive(
     name = "libev",
     build_file = "//bazel:libev.BUILD",
-    patch_args = ["-p1"],
-    patches = ["//bazel:libev.patch"],
     sha256 = "507eb7b8d1015fbec5b935f34ebed15bf346bed04a11ab82b8eee848c4205aea",
     strip_prefix = "libev-4.33",
-    url = "http://dist.schmorp.de/libev/libev-4.33.tar.gz",
+    url = "https://dist.schmorp.de/libev/libev-4.33.tar.gz",
 )
 
 new_git_repository(
@@ -708,6 +701,10 @@ rules_closure_toolchains()
 
 rules_proto_toolchains()
 
+load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
+
+boost_deps()
+
 #################### hedron_compile_commands ####################
 load("@hedron_compile_commands//:workspace_setup.bzl", "hedron_compile_commands_setup")
 load("@hedron_compile_commands//:workspace_setup_transitive.bzl", "hedron_compile_commands_setup_transitive")
@@ -728,19 +725,35 @@ register_toolchains(
 )
 
 http_archive(
-    name = "clang18.1.8-aarch64_sysroot",
-    build_file = "//bazel:cc_toolchain.BUILD",
-    sha256 = "95e32680f2f439773edd85640e5072bab099c399506008298cd1251be2d2df39",
-    strip_prefix = "clang18.1.8-linux-aarch64_sysroot",
-    urls = ["https://github.com/files/clang18.1.8-linux-aarch64_sysroot.tar.gz"],
+    name = "linux-x86_64-gnu_sysroot",
+    build_file = "//bazel:toolchains.BUILD",
+    sha256 = "30546f20d6a16bf5de3a15eb63418a488f5317402b4907484b1521a7a4e2bc7c",
+    strip_prefix = "linux-x86_64-gnu_sysroot",
+    urls = ["https://code.xiamu.com/files/linux-x86_64-gnu_sysroot.tar.gz"],
 )
 
 http_archive(
-    name = "macosx14.2-x86_64_sysroot",
-    build_file = "//bazel:cc_toolchain.BUILD",
-    sha256 = "d75e540388ade4056c0c91a5623b927f884bfc3f622b96e23ed31aacf226535d",
-    strip_prefix = "macosx14.2-x86_64_sysroot",
-    urls = ["https://github.com/files/macosx14.2-x86_64_sysroot.tar.gz"],
+    name = "linux-aarch64-gnu_sysroot",
+    build_file = "//bazel:toolchains.BUILD",
+    sha256 = "16bfff2c7306118f2bebc6d8d35188768bf312e60cf3fc363e2ab8d96f53240e",
+    strip_prefix = "linux-aarch64-gnu_sysroot",
+    urls = ["https://code.xiamu.com/files/linux-aarch64-gnu_sysroot.tar.gz"],
+)
+
+http_archive(
+    name = "linux-aarch64-musl_sysroot",
+    build_file = "//bazel:toolchains.BUILD",
+    sha256 = "a76ef46d1815d465cb2079825104aca507a230bc973477f4ce1e9d94a325d7e8",
+    strip_prefix = "linux-aarch64-musl_sysroot",
+    urls = ["https://code.xiamu.com/files/linux-aarch64-musl_sysroot.tar.gz"],
+)
+
+http_archive(
+    name = "macosx14.2_sysroot",
+    build_file = "//bazel:toolchains.BUILD",
+    sha256 = "dfda4d0f437035242c865fb10c3e183f348fab41251847e2f9c6930cf7772768",
+    strip_prefix = "macosx14.2_sysroot",
+    urls = ["https://code.xiamu.com/files/macosx14.2_sysroot.tar.gz"],
 )
 
 new_git_repository(
@@ -752,7 +765,7 @@ new_git_repository(
 
 new_git_repository(
     name = "cc_toolchains",
-    commit = "d52a3974b37e01ab7774694d5cd8ed8ae120f16e",
+    commit = "2a194c24161d9488bbfbb2bd9f486967edcc7170",
     remote = "git@github.com:xiedeacc/cc_toolchains.git",
 )
 

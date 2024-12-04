@@ -38,6 +38,12 @@ class ServerContext : public async_grpc::ExecutionContext {
               << util::ConfigManager::Instance()->HttpServerPort();
   }
 
+  void MarkedUdpServerInitedDone() {
+    LOG(INFO) << "Udp server started on: "
+              << util::ConfigManager::Instance()->ServerAddr()
+              << ", port: " << util::ConfigManager::Instance()->UdpServerPort();
+  }
+
   std::string ToString() {
     std::string info;
     info.reserve(1024);

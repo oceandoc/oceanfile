@@ -3,7 +3,7 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LINKOPTS", "GLOBAL_L
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Ox",
         "/Iexternal/lz4/lib",
         "/Iexternal/lz4/programs",
@@ -24,7 +24,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
     "XXH_NAMESPACE=LZ4_",
     #"lz4_shared_EXPORTS",
 ] + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "ENABLE_LZ4C_LEGACY_OPTIONS",
         "LZ4IO_MULTITHREAD=0",
     ],
@@ -39,7 +39,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + [
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [],

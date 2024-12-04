@@ -7,7 +7,7 @@ package(default_visibility = ["//visibility:public"])
 cpplint()
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
+    "@platforms//os:windows": [
         "/Iexternal/double-conversion",
         "/Iexternal/folly",
         "/Iexternal/double-conversion",
@@ -39,11 +39,6 @@ COPTS = GLOBAL_COPTS + select({
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [
-        "GLOG_NO_ABBREVIATED_SEVERITIES",
-    ],
-    "//conditions:default": ["BUILD_TRACING=0"],
-}) + select({
     "@platforms//os:linux": [],
     "@platforms//os:osx": [],
     "@platforms//os:windows": [],
@@ -51,7 +46,7 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
+    "@platforms//os:windows": [],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:linux": [],
@@ -63,11 +58,12 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_binary(
     name = "server",
     srcs = ["server.cc"],
-    copts = COPTS + [
-        "-Wno-implicit-fallthrough",
-        "-Wno-unused-parameter",
-    ],
-    linkopts = LINKOPTS,
+    copts = COPTS,
+    linkopts = LINKOPTS + select({
+        #"@oceandoc//bazel:cross_compiling_for_linux_aarch64_musl": ["-static"],
+        "@oceandoc//bazel:cross_compiling_for_linux_aarch64_musl": [],
+        "//conditions:default": [],
+    }),
     local_defines = LOCAL_DEFINES,
     deps = [
         ":server_context",
@@ -78,8 +74,10 @@ cc_binary(
         "@openssl//:crypto",
         ":grpc_server_impl",
         ":http_server_impl",
+        ":udp_server_impl",
         #"@jemalloc",
         "@openssl//:ssl",
+        "@xz//:lzma",
     ],
 )
 
@@ -89,7 +87,7 @@ cc_library(
     copts = COPTS,
     defines = [
         "BOOST_BIND_GLOBAL_PLACEHOLDERS",
-        "BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
+        #"BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
         "BOOST_THREAD_PROVIDES_EXECUTORS",
         "BOOST_THREAD_BUILD_LIB=1",
         "BOOST_THREAD_USES_CHRONO",
@@ -120,7 +118,7 @@ cc_library(
     copts = COPTS,
     defines = [
         "BOOST_BIND_GLOBAL_PLACEHOLDERS",
-        "BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
+        #"BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION=1",
         "BOOST_THREAD_PROVIDES_EXECUTORS",
         "BOOST_THREAD_BUILD_LIB=1",
         "BOOST_THREAD_USES_CHRONO",
@@ -171,4 +169,18 @@ cc_test(
     name = "version_info_test",
     srcs = ["version_info_test.cc"],
     deps = [":version_info"],
+)
+
+cc_library(
+    name = "udp_server_impl",
+    srcs = ["udp_server_impl.cc"],
+    hdrs = ["udp_server_impl.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        ":server_context",
+        "//src/util:config_manager",
+        "@boost//:asio",
+        "@com_github_glog_glog//:glog",
+    ],
 )

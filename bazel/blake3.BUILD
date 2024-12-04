@@ -3,19 +3,13 @@ load("@oceandoc//bazel:common.bzl", "GLOBAL_COPTS", "GLOBAL_LINKOPTS", "GLOBAL_L
 package(default_visibility = ["//visibility:public"])
 
 COPTS = GLOBAL_COPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
-    "//conditions:default": [],
-}) + select({
-    "@platforms//os:linux": ["-O3"],
+    "@platforms//os:linux": [],
     "@platforms//os:osx": [],
     "@platforms//os:windows": [],
     "//conditions:default": [],
 })
 
 LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
-    "//conditions:default": [],
-}) + select({
     "@platforms//os:linux": [],
     "@platforms//os:osx": [],
     "@platforms//os:windows": [],
@@ -23,9 +17,6 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
 })
 
 LINKOPTS = GLOBAL_LINKOPTS + select({
-    "@oceandoc//bazel:not_cross_compiling_on_windows": [],
-    "//conditions:default": [],
-}) + select({
     "@platforms//os:linux": [],
     "@platforms//os:osx": [],
     "@platforms//os:windows": [],
@@ -35,14 +26,26 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_library(
     name = "blake3",
     srcs = select({
-        "@platforms//os:linux": [
+        "@oceandoc//bazel:linux_x86_64": [
             "c/blake3_avx2_x86-64_unix.S",
             "c/blake3_avx512_x86-64_unix.S",
             "c/blake3_sse2_x86-64_unix.S",
             "c/blake3_sse41_x86-64_unix.S",
         ],
-        "@platforms//os:osx": [],
-        "@platforms//os:windows": [],
+        "@oceandoc//bazel:osx_x86_64": [
+            "c/blake3_avx2_x86-64_unix.S",
+            "c/blake3_avx512_x86-64_unix.S",
+            "c/blake3_sse2_x86-64_unix.S",
+            "c/blake3_sse41_x86-64_unix.S",
+        ],
+        "@oceandoc//bazel:windows_x86_64": [
+            "c/blake3_avx2_x86-64_windows_msvc.asm",
+            "c/blake3_avx512_x86-64_windows_msvc.asm",
+            "c/blake3_sse2_x86-64_windows_msvc.asm",
+            "c/blake3_sse41_x86-64_windows_msvc.asm",
+        ],
+        "@platforms//cpu:aarch64": ["c/blake3_neon.c"],
+        "//conditions:default": [],
     }) + [
         "c/blake3.c",
         "c/blake3_dispatch.c",
