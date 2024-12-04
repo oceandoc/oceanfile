@@ -152,6 +152,9 @@ class HandlerProxy {
   }
 
   static void UserOpHandle(const proto::UserReq& req, proto::UserRes* res) {
+    std::string json;
+    util::Util::MessageToJson(req, &json);
+    LOG(INFO) << json;
     std::string session_user;
     if (req.token().empty() && req.op() != proto::UserOp::UserCreate &&
         req.op() != proto::UserOp::UserLogin) {
