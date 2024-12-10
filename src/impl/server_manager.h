@@ -32,6 +32,7 @@ class ServerManager {
     res->set_handshake_msg(
         "7a3be8186493f1bc834e3a6b84fcb2f9dc6d042e93d285ec23fa56836889dfa9");
     res->set_server_uuid(util::ConfigManager::Instance()->ServerUUID());
+    LOG(INFO) << util::Util::MessageToJson(*res);
     return Err_Success;
   }
 

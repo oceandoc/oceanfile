@@ -1322,6 +1322,13 @@ bool Util::MessageToJson(const google::protobuf::Message &msg, string *json) {
   return true;
 }
 
+string Util::MessageToJson(const google::protobuf::Message &msg) {
+  static PrintOptions option = {false, true, true, true, true};
+  string json;
+  MessageToJsonString(msg, &json, option);  // NOLINT
+  return json;
+}
+
 bool Util::MessageToPrettyJson(const google::protobuf::Message &msg,
                                string *json) {
   static PrintOptions option = {true, true, false, true, true};
