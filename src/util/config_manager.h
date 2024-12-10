@@ -25,17 +25,59 @@ class ConfigManager {
  public:
   static std::shared_ptr<ConfigManager> Instance();
 
-  bool Init(const std::string& base_config_path) {
+  bool Init(const std::string& home_dir) {
+    std::string base_config_path = home_dir + "/conf/server_base_config.json";
     std::string content;
-    auto ret = Util::LoadSmallFile(base_config_path, &content);
-    if (ret && !Util::JsonToMessage(content, &base_config_)) {
+    if (!Util::LoadSmallFile(base_config_path, &content)) {
+      LOG(ERROR) << "load config error, path: " << base_config_path
+                 << ", content: " << content;
+      return false;
+    }
+
+    if (!Util::JsonToMessage(content, &base_config_)) {
       LOG(ERROR) << "parse base config error, path: " << base_config_path
                  << ", content: " << content;
       return false;
     }
+    GenerateServerUuid(home_dir + "/data");
     LOG(INFO) << "base config: " << ToString();
     return true;
   }
+
+  void GenerateServerUuid(const std::string& data_dir) {
+    std::string meta_path = data_dir + "/server_meta.json";
+    std::string content;
+    while (true) {
+      if (oceandoc::util::Util::Exists(meta_path)) {
+        if (!Util::LoadSmallFile(meta_path, &content)) {
+          LOG(ERROR) << "load meta error, path: " << meta_path
+                     << ", content: " << content;
+          break;
+        }
+        if (!Util::JsonToMessage(content, &server_meta_)) {
+          LOG(ERROR) << "parse meta config error, path: " << meta_path
+                     << ", content: " << content;
+          break;
+        }
+        return;
+      }
+      break;
+    }
+    server_meta_.set_server_uuid(Util::UUID());
+    if (!Util::MessageToJson(server_meta_, &content)) {
+      LOG(ERROR) << "serialize meta config error";
+      server_meta_.mutable_server_uuid()->clear();
+      return;
+    }
+
+    if (!Util::WriteToFile(meta_path, content)) {
+      LOG(ERROR) << "write meta config error";
+      server_meta_.mutable_server_uuid()->clear();
+      return;
+    }
+  }
+
+  std::string ServerUUID() { return server_meta_.server_uuid(); }
 
   std::string ServerAddr() { return base_config_.server_addr(); }
   uint32_t GrpcServerPort() { return base_config_.grpc_server_port(); }
@@ -60,6 +102,7 @@ class ConfigManager {
 
  private:
   oceandoc::proto::BaseConfig base_config_;
+  oceandoc::proto::ServerMeta server_meta_;
 };
 
 }  // namespace util

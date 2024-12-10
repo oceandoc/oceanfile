@@ -27,7 +27,7 @@ class HandlerProxy {
     res->set_err_code(proto::ErrCode::Fail);
   }
 
-  static int32_t Save(const proto::FileReq& req, proto::FileRes* res) {
+  static int32_t Save(const proto::FileReq& req, proto::FileRes* /*res*/) {
     int32_t ret = Err_Success;
     if (req.repo_type() == proto::RepoType::RT_Ocean) {
       if (req.repo_uuid().empty()) {

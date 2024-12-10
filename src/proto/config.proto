@@ -16,3 +16,7 @@ message BaseConfig {
   string server_ssl_key = 11;
   string server_ssl_ca = 12;
 }
+
+message ServerMeta {
+  string server_uuid = 1;
+}

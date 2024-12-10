@@ -45,11 +45,11 @@ class UserManager final {
   int32_t UserRegister(const std::string& user, const std::string& password,
                        std::string* token) {
     if (user.size() > 64 || user.empty()) {
-      return Err_User_invalid_name;
+      return Err_User_name_error;
     }
 
-    if (password.size() > 64 || password.empty()) {
-      return Err_User_invalid_passwd;
+    if (password.size() > 64 || password.size() < 8) {
+      return Err_User_passwd_error;
     }
 
     std::string salt = util::Util::GenerateSalt();
@@ -63,7 +63,7 @@ class UserManager final {
         "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);",
         &stmt);
     if (ret) {
-      return Err_User_register_prepare_error;
+      return Err_Fail;
     }
 
     sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
@@ -73,7 +73,7 @@ class UserManager final {
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
       sqlite3_finalize(stmt);
-      return Err_User_register_execute_error;
+      return Err_Fail;
     }
     sqlite3_finalize(stmt);
 
@@ -92,12 +92,12 @@ class UserManager final {
                      const std::string& to_delete_user,
                      const std::string& token) {
     if (to_delete_user.size() > 64 || to_delete_user.empty()) {
-      return Err_User_invalid_name;
+      return Err_User_name_error;
     }
 
     if (to_delete_user == "admin") {
       LOG(ERROR) << "Cannot delete admin";
-      return Err_User_invalid_name;
+      return Err_User_name_error;
     }
 
     if (login_user == "admin" || login_user == to_delete_user) {
@@ -105,13 +105,13 @@ class UserManager final {
       auto ret = util::SqliteManager::Instance()->PrepareStatement(
           "DELETE FROM users WHERE user = ?;", &stmt);
       if (ret) {
-        return Err_User_delete_prepare_error;
+        return Err_Fail;
       }
       sqlite3_bind_text(stmt, 1, to_delete_user.c_str(), to_delete_user.size(),
                         SQLITE_STATIC);
       if (sqlite3_step(stmt) != SQLITE_DONE) {
         sqlite3_finalize(stmt);
-        return Err_User_delete_execute_error;
+        return Err_Fail;
       }
       sqlite3_finalize(stmt);
       int changes = util::SqliteManager::Instance()->AffectRows();
@@ -123,23 +123,23 @@ class UserManager final {
                    << " may not exist";
       }
     }
-    return Err_User_invalid_name;
+    return Err_User_not_exists;
   }
 
   int32_t VerifyPassword(const std::string& user, const std::string& password) {
     if (user.size() > 64 || user.empty()) {
-      return Err_User_invalid_name;
+      return Err_User_name_error;
     }
 
-    if (password.size() > 64 || password.empty()) {
-      return Err_User_invalid_passwd;
+    if (password.size() > 64 || password.size() < 8) {
+      return Err_User_passwd_error;
     }
 
     sqlite3_stmt* stmt = nullptr;
     util::SqliteManager::Instance()->PrepareStatement(
         "SELECT salt, password FROM users WHERE user = ?;", &stmt);
     if (!stmt) {
-      return Err_User_login_prepare_error;
+      return Err_Fail;
     }
 
     sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
@@ -158,12 +158,12 @@ class UserManager final {
       if (util::Util::VerifyPassword(password, salt, hashed_password)) {
         return Err_Success;
       } else {
-        return Err_User_invalid_passwd;
+        return Err_User_passwd_error;
       }
     }
 
     sqlite3_finalize(stmt);
-    return Err_User_invalid_name;
+    return Err_User_not_exists;
   }
 
   int32_t UserLogin(const std::string& user, const std::string& password,
@@ -183,14 +183,14 @@ class UserManager final {
 
   int32_t UserExists(const std::string& user) {
     if (user.size() > 64 || user.empty()) {
-      return Err_User_invalid_name;
+      return Err_User_name_error;
     }
 
     sqlite3_stmt* stmt = nullptr;
     util::SqliteManager::Instance()->PrepareStatement(
         "SELECT salt, password FROM users WHERE user = ?;", &stmt);
     if (!stmt) {
-      return Err_User_exists_prepare_error;
+      return Err_Fail;
     }
 
     sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
@@ -213,11 +213,11 @@ class UserManager final {
                          const std::string& old_password,
                          const std::string& password, std::string* token) {
     if (user.size() > 64 || user.empty()) {
-      return Err_User_invalid_name;
+      return Err_User_name_error;
     }
 
-    if (password.size() > 64 || password.empty()) {
-      return Err_User_invalid_passwd;
+    if (password.size() > 64 || password.size() < 8) {
+      return Err_User_passwd_error;
     }
 
     auto ret = VerifyPassword(user, old_password);
@@ -228,14 +228,14 @@ class UserManager final {
     std::string salt = util::Util::GenerateSalt();
     std::string hashed_password;
     if (!util::Util::HashPassword(password, salt, &hashed_password)) {
-      return Err_User_change_password_error;
+      return Err_User_passwd_error;
     }
 
     sqlite3_stmt* stmt = nullptr;
     ret = util::SqliteManager::Instance()->PrepareStatement(
         "UPDATE users SET salt = ?, password = ? WHERE user = ?;", &stmt);
     if (ret) {
-      return Err_User_change_password_error;
+      return Err_Fail;
     }
 
     sqlite3_bind_text(stmt, 3, user.c_str(), user.size(), SQLITE_STATIC);
@@ -245,7 +245,7 @@ class UserManager final {
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
       sqlite3_finalize(stmt);
-      return Err_User_change_password_error;
+      return Err_Fail;
     }
     sqlite3_finalize(stmt);
 
@@ -257,7 +257,7 @@ class UserManager final {
       LOG(ERROR) << "No records were updated. user '" << user
                  << " may not exist.";
     }
-    return Err_User_change_password_error;
+    return Err_Fail;
   }
 
  private:

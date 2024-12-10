@@ -7,6 +7,7 @@
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "src/server/http_server_impl.h"
+#include "src/util/util.h"
 // #include "gperftools/profiler.h"
 
 #if !defined(_WIN32)
@@ -70,8 +71,7 @@ int main(int argc, char **argv) {
   google::SetStderrLogging(google::GLOG_INFO);
   LOG(INFO) << "CommandLine: " << google::GetArgv();
 
-  oceandoc::util::ConfigManager::Instance()->Init(
-      home_dir + "/conf/server_base_config.json");
+  oceandoc::util::ConfigManager::Instance()->Init(home_dir);
   oceandoc::util::ThreadPool::Instance()->Init();
   oceandoc::impl::ScanManager::Instance()->Init();
   oceandoc::impl::RepoManager::Instance()->Init();

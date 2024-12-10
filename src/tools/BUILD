@@ -58,7 +58,7 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_binary(
     name = "scan_status_prettier",
     srcs = ["scan_status_prettier.cc"],
-    copts = COPTS ,
+    copts = COPTS,
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
@@ -88,5 +88,18 @@ cc_binary(
     deps = [
         "//src/impl:scan_manager",
         "//src/util",
+    ],
+)
+
+cc_binary(
+    name = "user_op",
+    srcs = ["user_op.cc"],
+    copts = COPTS,
+    linkopts = LINKOPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        "//src/impl:user_manager",
+        "//src/util",
+        "//src/util:config_manager",
     ],
 )

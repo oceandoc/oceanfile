@@ -32,7 +32,7 @@ TEST(UserManager, UserExists) {
   plain_passwd = "admin";
   EXPECT_EQ(UserManager::Instance()->UserLogin(
                 user, util::Util::SHA256(plain_passwd), &token),
-            Err_User_invalid_passwd);
+            Err_User_passwd_error);
   EXPECT_EQ(token.empty(), false);
 
   plain_passwd = "admin1";

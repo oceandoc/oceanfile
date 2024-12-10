@@ -54,22 +54,10 @@ enum ErrCode {
   Sync_interrupted = 15000;
 
   // 17000
-  User_invalid_name = 17000;
-  User_invalid_passwd = 17001;
-  User_session_error = 17002;
-  User_register_prepare_error = 17003;
-  User_register_execute_error = 17004;
-  User_register_error = 17005;
-  User_delete_prepare_error = 17006;
-  User_delete_execute_error = 17007;
-  User_delete_error = 17008;
-  User_login_prepare_error = 17009;
-  User_login_execute_error = 17010;
-  User_login_error = 17011;
-  User_exists_prepare_error = 17012;
-  User_exists_execute_error = 17013;
-  User_exists_error = 17014;
-  User_exists = 17015;
-  User_not_exists = 17016;
-  User_change_password_error = 17017;
+  User_session_error = 17001;
+  User_name_error = 17002;
+  User_passwd_error = 17003;
+  User_exists = 17004;
+  User_not_exists = 17005;
+  User_disabled = 17006;
 }
