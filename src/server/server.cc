@@ -14,7 +14,7 @@
 #include <signal.h>
 #endif
 
-#include "src/impl/receive_queue_manager.h"
+#include "src/impl/file_process_manager.h"
 #include "src/impl/repo_manager.h"
 #include "src/impl/scan_manager.h"
 #include "src/server/grpc_server_impl.h"
@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
   oceandoc::util::ThreadPool::Instance()->Init();
   oceandoc::impl::ScanManager::Instance()->Init();
   oceandoc::impl::RepoManager::Instance()->Init();
-  oceandoc::impl::ReceiveQueueManager::Instance()->Init();
+  oceandoc::impl::FileProcessManager::Instance()->Init();
   if (!oceandoc::impl::UserManager::Instance()->Init()) {
     LOG(ERROR) << "UserManager init error";
     return -1;
@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
   }
 #endif
   oceandoc::impl::UserManager::Instance()->Stop();
-  oceandoc::impl::ReceiveQueueManager::Instance()->Stop();
+  oceandoc::impl::FileProcessManager::Instance()->Stop();
   oceandoc::impl::RepoManager::Instance()->Stop();
   oceandoc::util::ThreadPool::Instance()->Stop();
 

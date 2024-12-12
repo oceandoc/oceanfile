@@ -28,8 +28,6 @@ class FileHandler : public async_grpc::RpcHandler<FileOpMethod> {
     LOG(INFO) << "OnReadsDone";
     Finish(grpc::Status::OK);
   }
-
- private:
 };
 
 }  // namespace grpc_handler

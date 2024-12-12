@@ -104,7 +104,7 @@ class ReceiveQueueManager final {
       if (stop_.load()) {
         break;
       }
-      util::Util::Sleep(1000);
+      util::Util::Sleep(500);
 
       auto now = util::Util::CurrentTimeMillis();
       auto offset = now - last_time;

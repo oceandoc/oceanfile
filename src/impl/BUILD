@@ -35,6 +35,7 @@ cc_library(
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        ":file_process_manager",
         ":scan_manager",
         "//src/proto:cc_config",
         "//src/proto:cc_data",
@@ -114,13 +115,12 @@ cc_test(
 )
 
 cc_library(
-    name = "receive_queue_manager",
-    srcs = ["receive_queue_manager.cc"],
-    hdrs = ["receive_queue_manager.h"],
+    name = "file_process_manager",
+    srcs = ["file_process_manager.cc"],
+    hdrs = ["file_process_manager.h"],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
-        ":repo_manager",
         "//src/client/grpc_client:grpc_clients",
         "//src/common:defs",
         "//src/proto:cc_data",
@@ -131,6 +131,25 @@ cc_library(
         "@folly",
     ],
 )
+
+#cc_library(
+#name = "receive_queue_manager",
+#srcs = ["receive_queue_manager.cc"],
+#hdrs = ["receive_queue_manager.h"],
+#copts = COPTS,
+#local_defines = LOCAL_DEFINES,
+#deps = [
+#":repo_manager",
+#"//src/client/grpc_client:grpc_clients",
+#"//src/common:defs",
+#"//src/proto:cc_data",
+#"//src/proto:cc_grpc_service",
+#"//src/util",
+#"//src/util:thread_pool",
+#"@com_github_grpc_grpc//:grpc++",
+#"@folly",
+#],
+#)
 
 cc_library(
     name = "user_manager",

@@ -99,6 +99,7 @@ enum FileOp {
   FileExists = 1;
   FilePut = 2;
   FileDelete = 3;
+  FileSaveSuccess = 4;
 }
 
 message FileReq {
@@ -117,7 +118,7 @@ message FileReq {
   int64 partition_size = 13;
   string user = 14;
   string group = 15;
-  string token = 17;
+  string token = 16;
 }
 
 message FileRes {

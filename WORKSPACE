@@ -763,6 +763,21 @@ new_git_repository(
     tag = "1.5.4",
 )
 
+http_archive(
+    name = "sqlite",
+    build_file = "//bazel:sqlite.BUILD",
+    sha256 = "77823cb110929c2bcb0f5d48e4833b5c59a8a6e40cdea3936b99e199dbbe5784",
+    strip_prefix = "sqlite-amalgamation-3460100",
+    urls = ["https://sqlite.org/2024/sqlite-amalgamation-3460100.zip"],
+)
+
+new_git_repository(
+    name = "imagemagick",
+    build_file = "//bazel:imagemagick.BUILD",
+    remote = "git@github.com:BLAKE3-team/BLAKE3.git",
+    tag = "1.5.4",
+)
+
 new_git_repository(
     name = "cc_toolchains",
     commit = "2a194c24161d9488bbfbb2bd9f486967edcc7170",
@@ -772,11 +787,3 @@ new_git_repository(
 load("//bazel:toolchains.bzl", "cc_toolchains_register")
 
 cc_toolchains_register()
-
-http_archive(
-    name = "sqlite",
-    build_file = "//bazel:sqlite.BUILD",
-    sha256 = "77823cb110929c2bcb0f5d48e4833b5c59a8a6e40cdea3936b99e199dbbe5784",
-    strip_prefix = "sqlite-amalgamation-3460100",
-    urls = ["https://sqlite.org/2024/sqlite-amalgamation-3460100.zip"],
-)

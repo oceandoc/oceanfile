@@ -57,7 +57,12 @@ int32_t SyncManager::WriteToFile(const proto::FileReq& req) {
     return Err_File_partition_size_error;
   }
   std::unique_lock<std::shared_mutex> locker(mu);
-  return util::Util::WriteToFile(req.dst(), req.content(), start);
+  auto ret = util::Util::WriteToFile(req.dst(), req.content(), start);
+  if (ret) {
+    LOG(ERROR) << "Store part error, "
+               << "path: " << req.dst() << ", part: " << req.partition_num();
+  }
+  return ret;
 }
 
 int32_t SyncManager::SyncRemoteRecursive(common::SyncContext* sync_ctx) {

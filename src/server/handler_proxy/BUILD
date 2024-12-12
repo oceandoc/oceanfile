@@ -58,13 +58,14 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 cc_library(
     name = "handler_proxy",
     hdrs = [
+        "file_handler.h",
         "handler_proxy.h",
     ],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
         "//src/async_grpc",
-        "//src/impl:receive_queue_manager",
+        #"//src/impl:receive_queue_manager",
         "//src/impl:repo_manager",
         "//src/impl:server_manager",
         "//src/impl:session_manager",

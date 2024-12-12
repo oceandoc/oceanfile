@@ -17,6 +17,7 @@
 #include "glog/logging.h"
 #include "src/common/defs.h"
 #include "src/common/error.h"
+#include "src/impl/file_process_manager.h"
 #include "src/proto/data.pb.h"
 #include "src/proto/service.pb.h"
 #include "src/util/util.h"
@@ -466,6 +467,10 @@ class RepoManager {
   }
 
   int32_t WriteToFile(const proto::FileReq& req) {
+    if (req.repo_uuid().empty()) {
+      LOG(ERROR) << "Repo uuid empty";
+      return Err_Repo_uuid_error;
+    }
     proto::RepoMeta repo_meta;
     if (!RepoMetaByUUID(req.repo_uuid(), &repo_meta)) {
       LOG(ERROR) << "Invalid repo path";
@@ -500,7 +505,14 @@ class RepoManager {
 
     static thread_local std::shared_mutex mu;
     std::unique_lock<std::shared_mutex> locker(mu);
-    return util::Util::WriteToFile(repo_file_path, req.content(), start);
+    auto ret = util::Util::WriteToFile(repo_file_path, req.content(), start);
+    if (ret) {
+      LOG(ERROR) << "Store part error, "
+                 << "path: " << req.dst() << ", part: " << req.partition_num();
+    } else {
+      impl::FileProcessManager::Instance()->Put(req);
+    }
+    return ret;
   }
 
   int32_t CreateRepoFile(const common::ReceiveContext& receive_ctx) {
