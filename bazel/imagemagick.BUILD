@@ -25,38 +25,42 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 
 cc_library(
     name = "imagemagick",
-    srcs = select({
+    srcs = glob(
+        [
+            "Magick++/lib/**/*.cpp",
+            "MagickCore/**/*.c",
+            "MagickWand/**/*.c",
+        ],
+        exclude = ["MagickWand/tests/**/**.c"],
+    ) + select({
         "@oceandoc//bazel:linux_x86_64": [
-            "c/blake3_avx2_x86-64_unix.S",
-            "c/blake3_avx512_x86-64_unix.S",
-            "c/blake3_sse2_x86-64_unix.S",
-            "c/blake3_sse41_x86-64_unix.S",
         ],
         "@oceandoc//bazel:osx_x86_64": [
-            "c/blake3_avx2_x86-64_unix.S",
-            "c/blake3_avx512_x86-64_unix.S",
-            "c/blake3_sse2_x86-64_unix.S",
-            "c/blake3_sse41_x86-64_unix.S",
         ],
         "@oceandoc//bazel:windows_x86_64": [
-            "c/blake3_avx2_x86-64_windows_msvc.asm",
-            "c/blake3_avx512_x86-64_windows_msvc.asm",
-            "c/blake3_sse2_x86-64_windows_msvc.asm",
-            "c/blake3_sse41_x86-64_windows_msvc.asm",
         ],
-        "@platforms//cpu:aarch64": ["c/blake3_neon.c"],
+        "@platforms//cpu:aarch64": [],
         "//conditions:default": [],
     }) + [
-        "c/blake3.c",
-        "c/blake3_dispatch.c",
-        "c/blake3_portable.c",
     ],
     hdrs = [
-        "c/blake3.h",
-        "c/blake3_impl.h",
+        ":config_h",
     ],
     copts = COPTS,
     includes = ["include"],
     linkopts = LINKOPTS,
     local_defines = LOCAL_DEFINES,
+)
+
+write_file(
+    name = "config_h_in",
+    out = "config/config.h.in",
+    content = [],
+)
+
+template_rule(
+    name = "config_h",
+    src = ":config_h_in",
+    out = "config/config.h",
+    substitutions = {},
 )

@@ -774,8 +774,8 @@ http_archive(
 new_git_repository(
     name = "imagemagick",
     build_file = "//bazel:imagemagick.BUILD",
-    remote = "git@github.com:BLAKE3-team/BLAKE3.git",
-    tag = "1.5.4",
+    remote = "git@github.com:ImageMagick/ImageMagick.git",
+    tag = "7.1.1-41",
 )
 
 new_git_repository(
