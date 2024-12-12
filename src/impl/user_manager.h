@@ -260,6 +260,19 @@ class UserManager final {
     return Err_Fail;
   }
 
+  int32_t UpdateToken(const std::string& user, const std::string& token,
+                      std::string* new_token) {
+    if (user.size() > 64 || user.empty()) {
+      return Err_User_name_error;
+    }
+
+    if (SessionManager::Instance()->UpdateSession(user, token, new_token)) {
+      return Err_Success;
+    }
+
+    return Err_Fail;
+  }
+
  private:
   mutable absl::base_internal::SpinLock lock_;
   std::atomic<bool> stop_ = false;

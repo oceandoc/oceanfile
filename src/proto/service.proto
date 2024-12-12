@@ -20,6 +20,7 @@ enum UserOp {
   UserLogin = 3;
   UserLogout = 4;
   UserChangePassword = 5;
+  UserUpdateToken = 6;
 }
 
 message UserReq {

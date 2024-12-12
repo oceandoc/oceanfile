@@ -18,7 +18,6 @@ namespace grpc_handler {
 class ServerHandler : public async_grpc::RpcHandler<ServerMethod> {
  public:
   void OnRequest(const proto::ServerReq& req) override {
-    LOG(INFO) << "request_id: " << req.request_id();
     auto res = std::make_unique<proto::ServerRes>();
     handler_proxy::HandlerProxy::ServerOpHandle(req, res.get());
     Send(std::move(res));

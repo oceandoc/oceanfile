@@ -65,8 +65,42 @@ class SessionManager final {
       return false;
     }
 
-    it->second.last_update_time = now;
     *user = it->second.user;
+    return true;
+  }
+
+  bool UpdateSession(const std::string& user, const std::string& token,
+                     std::string* new_token) {
+    if (token.empty()) {
+      return false;
+    }
+    absl::base_internal::SpinLockHolder locker(&lock_);
+    auto it = token_sessions_.find(token);
+    if (it == token_sessions_.end()) {
+      LOG(INFO) << "token session not found";
+      return false;
+    }
+
+    if (user != it->second.user) {
+      LOG(INFO) << "user not same";
+      return false;
+    }
+
+    auto now = util::Util::CurrentTimeMillis();
+    if (now - it->second.last_update_time >= common::SESSION_INTERVAL) {
+      LOG(INFO) << "expired";
+      return false;
+    }
+
+    it->second.last_update_time = now;
+
+    auto new_session = it->second;
+    new_session.token = util::Util::UUID();
+
+    user_sessions_[user] = new_session;
+    token_sessions_.erase(it);
+    token_sessions_[new_session.token] = new_session;
+    *new_token = new_session.token;
     return true;
   }
 

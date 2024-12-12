@@ -25,10 +25,9 @@ class HandlerProxy {
   }
 
   static void UserOpHandle(const proto::UserReq& req, proto::UserRes* res) {
-    std::string json;
-    util::Util::MessageToJson(req, &json);
-    LOG(INFO) << json;
+    LOG(INFO) << "user req: " << util::Util::MessageToJson(req);
     std::string session_user;
+    res->set_err_code(proto::ErrCode::Success);
     if (req.token().empty() && req.op() != proto::UserOp::UserCreate &&
         req.op() != proto::UserOp::UserLogin) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
@@ -37,10 +36,12 @@ class HandlerProxy {
         !impl::SessionManager::Instance()->ValidateSession(req.token(),
                                                            &session_user)) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
-      return;
     }
     if (!session_user.empty() && session_user != req.user()) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
+    }
+    if (res->err_code()) {
+      LOG(INFO) << "token error";
       return;
     }
 
@@ -66,6 +67,10 @@ class HandlerProxy {
       case proto::UserOp::UserLogout:
         ret = impl::UserManager::Instance()->UserLogout(req.token());
         break;
+      case proto::UserOp::UserUpdateToken:
+        ret = impl::UserManager::Instance()->UpdateToken(
+            req.user(), req.token(), res->mutable_token());
+        break;
       default:
         ret = Err_Unsupported_op;
         LOG(ERROR) << "Unsupported operation";
@@ -76,9 +81,12 @@ class HandlerProxy {
     } else {
       res->set_err_code(proto::ErrCode::Success);
     }
+
+    LOG(INFO) << "user res: " << util::Util::MessageToJson(*res);
   }
 
   static void RepoOpHandle(const proto::RepoReq& req, proto::RepoRes* res) {
+    LOG(INFO) << "repo req: " << util::Util::MessageToJson(req);
     if (req.token().empty()) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
       return;
@@ -124,10 +132,12 @@ class HandlerProxy {
     } else {
       res->set_err_code(proto::ErrCode::Success);
     }
+    LOG(INFO) << "repo res: " << util::Util::MessageToJson(*res);
   }
 
   static void ServerOpHandle(const proto::ServerReq& req,
                              proto::ServerRes* res) {
+    LOG(INFO) << "server req: " << util::Util::MessageToJson(req);
     int32_t ret = Err_Success;
     switch (req.op()) {
       case proto::ServerOp::ServerHandShake:
@@ -142,6 +152,7 @@ class HandlerProxy {
     } else {
       res->set_err_code(proto::ErrCode::Success);
     }
+    LOG(INFO) << "server res: " << util::Util::MessageToJson(*res);
   }
 };
 
