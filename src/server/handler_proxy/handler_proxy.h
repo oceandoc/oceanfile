@@ -89,6 +89,7 @@ class HandlerProxy {
     LOG(INFO) << "repo req: " << util::Util::MessageToJson(req);
     if (req.token().empty()) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
+      LOG(ERROR) << "User token empty: " << req.user();
       return;
     }
 
@@ -96,10 +97,12 @@ class HandlerProxy {
     if (!impl::SessionManager::Instance()->ValidateSession(req.token(),
                                                            &session_user)) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
+      LOG(ERROR) << "User token wrong: " << req.user();
       return;
     }
     if (!session_user.empty() && session_user != req.user()) {
       res->set_err_code(proto::ErrCode(Err_User_session_error));
+      LOG(ERROR) << "User name mismatch: " << req.user();
       return;
     }
 

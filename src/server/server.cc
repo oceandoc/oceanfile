@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   oceandoc::util::ConfigManager::Instance()->Init(home_dir);
   oceandoc::util::ThreadPool::Instance()->Init();
   oceandoc::impl::ScanManager::Instance()->Init();
-  oceandoc::impl::RepoManager::Instance()->Init();
+  oceandoc::impl::RepoManager::Instance()->Init(home_dir);
   oceandoc::impl::FileProcessManager::Instance()->Init();
   if (!oceandoc::impl::UserManager::Instance()->Init()) {
     LOG(ERROR) << "UserManager init error";

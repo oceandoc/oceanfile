@@ -39,14 +39,18 @@ class RepoManager {
     }
   }
 
-  bool Init() {
-    std::string content;
-    auto ret = util::Util::LoadSmallFile(common::REPOS_CONFIG_FILE, &content);
+  bool Init(const std::string& home_dir) {
+    repos_config_path_ = home_dir + "/data/repos.json";
+    tmp_repos_config_path_ = home_dir + "/data/repos.tmp.json";
+    if (util::Util::Exists(repos_config_path_)) {
+      std::string content;
+      auto ret = util::Util::LoadSmallFile(repos_config_path_, &content);
 
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    if (ret && !util::Util::JsonToMessage(content, &repos_)) {
-      LOG(ERROR) << "Read repos config error, content: " << content;
-      return false;
+      absl::base_internal::SpinLockHolder locker(&lock_);
+      if (ret && !util::Util::JsonToMessage(content, &repos_)) {
+        LOG(ERROR) << "Read repos config error, content: " << content;
+        return false;
+      }
     }
     dump_task_ = std::thread(&RepoManager::FlushRepoDataTask, this);
     LOG(INFO) << "Loaded repo num: " << repos_.repos().size();
@@ -60,9 +64,9 @@ class RepoManager {
 
   bool FlushRepoMeta() {
     bool copy_tmp = false;
-    if (util::Util::Exists(common::REPOS_CONFIG_FILE)) {
-      auto ret = util::Util::CopyFile(common::REPOS_CONFIG_FILE,
-                                      common::REPOS_CONFIG_TMP_FILE);
+    if (util::Util::Exists(repos_config_path_)) {
+      auto ret =
+          util::Util::CopyFile(repos_config_path_, tmp_repos_config_path_);
       if (!ret) {
         return false;
       }
@@ -78,18 +82,17 @@ class RepoManager {
       }
     }
 
-    if (util::Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false) ==
+    if (util::Util::WriteToFile(repos_config_path_, content, false) ==
             Err_Success ||
-        util::Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false) ==
+        util::Util::WriteToFile(repos_config_path_, content, false) ==
             Err_Success ||
-        util::Util::WriteToFile(common::REPOS_CONFIG_FILE, content, false) ==
+        util::Util::WriteToFile(repos_config_path_, content, false) ==
             Err_Success) {
       LOG(INFO) << "Flush repos config success, num: " << repos_.repos_size();
       return true;
     }
-    if (util::Util::Exists(common::REPOS_CONFIG_TMP_FILE) && copy_tmp) {
-      util::Util::CopyFile(common::REPOS_CONFIG_TMP_FILE,
-                           common::REPOS_CONFIG_FILE);
+    if (util::Util::Exists(tmp_repos_config_path_) && copy_tmp) {
+      util::Util::CopyFile(tmp_repos_config_path_, repos_config_path_);
       LOG(ERROR) << "Disaster: flush repos config error";
     }
     return false;
@@ -278,12 +281,12 @@ class RepoManager {
       LOG(WARNING) << "Repo moved, origin path: " << repo->repo_path();
       repo->set_repo_path(path);
     }
-    LOG(INFO) << "Restored " << repo->repo_uuid();
+    LOG(INFO) << "Restored success" << repo->repo_uuid();
 
     {
       absl::base_internal::SpinLockHolder locker(&lock_);
       if (repos_.repos().find(repo->repo_uuid()) != repos_.repos().end()) {
-        LOG(INFO) << "Repo already exists" << repo->repo_uuid();
+        LOG(INFO) << "Repo already exists: " << repo->repo_uuid();
         return Err_Success;
       }
       (*repos_.mutable_repos())[repo->repo_uuid()] = *repo;
@@ -294,7 +297,8 @@ class RepoManager {
   int32_t CreateRepo(const proto::RepoReq& req, proto::RepoRes* res) {
     proto::RepoMeta repo;
     if (ExistsRepo(req.path(), repo.mutable_repo_uuid())) {
-      if (RestoreRepo(req.path(), &repo)) {
+      if (RestoreRepo(req.path(), &repo) == Err_Success) {
+        *res->mutable_repo() = repo;
         return Err_Success;
       }
       return Err_Repo_restore_repo_error;
@@ -552,13 +556,15 @@ class RepoManager {
   }
 
  private:
+  std::string repos_config_path_;
+  std::string tmp_repos_config_path_;
   proto::Repos repos_;
+  std::map<std::string, proto::RepoData> repo_datas_;
   mutable absl::base_internal::SpinLock lock_;
   std::atomic<bool> stop_ = false;
   std::shared_mutex mutex_;
   std::mutex mu_;
   std::condition_variable cv_;
-  std::map<std::string, proto::RepoData> repo_datas_;
   std::thread dump_task_;
 };
 
