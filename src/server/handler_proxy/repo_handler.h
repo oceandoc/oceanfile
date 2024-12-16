@@ -59,7 +59,7 @@ class RepoHandler {
         ret = impl::RepoManager::Instance()->ListRepoDir(req, res);
         break;
       case proto::RepoOp::RepoListRepoMediaFiles:
-        ret = impl::RepoManager::Instance()->ListRepoDir(req, res);
+        ret = impl::RepoManager::Instance()->ListRepoMediaFiles(req, res);
         break;
       default:
         ret = Err_Unsupported_op;

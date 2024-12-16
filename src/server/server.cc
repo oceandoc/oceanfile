@@ -76,6 +76,7 @@ int main(int argc, char **argv) {
   oceandoc::impl::ScanManager::Instance()->Init();
   oceandoc::impl::RepoManager::Instance()->Init(home_dir);
   oceandoc::impl::FileProcessManager::Instance()->Init();
+  oceandoc::util::SqliteManager::Instance()->Init(home_dir);
   if (!oceandoc::impl::UserManager::Instance()->Init()) {
     LOG(ERROR) << "UserManager init error";
     return -1;

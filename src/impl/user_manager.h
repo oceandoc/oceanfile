@@ -30,12 +30,7 @@ class UserManager final {
 
   ~UserManager() {}
 
-  bool Init() {
-    if (!util::SqliteManager::Instance()->Init()) {
-      return false;
-    }
-    return true;
-  }
+  bool Init() { return true; }
 
   void Stop() {
     stop_.store(true);

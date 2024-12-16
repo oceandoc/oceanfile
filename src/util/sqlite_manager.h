@@ -31,8 +31,7 @@ class SqliteManager final {
     }
   }
 
-  bool Init() {
-    std::string home_dir = oceandoc::util::Util::HomeDir();
+  bool Init(const std::string& home_dir) {
     std::string user_db_path = home_dir + "/data/user.db";
     if (sqlite3_open(user_db_path.c_str(), &db_) != SQLITE_OK) {
       LOG(ERROR) << "open database error";
@@ -110,19 +109,19 @@ class SqliteManager final {
     }
 
     std::vector<uint8_t> salt_arr{0x45, 0x2c, 0x03, 0x06, 0x73, 0x0b,
-                                 0x0f, 0x3a, 0xc3, 0x08, 0x6d, 0x4f,
-                                 0x62, 0xef, 0xfc, 0x20};
+                                  0x0f, 0x3a, 0xc3, 0x08, 0x6d, 0x4f,
+                                  0x62, 0xef, 0xfc, 0x20};
     std::vector<uint8_t> hashed_password_arr{
         0x29, 0x9a, 0xe5, 0x3a, 0xb2, 0x2c, 0x08, 0x5a, 0x47, 0x96, 0xb5,
         0x91, 0x87, 0xd2, 0xb5, 0x4c, 0x21, 0x7e, 0x48, 0x30, 0xb4, 0xab,
         0xe4, 0xad, 0xe7, 0x9d, 0x7d, 0x8e, 0x6d, 0x90, 0xf5, 0x1a};
     std::string salt(salt_arr.begin(), salt_arr.end());
     std::string hashed_password(hashed_password_arr.begin(),
-                              hashed_password_arr.end());
+                                hashed_password_arr.end());
     sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, salt.c_str(), Util::kSaltSize, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 3, hashed_password.c_str(), Util::kDerivedKeySize,
-                     SQLITE_STATIC);
+                      SQLITE_STATIC);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
       LOG(ERROR) << "Init admin execute error: " << sqlite3_errmsg(db_);
