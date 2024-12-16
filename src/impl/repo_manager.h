@@ -437,27 +437,59 @@ class RepoManager {
     return Err_Success;
   }
 
-  int32_t ListRepoMediaFiles(const proto::RepoReq& req, proto::RepoRes* res) {
+  void ListRepoMediaFiles(const proto::RepoReq& req, proto::RepoRes* res) {
     sqlite3_stmt* stmt = nullptr;
-    auto ret = util::SqliteManager::Instance()->PrepareStatement(
-        "select id, hash, file_name FROM files where type = ? or type = ?;",
-        &stmt);
-    if (ret) {
-      return Err_Fail;
+    std::string query = 
+        "SELECT hash, local_id, device_id, create_time, update_time, "
+        "duration, type, width, height, file_name, favorite, owner, "
+        "live_photo_video_hash, deleted, thumb_hash "
+        "FROM files WHERE type IN (1, 2) AND deleted = 0 "
+        "ORDER BY create_time DESC;";
+
+    auto ret = util::SqliteManager::Instance()->PrepareStatement(query, &stmt);
+    if (ret != Err_Success) {
+        res->set_err_code(proto::ErrCode::Database_error);
+        return;
     }
 
-    sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, salt.c_str(), salt.size(), SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), hashed_password.size(),
-                      SQLITE_STATIC);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        auto* file_info = res->add_file_infos();
+        
+        // Get values from result row
+        const char* hash = (const char*)sqlite3_column_text(stmt, 0);
+        const char* local_id = (const char*)sqlite3_column_text(stmt, 1);
+        const char* device_id = (const char*)sqlite3_column_text(stmt, 2);
+        int64_t create_time = sqlite3_column_int64(stmt, 3);
+        int64_t update_time = sqlite3_column_int64(stmt, 4);
+        int64_t duration = sqlite3_column_int64(stmt, 5);
+        int32_t type = sqlite3_column_int(stmt, 6);
+        int32_t width = sqlite3_column_int(stmt, 7);
+        int32_t height = sqlite3_column_int(stmt, 8);
+        const char* file_name = (const char*)sqlite3_column_text(stmt, 9);
+        int32_t favorite = sqlite3_column_int(stmt, 10);
+        const char* owner = (const char*)sqlite3_column_text(stmt, 11);
+        const char* live_photo_hash = (const char*)sqlite3_column_text(stmt, 12);
+        const char* thumb_hash = (const char*)sqlite3_column_text(stmt, 14);
 
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-      sqlite3_finalize(stmt);
-      return Err_Fail;
+        // Set values in protobuf message
+        if (hash) file_info->set_hash(hash);
+        if (local_id) file_info->set_local_id(local_id);
+        if (device_id) file_info->set_device_id(device_id);
+        file_info->set_create_time(create_time);
+        file_info->set_update_time(update_time);
+        file_info->set_duration(duration);
+        file_info->set_type(type);
+        file_info->set_width(width);
+        file_info->set_height(height);
+        if (file_name) file_info->set_file_name(file_name);
+        file_info->set_favorite(favorite);
+        if (owner) file_info->set_owner(owner);
+        if (live_photo_hash) file_info->set_live_photo_video_hash(live_photo_hash);
+        if (thumb_hash) file_info->set_thumb_hash(thumb_hash);
     }
+
     sqlite3_finalize(stmt);
-
-    return Err_Success;
+    res->set_err_code(proto::ErrCode::Success);
   }
 
   int32_t GetRepoDir(const proto::RepoReq& req, proto::RepoRes* res) {
