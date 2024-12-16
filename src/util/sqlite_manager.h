@@ -46,48 +46,34 @@ class SqliteManager final {
                         "salt TEXT, "
                         "password TEXT);",
                         &error_msg)) {
-      LOG(ERROR) << "Init database error";
+      LOG(ERROR) << "Init users table error: " << error_msg;
       return false;
     }
 
-    sqlite3_stmt* stmt = nullptr;
-    auto ret = util::SqliteManager::Instance()->PrepareStatement(
-        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);",
-        &stmt);
-    if (ret) {
-      LOG(ERROR) << "Init admin prepare error";
+    if (ExecuteNonQuery("CREATE TABLE IF NOT EXISTS files ("
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        "local_id TEXT, "
+                        "hash TEXT UNIQUE, "
+                        "device_id TEXT, "
+                        "create_time INTEGER, "
+                        "update_time INTEGER, "
+                        "duration INTEGER, "
+                        "type INTEGER, "
+                        "width INTEGER, "
+                        "height INTEGER, "
+                        "file_name TEXT, "
+                        "favorite INTEGER DEFAULT 0, "
+                        "owner TEXT, "
+                        "live_photo_video_hash TEXT, "
+                        "deleted INTEGER DEFAULT 0, "
+                        "thumb_hash TEXT"
+                        ");",
+                        &error_msg)) {
+      LOG(ERROR) << "Init media table error: " << error_msg;
       return false;
     }
 
-    std::vector<uint8_t> salt_arr{0x45, 0x2c, 0x03, 0x06, 0x73, 0x0b,
-                                  0x0f, 0x3a, 0xc3, 0x08, 0x6d, 0x4f,
-                                  0x62, 0xef, 0xfc, 0x20};
-    std::vector<uint8_t> hashed_password_arr{
-        0x29, 0x9a, 0xe5, 0x3a, 0xb2, 0x2c, 0x08, 0x5a, 0x47, 0x96, 0xb5,
-        0x91, 0x87, 0xd2, 0xb5, 0x4c, 0x21, 0x7e, 0x48, 0x30, 0xb4, 0xab,
-        0xe4, 0xad, 0xe7, 0x9d, 0x7d, 0x8e, 0x6d, 0x90, 0xf5, 0x1a};
-    std::string salt(salt_arr.begin(), salt_arr.end());
-    std::string hashed_password(hashed_password_arr.begin(),
-                                hashed_password_arr.end());
-    sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, salt.c_str(), Util::kSaltSize, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), Util::kDerivedKeySize,
-                      SQLITE_STATIC);
-
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-      LOG(ERROR) << "Init admin execute error";
-      LOG(ERROR) << sqlite3_errmsg(db_);
-      sqlite3_finalize(stmt);
-      return false;
-    }
-    if (AffectRows() > 0) {
-      LOG(INFO) << "Add admin success";
-    } else {
-      LOG(INFO) << "Already exists admin";
-    }
-
-    sqlite3_finalize(stmt);
-    return true;
+    return InitAdminUser();
   }
 
   int32_t PrepareStatement(const std::string& query, sqlite3_stmt** stmt) {
@@ -113,6 +99,46 @@ class SqliteManager final {
   int32_t AffectRows() { return sqlite3_changes(db_); }
 
  private:
+  bool InitAdminUser() {
+    sqlite3_stmt* stmt = nullptr;
+    auto ret = PrepareStatement(
+        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);",
+        &stmt);
+    if (ret) {
+      LOG(ERROR) << "Init admin prepare error";
+      return false;
+    }
+
+    std::vector<uint8_t> salt_arr{0x45, 0x2c, 0x03, 0x06, 0x73, 0x0b,
+                                 0x0f, 0x3a, 0xc3, 0x08, 0x6d, 0x4f,
+                                 0x62, 0xef, 0xfc, 0x20};
+    std::vector<uint8_t> hashed_password_arr{
+        0x29, 0x9a, 0xe5, 0x3a, 0xb2, 0x2c, 0x08, 0x5a, 0x47, 0x96, 0xb5,
+        0x91, 0x87, 0xd2, 0xb5, 0x4c, 0x21, 0x7e, 0x48, 0x30, 0xb4, 0xab,
+        0xe4, 0xad, 0xe7, 0x9d, 0x7d, 0x8e, 0x6d, 0x90, 0xf5, 0x1a};
+    std::string salt(salt_arr.begin(), salt_arr.end());
+    std::string hashed_password(hashed_password_arr.begin(),
+                              hashed_password_arr.end());
+    sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, salt.c_str(), Util::kSaltSize, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), Util::kDerivedKeySize,
+                     SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+      LOG(ERROR) << "Init admin execute error: " << sqlite3_errmsg(db_);
+      sqlite3_finalize(stmt);
+      return false;
+    }
+    if (AffectRows() > 0) {
+      LOG(INFO) << "Add admin success";
+    } else {
+      LOG(INFO) << "Already exists admin";
+    }
+
+    sqlite3_finalize(stmt);
+    return true;
+  }
+
   sqlite3* db_ = nullptr;
 };
 
