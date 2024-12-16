@@ -12,9 +12,9 @@
 #include <set>
 #include <thread>
 #include <unordered_map>
-#include <vector>
 
 #include "folly/Singleton.h"
+#include "src/util/sqlite_manager.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -58,7 +58,6 @@ class FileProcessManager final {
       if (req.repo_type() == proto::RepoType::RT_Ocean) {
         ctx.repo_uuid = req.repo_uuid();
         ctx.file_name = req.src();
-      } else if (req.repo_type() == proto::RepoType::RT_Remote) {
       } else {
         LOG(ERROR) << "Unsupport repo type: " << req.repo_type();
       }
@@ -75,11 +74,44 @@ class FileProcessManager final {
     cv_.notify_all();
   }
 
-  void DoProcess(const std::string& request_id,
-                 const common::ReceiveContext& ctx) {
-    if (ctx.part_num == ctx.partitions.size()) {
-      to_delete_ctx_.push_back(request_id);
+  bool InsertToDb(const common::ReceiveContext& ctx) {
+    sqlite3_stmt* stmt = nullptr;
+    auto ret = util::SqliteManager::Instance()->PrepareStatement(
+        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);",
+        &stmt);
+    if (ret) {
+      return Err_Fail;
     }
+
+    sqlite3_bind_text(stmt, 2, ctx.file_hash.c_str(), ctx.file_hash.size(),
+                      SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 11, ctx.file_name.c_str(), ctx.file_name.size(),
+                      SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+      sqlite3_finalize(stmt);
+      return false;
+    }
+
+    sqlite3_finalize(stmt);
+
+    int changes = util::SqliteManager::Instance()->AffectRows();
+    if (changes > 0) {
+      LOG(ERROR) << "insert success. file: " << ctx.file_hash;
+    } else {
+      LOG(ERROR) << "No records were updated. file: " << ctx.file_hash
+                 << " may exist already";
+    }
+    return true;
+  }
+
+  bool DoProcess(const common::ReceiveContext& ctx) {
+    if (ctx.part_num == ctx.partitions.size()) {
+      if (InsertToDb(ctx)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   void Process() {
@@ -89,29 +121,36 @@ class FileProcessManager final {
         break;
       }
 
-      absl::base_internal::SpinLockHolder locker(&lock_);
       if (queue_.empty()) {
         std::unique_lock<std::mutex> lock(mu_);
         cv_.wait_for(lock, std::chrono::seconds(60));
       }
 
+      absl::base_internal::SpinLockHolder locker(&lock_);
       for (auto it = queue_.begin(); it != queue_.end();) {
-        DoProcess(it->first, it->second);
+        if (DoProcess(it->second)) {
+          it = queue_.erase(it);
+          continue;
+        }
+        ++it;
       }
     }
 
     for (auto it = queue_.begin(); it != queue_.end();) {
-      DoProcess(it->first, it->second);
+      if (DoProcess(it->second)) {
+        it = queue_.erase(it);
+        continue;
+      }
+      ++it;
     }
 
     process_task_exits = true;
-    LOG(INFO) << "Clean task exists";
+    LOG(INFO) << "Process task exists";
   }
 
  private:
   mutable absl::base_internal::SpinLock lock_;
   std::unordered_map<std::string, common::ReceiveContext> queue_;
-  std::vector<std::string> to_delete_ctx_;
   std::atomic<bool> stop_ = false;
   std::mutex mu_;
   std::condition_variable cv_;

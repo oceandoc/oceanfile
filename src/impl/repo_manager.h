@@ -519,7 +519,7 @@ class RepoManager {
                 << "file: " << req.file_hash()
                 << ", part: " << req.partition_num()
                 << ", size: " << req.file_size();
-      // impl::FileProcessManager::Instance()->Put(req);
+      impl::FileProcessManager::Instance()->Put(req);
     }
     return ret;
   }

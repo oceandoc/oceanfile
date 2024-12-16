@@ -126,6 +126,7 @@ cc_library(
         "//src/proto:cc_data",
         "//src/proto:cc_grpc_service",
         "//src/util",
+        "//src/util:sqlite_manager",
         "//src/util:thread_pool",
         "@com_github_grpc_grpc//:grpc++",
         "@folly",
