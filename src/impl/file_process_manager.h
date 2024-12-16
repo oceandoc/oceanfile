@@ -77,15 +77,14 @@ class FileProcessManager final {
   bool InsertToDb(const common::ReceiveContext& ctx) {
     sqlite3_stmt* stmt = nullptr;
     auto ret = util::SqliteManager::Instance()->PrepareStatement(
-        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);",
-        &stmt);
+        "INSERT OR IGNORE INTO files (hash, file_name) VALUES (?, ?);", &stmt);
     if (ret) {
       return Err_Fail;
     }
 
-    sqlite3_bind_text(stmt, 2, ctx.file_hash.c_str(), ctx.file_hash.size(),
+    sqlite3_bind_text(stmt, 1, ctx.file_hash.c_str(), ctx.file_hash.size(),
                       SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 11, ctx.file_name.c_str(), ctx.file_name.size(),
+    sqlite3_bind_text(stmt, 2, ctx.file_name.c_str(), ctx.file_name.size(),
                       SQLITE_STATIC);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {

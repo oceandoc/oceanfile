@@ -60,6 +60,7 @@ cc_library(
     hdrs = [
         "file_handler.h",
         "handler_proxy.h",
+        "repo_handler.h",
     ],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,

@@ -74,6 +74,7 @@ enum RepoOp {
   RepoCreateRepoDir = 8;
   RepoDeleteRepoDir = 9;
   RepoDeleteRepoFile = 10;
+  RepoListRepoMediaFiles = 11;
 }
 
 message RepoReq {
@@ -87,12 +88,32 @@ message RepoReq {
   string user = 8;
 }
 
+message FileInfo {
+  int64 remote_id = 1;
+  string local_id = 2;
+  string hash = 3;
+  string device_id = 4;
+  int64 create_time = 5;
+  int64 update_time = 6;
+  int64 duration = 7;
+  int32 type = 8;
+  int32 width = 9;
+  int32 height = 10;
+  string file_name = 11;
+  int32 favorite = 12;
+  string owner = 13;
+  string live_photo_video_hash = 14;
+  int32 deleted = 15;
+  string thumb_hash = 16;
+}
+
 message RepoRes {
   ErrCode err_code = 1;
   map<string, RepoMeta> repos = 2;
   RepoDir repo_dir = 3;
   Dir dir = 4;
   RepoMeta repo = 5;
+  repeated FileInfo file_infos = 10;
 }
 
 enum FileOp {

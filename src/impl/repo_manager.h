@@ -437,6 +437,29 @@ class RepoManager {
     return Err_Success;
   }
 
+  int32_t ListRepoMediaFiles(const proto::RepoReq& req, proto::RepoRes* res) {
+    sqlite3_stmt* stmt = nullptr;
+    auto ret = util::SqliteManager::Instance()->PrepareStatement(
+        "select id, hash, file_name FROM files where type = ? or type = ?;",
+        &stmt);
+    if (ret) {
+      return Err_Fail;
+    }
+
+    sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, salt.c_str(), salt.size(), SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), hashed_password.size(),
+                      SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+      sqlite3_finalize(stmt);
+      return Err_Fail;
+    }
+    sqlite3_finalize(stmt);
+
+    return Err_Success;
+  }
+
   int32_t GetRepoDir(const proto::RepoReq& req, proto::RepoRes* res) {
     absl::base_internal::SpinLockHolder locker(&lock_);
     auto it = repo_datas_.find(req.repo_uuid());
