@@ -18,16 +18,12 @@ namespace grpc_handler {
 class FileHandler : public async_grpc::RpcHandler<FileOpMethod> {
  public:
   void OnRequest(const proto::FileReq& req) override {
-    LOG(INFO) << "request_id: " << req.request_id();
     auto res = std::make_unique<proto::FileRes>();
     handler_proxy::HandlerProxy::FileOpHandle(req, res.get());
     Send(std::move(res));
   }
 
-  void OnReadsDone() override {
-    LOG(INFO) << "OnReadsDone";
-    Finish(grpc::Status::OK);
-  }
+  void OnReadsDone() override { Finish(grpc::Status::OK); }
 };
 
 }  // namespace grpc_handler

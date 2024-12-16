@@ -28,7 +28,11 @@ class FileProcessManager final {
  public:
   static std::shared_ptr<FileProcessManager> Instance();
 
-  ~FileProcessManager() {}
+  ~FileProcessManager() {
+    if (process_task_.joinable()) {
+      process_task_.join();
+    }
+  }
 
   bool Init() {
     queue_.reserve(10000);

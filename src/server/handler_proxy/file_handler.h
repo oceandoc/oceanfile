@@ -80,24 +80,27 @@ class FileHandler {
   }
 
   static void FileOpHandle(const proto::FileReq& req, proto::FileRes* res) {
-    // if (req.repo_type() == proto::RepoType::RT_Ocean) {
-    // if (req.token().empty()) {
-    // res->set_err_code(proto::ErrCode(Err_User_session_error));
-    // return;
-    //}
+    if (req.repo_type() == proto::RepoType::RT_Ocean) {
+      if (req.token().empty()) {
+        res->set_err_code(proto::ErrCode(Err_User_session_error));
+        LOG(ERROR) << "token empty";
+        return;
+      }
 
-    // std::string session_user;
-    // if (!req.token().empty() &&
-    //! impl::SessionManager::Instance()->ValidateSession(req.token(),
-    //&session_user)) {
-    // res->set_err_code(proto::ErrCode(Err_User_session_error));
-    // return;
-    //}
-    // if (!session_user.empty() && session_user != req.user()) {
-    // res->set_err_code(proto::ErrCode(Err_User_session_error));
-    // return;
-    //}
-    //}
+      std::string session_user;
+      if (!req.token().empty() &&
+          !impl::SessionManager::Instance()->ValidateSession(req.token(),
+                                                             &session_user)) {
+        LOG(ERROR) << "token invalid";
+        res->set_err_code(proto::ErrCode(Err_User_session_error));
+        return;
+      }
+      if (!session_user.empty() && session_user != req.user()) {
+        LOG(ERROR) << "user mismatch";
+        res->set_err_code(proto::ErrCode(Err_User_session_error));
+        return;
+      }
+    }
 
     res->set_src(req.src());
     res->set_dst(req.dst());
@@ -127,6 +130,7 @@ class FileHandler {
     } else {
       res->set_err_code(proto::ErrCode::Success);
     }
+    LOG(INFO) << "res: " << util::Util::MessageToJson(*res);
   }
 };
 

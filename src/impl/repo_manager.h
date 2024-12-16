@@ -512,9 +512,14 @@ class RepoManager {
     auto ret = util::Util::WriteToFile(repo_file_path, req.content(), start);
     if (ret) {
       LOG(ERROR) << "Store part error, "
-                 << "path: " << req.dst() << ", part: " << req.partition_num();
+                 << "file: " << req.file_hash()
+                 << ", part: " << req.partition_num();
     } else {
-      impl::FileProcessManager::Instance()->Put(req);
+      LOG(INFO) << "Store part success, "
+                << "file: " << req.file_hash()
+                << ", part: " << req.partition_num()
+                << ", size: " << req.file_size();
+      // impl::FileProcessManager::Instance()->Put(req);
     }
     return ret;
   }
