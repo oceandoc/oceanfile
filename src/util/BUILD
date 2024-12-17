@@ -57,6 +57,21 @@ cc_library(
 )
 
 cc_library(
+    name = "sqlite_helper",
+    srcs = ["sqlite_helper.cc"],
+    hdrs = ["sqlite_helper.h"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        ":util",
+        "//src/common:defs",
+        "@com_github_glog_glog//:glog",
+        "@folly",
+        "@sqlite",
+    ],
+)
+
+cc_library(
     name = "thread_pool",
     srcs = ["thread_pool.cc"],
     hdrs = ["thread_pool.h"],
@@ -151,4 +166,26 @@ cc_test(
     data = ["//conf:client_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":config_manager"],
+)
+
+cc_test(
+    name = "sqlite_manager_test",
+    srcs = [
+        "sqlite_manager_test.cc",
+    ],
+    copts = COPTS,
+    data = ["//data:user.db"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":sqlite_manager"],
+)
+
+cc_test(
+    name = "sqlite_helper_test",
+    srcs = [
+        "sqlite_helper_test.cc",
+    ],
+    copts = COPTS,
+    data = ["//data:test.db"],
+    local_defines = LOCAL_DEFINES,
+    deps = [":sqlite_helper"],
 )
