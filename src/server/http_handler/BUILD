@@ -49,9 +49,17 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 
 cc_library(
     name = "http_handler",
-    srcs = [],
+    srcs = [
+        "file_put_handler.h",
+        "file_json_handler.h",
+        "http_handler_factory.h",
+        "repo_handler.h",
+        "server_handler.h",
+        "user_handler.h",
+        "util.h",
+    ],
     hdrs = [
-        "file_handler.h",
+        "file_put_handler.h",
         "file_json_handler.h",
         "http_handler_factory.h",
         "repo_handler.h",
