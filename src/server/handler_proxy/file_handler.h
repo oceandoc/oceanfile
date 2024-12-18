@@ -37,6 +37,17 @@ class FileHandler {
     return ret;
   }
 
+  static int32_t Read(const proto::FileReq& req, proto::FileRes* /*res*/) {
+    int32_t ret = Err_Success;
+    if (req.repo_type() == proto::RepoType::RT_Ocean) {
+      ret = impl::RepoManager::Instance()->ReadFile(req);
+    } else {
+      ret = Err_Unsupported_op;
+      LOG(ERROR) << "Unsupported repo type";
+    }
+    return ret;
+  }
+
   static int32_t Exists(const proto::FileReq& req, proto::FileRes* res) {
     int32_t ret = Err_Success;
     if (!util::Util::Exists(req.dst())) {
@@ -114,6 +125,9 @@ class FileHandler {
     switch (req.op()) {
       case proto::FileOp::FilePut:
         ret = Save(req, res);
+        break;
+      case proto::FileOp::FileGet:
+        ret = Read(req, res);
         break;
       case proto::FileOp::FileExists:
         ret = Exists(req, res);

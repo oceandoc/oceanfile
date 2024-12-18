@@ -531,6 +531,59 @@ class RepoManager {
     return Err_File_not_exists;
   }
 
+  int32_t ReadFile(const proto::FileReq& req) {
+    if (req.repo_uuid().empty()) {
+      LOG(ERROR) << "Repo uuid empty";
+      return Err_Repo_uuid_error;
+    }
+    proto::RepoMeta repo_meta;
+    if (!RepoMetaByUUID(req.repo_uuid(), &repo_meta)) {
+      LOG(ERROR) << "Invalid repo path";
+      return Err_Repo_not_exists;
+    }
+    const auto& repo_path = repo_meta.repo_path();
+    const auto& repo_file_path =
+        util::Util::RepoFilePath(repo_path, req.file_hash());
+    if (repo_file_path.empty()) {
+      LOG(ERROR) << "Invalid repo file path";
+      return Err_Repo_uuid_error;
+    }
+
+    util::Util::MkParentDir(repo_file_path);
+
+    auto err_code = Err_Success;
+    err_code = util::Util::CreateFileWithSize(repo_file_path, req.file_size());
+    if (err_code != Err_Success) {
+      LOG(ERROR) << "Create file error: " << repo_file_path;
+      return err_code;
+    }
+
+    int64_t start = 0, end = 0;
+    util::Util::CalcPartitionStart(req.file_size(), req.partition_num(),
+                                   req.partition_size(), &start, &end);
+    if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
+      LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
+                 << ", start: " << start << ", end: " << end
+                 << ", content size: " << req.content().size();
+      return Err_File_partition_size_error;
+    }
+
+    static thread_local std::shared_mutex mu;
+    std::unique_lock<std::shared_mutex> locker(mu);
+    auto ret = util::Util::WriteToFile(repo_file_path, req.content(), start);
+    if (ret) {
+      LOG(ERROR) << "Store part error, "
+                 << "file: " << req.file_hash()
+                 << ", part: " << req.partition_num();
+    } else {
+      LOG(INFO) << "Store part success, "
+                << "file: " << req.file_hash()
+                << ", part: " << req.partition_num()
+                << ", size: " << req.file_size();
+      impl::FileProcessManager::Instance()->Put(req);
+    }
+    return ret;
+  }
   int32_t WriteToFile(const proto::FileReq& req) {
     if (req.repo_uuid().empty()) {
       LOG(ERROR) << "Repo uuid empty";

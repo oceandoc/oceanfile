@@ -122,6 +122,7 @@ enum FileOp {
   FilePut = 2;
   FileDelete = 3;
   FileSaveSuccess = 4;
+  FileGet = 5;
 }
 
 message FileReq {
