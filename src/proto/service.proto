@@ -154,6 +154,7 @@ message FileRes {
   string request_id = 7;
   FileOp op = 8;
   bool can_skip_upload = 9;
+  bytes content = 10;
 }
 
 service OceanFile {

@@ -8,8 +8,9 @@
 
 #include "proxygen/httpserver/RequestHandler.h"
 #include "proxygen/httpserver/RequestHandlerFactory.h"
-#include "src/server/http_handler/file_handler.h"
+#include "src/server/http_handler/file_get_handler.h"
 #include "src/server/http_handler/file_json_handler.h"
+#include "src/server/http_handler/file_put_handler.h"
 #include "src/server/http_handler/repo_handler.h"
 #include "src/server/http_handler/server_handler.h"
 #include "src/server/http_handler/user_handler.h"
@@ -30,8 +31,10 @@ class HTTPHandlerFactory : public proxygen::RequestHandlerFactory {
       return new UserHandler();
     } else if (message->getPath() == "/server") {
       return new ServerHandler();
-    } else if (message->getPath() == "/file") {
-      return new FileHandler();
+    } else if (message->getPath() == "/file_put") {
+      return new FilePutHandler();
+    } else if (message->getPath() == "/file_get") {
+      return new FileGetHandler();
     } else if (message->getPath() == "/file_json") {
       return new FileJsonHandler();
     } else if (message->getPath() == "/repo") {

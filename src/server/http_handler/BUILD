@@ -49,18 +49,10 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
 
 cc_library(
     name = "http_handler",
-    srcs = [
-        "file_put_handler.h",
-        "file_json_handler.h",
-        "http_handler_factory.h",
-        "repo_handler.h",
-        "server_handler.h",
-        "user_handler.h",
-        "util.h",
-    ],
     hdrs = [
-        "file_put_handler.h",
+        "file_get_handler.h",
         "file_json_handler.h",
+        "file_put_handler.h",
         "http_handler_factory.h",
         "repo_handler.h",
         "server_handler.h",
@@ -76,6 +68,9 @@ cc_library(
         "//src/util",
         "//src/util:config_manager",
         "//src/util:timer",
+        "@boost//:beast",
+        "@boost//:system",
+        "@boost//:url",
         "@multipart-parser",
         "@proxygen",
     ],

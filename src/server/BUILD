@@ -76,6 +76,7 @@ cc_binary(
         ":http_server_impl",
         ":udp_server_impl",
         #"@jemalloc",
+        "@boost//:url",
         "@openssl//:ssl",
         "@xz//:lzma",
     ],

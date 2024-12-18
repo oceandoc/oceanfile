@@ -9,8 +9,8 @@
 #include <filesystem>
 
 #include "src/impl/repo_manager.h"
-#include "src/impl/session_manager.h"
 #include "src/impl/sync_manager.h"
+#include "src/impl/user_manager.h"
 #include "src/proto/service.pb.h"
 #include "src/util/util.h"
 
@@ -37,15 +37,14 @@ class FileHandler {
     return ret;
   }
 
-  static int32_t Read(const proto::FileReq& req, proto::FileRes* /*res*/) {
-    int32_t ret = Err_Success;
+  static int32_t Read(const proto::FileReq& req, proto::FileRes* res) {
     if (req.repo_type() == proto::RepoType::RT_Ocean) {
-      ret = impl::RepoManager::Instance()->ReadFile(req);
+      return impl::RepoManager::Instance()->ReadFile(req,
+                                                     res->mutable_content());
     } else {
-      ret = Err_Unsupported_op;
       LOG(ERROR) << "Unsupported repo type";
     }
-    return ret;
+    return Err_Unsupported_op;
   }
 
   static int32_t Exists(const proto::FileReq& req, proto::FileRes* res) {
@@ -92,22 +91,9 @@ class FileHandler {
 
   static void FileOpHandle(const proto::FileReq& req, proto::FileRes* res) {
     if (req.repo_type() == proto::RepoType::RT_Ocean) {
-      if (req.token().empty()) {
-        res->set_err_code(proto::ErrCode(Err_User_session_error));
-        LOG(ERROR) << "token empty";
-        return;
-      }
-
-      std::string session_user;
-      if (!req.token().empty() &&
-          !impl::SessionManager::Instance()->ValidateSession(req.token(),
-                                                             &session_user)) {
-        LOG(ERROR) << "token invalid";
-        res->set_err_code(proto::ErrCode(Err_User_session_error));
-        return;
-      }
-      if (!session_user.empty() && session_user != req.user()) {
-        LOG(ERROR) << "user mismatch";
+      auto ret = impl::UserManager::Instance()->UserValidateSession(
+          req.user(), req.token());
+      if (ret) {
         res->set_err_code(proto::ErrCode(Err_User_session_error));
         return;
       }

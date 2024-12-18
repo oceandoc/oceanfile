@@ -6,24 +6,22 @@
 #ifndef BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_FILE_GET_HANDLER_H
 #define BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_FILE_GET_HANDLER_H
 
-#include <proxygen/httpserver/RequestHandler.h>
-#include <proxygen/httpserver/ResponseBuilder.h>
-
 #include "glog/logging.h"
+#include "proxygen/httpserver/RequestHandler.h"
 #include "src/impl/repo_manager.h"
 #include "src/impl/user_manager.h"
 #include "src/server/http_handler/util.h"
-#include "src/util/util.h"
 
 namespace oceandoc {
 namespace server {
+namespace http_handler {
 
 class FileGetHandler : public proxygen::RequestHandler {
  public:
-  void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override {
-    // Get authorization token from header
-    auto auth_header = headers->getHeaders().getSingleOrEmpty("Authorization");
-    if (auth_header.empty()) {
+  void onRequest(std::unique_ptr<proxygen::HTTPMessage> msg) noexcept override {
+    auto auth_header = msg->getHeaders().getSingleOrEmpty("Authorization");
+    auto user = msg->getHeaders().getSingleOrEmpty("User");
+    if (auth_header.empty() || user.empty()) {
       LOG(ERROR) << "Missing Authorization header";
       proxygen::ResponseBuilder(downstream_)
           .status(401, "Unauthorized")
@@ -34,7 +32,7 @@ class FileGetHandler : public proxygen::RequestHandler {
 
     // Validate token
     std::string token = auth_header;
-    if (!impl::UserManager::Instance()->ValidateToken(token)) {
+    if (!impl::UserManager::Instance()->UserValidateSession(user, token)) {
       LOG(ERROR) << "Invalid authorization token";
       proxygen::ResponseBuilder(downstream_)
           .status(403, "Forbidden")
@@ -44,9 +42,8 @@ class FileGetHandler : public proxygen::RequestHandler {
     }
 
     // Parse request parameters
-    auto params = util::ParseQueryString(headers->getQueryString());
-    
-    // Required parameters
+    auto full_url = Util::GetFullUrl(msg.get());
+    auto params = Util::ParseQueryString(full_url);
     if (!params.count("repo_uuid") || !params.count("file_hash")) {
       LOG(ERROR) << "Missing required parameters";
       proxygen::ResponseBuilder(downstream_)
@@ -60,33 +57,25 @@ class FileGetHandler : public proxygen::RequestHandler {
     file_req.set_repo_uuid(params["repo_uuid"]);
     file_req.set_file_hash(params["file_hash"]);
 
-    // Read file using repo manager
-    auto ret = impl::RepoManager::Instance()->ReadFile(file_req);
-    if (ret != Err_Success) {
-      LOG(ERROR) << "Failed to read file: " << ret;
+    // Set response headers
+
+    std::string content;
+    if (impl::RepoManager::Instance()->ReadFile(file_req, &content) ==
+        Err_Success) {
+      proxygen::ResponseBuilder(downstream_)
+          .status(200, "OK")
+          .header("Content-Type", "image/jpeg")
+          .header("Content-Disposition",
+                  "attachment; filename=\"" + file_req.file_hash() + ".jpeg\"")
+          .send();
+    } else {
+      LOG(ERROR) << "Failed to read file: " << file_req.file_hash()
+                 << ", repo: " << file_req.repo_uuid();
       proxygen::ResponseBuilder(downstream_)
           .status(404, "Not Found")
           .body("File not found or error reading file")
           .sendWithEOM();
-      return;
     }
-
-    // Set response headers
-    proxygen::ResponseBuilder(downstream_)
-        .status(200, "OK")
-        .header("Content-Type", "application/octet-stream")
-        .header("Content-Disposition", 
-                "attachment; filename=\"" + file_req.file_hash() + "\"")
-        .send();
-
-    // Send file content in chunks
-    // Note: Implement chunked transfer if needed for large files
-    std::string content;
-    if (util::Util::LoadSmallFile(file_req.file_hash(), &content)) {
-      downstream_->sendBody(std::move(content));
-    }
-
-    downstream_->sendEOM();
   }
 
   void onBody(std::unique_ptr<folly::IOBuf> /*body*/) noexcept override {}
@@ -94,9 +83,12 @@ class FileGetHandler : public proxygen::RequestHandler {
   void onUpgrade(proxygen::UpgradeProtocol /*protocol*/) noexcept override {}
 
   void requestComplete() noexcept override { delete this; }
-  void onError(proxygen::ProxygenError /*err*/) noexcept override { delete this; }
+  void onError(proxygen::ProxygenError /*err*/) noexcept override {
+    delete this;
+  }
 };
 
+}  // namespace http_handler
 }  // namespace server
 }  // namespace oceandoc
 

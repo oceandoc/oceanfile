@@ -14,8 +14,8 @@ namespace http_handler {
 
 class ServerHandler : public proxygen::RequestHandler {
  public:
-  void onRequest(
-      std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override {}
+  void onRequest(std::unique_ptr<proxygen::HTTPMessage> msg) noexcept override {
+  }
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override {}
   void onEOM() noexcept override {}
   void onUpgrade(proxygen::UpgradeProtocol protocol) noexcept override {}

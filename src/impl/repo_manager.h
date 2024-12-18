@@ -531,7 +531,7 @@ class RepoManager {
     return Err_File_not_exists;
   }
 
-  int32_t ReadFile(const proto::FileReq& req) {
+  int32_t ReadFile(const proto::FileReq& req, std::string* content) {
     if (req.repo_uuid().empty()) {
       LOG(ERROR) << "Repo uuid empty";
       return Err_Repo_uuid_error;

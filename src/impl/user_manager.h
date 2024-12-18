@@ -171,6 +171,26 @@ class UserManager final {
     return Err_Success;
   }
 
+  int32_t UserValidateSession(const std::string& user,
+                              const std::string& token) {
+    if (user.empty() || token.empty()) {
+      LOG(ERROR) << "user name or token empty";
+      return Err_User_session_error;
+    }
+
+    std::string session_user;
+    if (!impl::SessionManager::Instance()->ValidateSession(token,
+                                                           &session_user)) {
+      LOG(ERROR) << "token invalid";
+      return Err_User_session_error;
+    }
+    if (session_user.empty() || session_user != user) {
+      LOG(ERROR) << "user mismatch";
+      return Err_User_session_error;
+    }
+    return Err_Success;
+  }
+
   int32_t UserLogout(const std::string& token) {
     SessionManager::Instance()->KickoutByToken(token);
     return Err_Success;

@@ -3,8 +3,8 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_FILE_HANDLER_H
-#define BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_FILE_HANDLER_H
+#ifndef BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_FILE_PUT_HANDLER_H
+#define BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_FILE_PUT_HANDLER_H
 
 #include "folly/io/IOBuf.h"
 #include "proxygen/httpserver/RequestHandler.h"
@@ -18,15 +18,14 @@ namespace server {
 namespace http_handler {
 
 // https://tonybai.com/2021/01/16/upload-and-download-file-using-multipart-form-over-http/
-class FileHandler : public proxygen::RequestHandler {
+class FilePutHandler : public proxygen::RequestHandler {
  public:
-  FileHandler() { body_.reserve(common::NET_BUFFER_SIZE_BYTES + 100); }
+  FilePutHandler() { body_.reserve(common::NET_BUFFER_SIZE_BYTES + 100); }
 
   void onUpgrade(proxygen::UpgradeProtocol) noexcept override {}
-  void onRequest(
-      std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override {
+  void onRequest(std::unique_ptr<proxygen::HTTPMessage> msg) noexcept override {
     const std::string& contentType =
-        headers->getHeaders().getSingleOrEmpty("Content-Type");
+        msg->getHeaders().getSingleOrEmpty("Content-Type");
     boundary_ = contentType.substr(30);
   }
 
@@ -74,4 +73,4 @@ class FileHandler : public proxygen::RequestHandler {
 }  // namespace server
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_FILE_HANDLER_H
+#endif  // BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_FILE_PUT_HANDLER_H

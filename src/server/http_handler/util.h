@@ -7,6 +7,8 @@
 #define BAZEL_TEMPLATE_SERVER_HTTP_HANDLER_UTIL_H
 
 #include "MultipartReader.h"
+#include "boost/url/parse.hpp"
+#include "proxygen/httpserver/RequestHandler.h"
 #include "proxygen/httpserver/ResponseBuilder.h"
 #include "src/proto/service.pb.h"
 #include "src/util/util.h"
@@ -164,6 +166,45 @@ class Util {
     }
 
     return !reader.hasError();
+  }
+
+  static std::map<std::string, std::string> ParseQueryString(
+      const std::string& url) {
+    std::map<std::string, std::string> query_map;
+
+    try {
+      auto params = boost::urls::parse_uri(url).value();
+      for (const auto& param : params.params()) {
+        query_map[param.key] = param.value;
+      }
+    } catch (const std::exception& ex) {
+      std::cerr << "Error: " << ex.what() << std::endl;
+    }
+
+    return query_map;
+  }
+
+  static std::string GetFullUrl(const proxygen::HTTPMessage* msg) {
+    std::string scheme =
+        msg->getHeaders().getSingleOrEmpty("X-Forwarded-Proto");
+    if (scheme.empty()) {
+      scheme = "http";  // Default to http if the scheme is not provided
+    }
+
+    // Retrieve the host (e.g., example.com)
+    std::string host =
+        msg->getHeaders().getSingleOrEmpty(proxygen::HTTP_HEADER_HOST);
+
+    // Retrieve the path (e.g., /some/path)
+    std::string path = msg->getPath();
+
+    std::string query_str = msg->getQueryString();
+    std::string full_url = scheme + "://" + host + path;
+
+    if (!query_str.empty()) {
+      full_url += "?" + query_str;
+    }
+    return full_url;
   }
 };
 
