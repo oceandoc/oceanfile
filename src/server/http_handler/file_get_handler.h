@@ -19,10 +19,10 @@ namespace http_handler {
 class FileGetHandler : public proxygen::RequestHandler {
  public:
   void onRequest(std::unique_ptr<proxygen::HTTPMessage> msg) noexcept override {
-    auto auth_header = msg->getHeaders().getSingleOrEmpty("Authorization");
-    auto user = msg->getHeaders().getSingleOrEmpty("User");
-    if (auth_header.empty() || user.empty()) {
-      LOG(ERROR) << "Missing Authorization header";
+    auto full_url = Util::GetFullUrl(msg.get());
+    auto params = Util::ParseQueryString(full_url);
+
+    if (!params.count("user") || !params.count("token")) {
       proxygen::ResponseBuilder(downstream_)
           .status(401, "Unauthorized")
           .body("Authorization required")
@@ -30,10 +30,11 @@ class FileGetHandler : public proxygen::RequestHandler {
       return;
     }
 
-    // Validate token
-    std::string token = auth_header;
-    if (!impl::UserManager::Instance()->UserValidateSession(user, token)) {
+    const std::string& user = params["user"];
+    const std::string& token = params["token"];
+    if (impl::UserManager::Instance()->UserValidateSession(user, token)) {
       LOG(ERROR) << "Invalid authorization token";
+      LOG(INFO) << impl::UserManager::Instance()->UserQueryToken(user);
       proxygen::ResponseBuilder(downstream_)
           .status(403, "Forbidden")
           .body("Invalid authorization")
@@ -41,9 +42,6 @@ class FileGetHandler : public proxygen::RequestHandler {
       return;
     }
 
-    // Parse request parameters
-    auto full_url = Util::GetFullUrl(msg.get());
-    auto params = Util::ParseQueryString(full_url);
     if (!params.count("repo_uuid") || !params.count("file_hash")) {
       LOG(ERROR) << "Missing required parameters";
       proxygen::ResponseBuilder(downstream_)
@@ -60,13 +58,13 @@ class FileGetHandler : public proxygen::RequestHandler {
     // Set response headers
 
     std::string content;
-    if (impl::RepoManager::Instance()->ReadFile(file_req, &content) ==
-        Err_Success) {
+    if (!impl::RepoManager::Instance()->ReadFile(file_req, &content)) {
       proxygen::ResponseBuilder(downstream_)
           .status(200, "OK")
           .header("Content-Type", "image/jpeg")
           .header("Content-Disposition",
                   "attachment; filename=\"" + file_req.file_hash() + ".jpeg\"")
+          .body(content)
           .send();
     } else {
       LOG(ERROR) << "Failed to read file: " << file_req.file_hash()

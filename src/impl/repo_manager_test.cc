@@ -14,7 +14,8 @@ namespace impl {
 
 TEST(RepoManager, ListRepoMediaFiles) {
   std::string home_dir = "/usr/local/fstation";
-  util::ConfigManager::Instance()->Init(home_dir);
+  util::ConfigManager::Instance()->Init(
+      home_dir, home_dir + "/conf/server_base_config.json");
   RepoManager::Instance()->Init(home_dir);
   oceandoc::util::SqliteManager::Instance()->Init(home_dir);
   proto::RepoReq req;

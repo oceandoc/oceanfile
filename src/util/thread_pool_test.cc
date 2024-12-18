@@ -16,7 +16,10 @@ std::mutex mu;
 std::condition_variable cond_var;
 
 TEST(ThreadPool, Lambda) {
-  ConfigManager::Instance()->Init("./conf/base_config.json");
+  std::string home_dir = oceandoc::util::Util::HomeDir();
+  LOG(INFO) << "Home dir: " << home_dir;
+  oceandoc::util::ConfigManager::Instance()->Init(
+      home_dir, home_dir + "/conf/server_base_config.json");
   ThreadPool::Instance()->Init();
 
   auto callable = std::bind([](int a) -> int { return a + 5; }, 6);
@@ -46,7 +49,10 @@ int TestFunc(const bool* stop) {
 }
 
 TEST(ThreadPool, Ref) {
-  ConfigManager::Instance()->Init("./conf/base_config.json");
+  std::string home_dir = oceandoc::util::Util::HomeDir();
+  LOG(INFO) << "Home dir: " << home_dir;
+  oceandoc::util::ConfigManager::Instance()->Init(
+      home_dir, home_dir + "/conf/server_base_config.json");
   ThreadPool::Instance()->Init();
   bool stop = false;
   auto callable = std::bind(&TestFunc, &stop);

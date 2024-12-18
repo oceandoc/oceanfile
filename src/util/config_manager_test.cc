@@ -5,7 +5,6 @@
 
 #include "src/util/config_manager.h"
 
-#include "folly/init/Init.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 
@@ -13,7 +12,10 @@ namespace oceandoc {
 namespace util {
 
 TEST(ConfigManager, Init) {
-  EXPECT_TRUE(ConfigManager::Instance()->Init("./conf/base_config.json"));
+  std::string home_dir = oceandoc::util::Util::HomeDir();
+  LOG(INFO) << "Home dir: " << home_dir;
+  EXPECT_TRUE(ConfigManager::Instance()->Init(
+      home_dir, home_dir + "/conf/server_base_config.json"));
   LOG(INFO) << ConfigManager::Instance()->ToString();
 }
 

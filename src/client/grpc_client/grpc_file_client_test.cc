@@ -3,8 +3,6 @@
  * All rights reserved.
  *******************************************************************************/
 
-
-
 #include "src/client/grpc_client/grpc_file_client.h"
 
 #include "glog/logging.h"
@@ -20,8 +18,8 @@ namespace client {
 TEST(FileClient, Send) {
   std::string home_dir = util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
-  util::ConfigManager::Instance()->Init(home_dir +
-                                        "/conf/client_base_config.json");
+  util::ConfigManager::Instance()->Init(
+      home_dir, home_dir + "/conf/client_base_config.json");
   util::ThreadPool::Instance()->Init();
   auto addr = util::ConfigManager::Instance()->ServerAddr();
   auto port = std::to_string(util::ConfigManager::Instance()->GrpcServerPort());

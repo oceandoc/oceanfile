@@ -18,7 +18,10 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  oceandoc::util::ConfigManager::Instance()->Init("./conf/base_config.json");
+  std::string home_dir = oceandoc::util::Util::HomeDir();
+  LOG(INFO) << "Home dir: " << home_dir;
+  oceandoc::util::ConfigManager::Instance()->Init(
+      home_dir, home_dir + "/conf/server_base_config.json");
   oceandoc::util::ThreadPool::Instance()->Init();
 
   std::string path = argv[1];

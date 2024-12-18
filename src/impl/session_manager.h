@@ -104,6 +104,15 @@ class SessionManager final {
     return true;
   }
 
+  std::string QueryUserToken(const std::string& user) {
+    absl::base_internal::SpinLockHolder locker(&lock_);
+    auto user_it = user_sessions_.find(user);
+    if (user_it == user_sessions_.end()) {
+      return "";
+    }
+    return user_it->second.token;
+  }
+
   void KickoutByUser(const std::string& user) {
     absl::base_internal::SpinLockHolder locker(&lock_);
     auto user_it = user_sessions_.find(user);

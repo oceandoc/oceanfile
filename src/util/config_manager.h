@@ -25,8 +25,7 @@ class ConfigManager {
  public:
   static std::shared_ptr<ConfigManager> Instance();
 
-  bool Init(const std::string& home_dir) {
-    std::string base_config_path = home_dir + "/conf/server_base_config.json";
+  bool Init(const std::string& home_dir, const std::string& base_config_path) {
     std::string content;
     if (!Util::LoadSmallFile(base_config_path, &content)) {
       LOG(ERROR) << "load config error, path: " << base_config_path

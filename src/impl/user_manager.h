@@ -191,6 +191,15 @@ class UserManager final {
     return Err_Success;
   }
 
+  std::string UserQueryToken(const std::string& user) {
+    if (user.empty()) {
+      LOG(ERROR) << "user name empty";
+      return "";
+    }
+
+    return impl::SessionManager::Instance()->QueryUserToken(user);
+  }
+
   int32_t UserLogout(const std::string& token) {
     SessionManager::Instance()->KickoutByToken(token);
     return Err_Success;

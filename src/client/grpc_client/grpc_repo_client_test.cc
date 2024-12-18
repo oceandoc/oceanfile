@@ -17,8 +17,8 @@ namespace client {
 TEST(RepoClient, ListUserRepo) {
   std::string home_dir = util::Util::HomeDir();
   LOG(INFO) << "Home dir: " << home_dir;
-  util::ConfigManager::Instance()->Init(home_dir +
-                                        "/conf/client_base_config.json");
+  util::ConfigManager::Instance()->Init(
+      home_dir, home_dir + "/conf/client_base_config.json");
   auto addr = util::ConfigManager::Instance()->ServerAddr();
   auto port = std::to_string(util::ConfigManager::Instance()->GrpcServerPort());
   std::string user = "dev";

@@ -20,8 +20,10 @@ int main(int argc, char** argv) {
     return -1;
   }
 
+  std::string home_dir = oceandoc::util::Util::HomeDir();
+  LOG(INFO) << "Home dir: " << home_dir;
   oceandoc::util::ConfigManager::Instance()->Init(
-      "./conf/server_base_config.json");
+      home_dir, home_dir + "/conf/server_base_config.json");
   oceandoc::impl::UserManager::Instance()->Init();
 
   std::string user = argv[1];
