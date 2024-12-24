@@ -504,7 +504,7 @@ int32_t Util::CreateFileWithSize(const string &path, const int64_t size) {
 
   if (ftruncate(fd, size) == -1) {
     close(fd);
-    return Err_File_size_set_error;
+    return Err_Fail;
   }
   close(fd);
 #endif

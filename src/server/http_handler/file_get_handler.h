@@ -65,7 +65,47 @@ class FileGetHandler : public proxygen::RequestHandler {
           .header("Content-Disposition",
                   "attachment; filename=\"" + file_req.file_hash() + ".jpeg\"")
           .body(content)
-          .send();
+          .sendWithEOM();
+
+      // Set the response headers
+      // std::ifstream file(filePath, std::ios::binary);
+      // if (!file.is_open()) {
+      //// Handle file not found or access error
+      // ResponseBuilder(downstream_)
+      //.status(404, "Not Found")
+      //.body("File not found")
+      //.sendWithEOM();
+      // return;
+      //}
+      // ResponseBuilder(downstream_)
+      //.status(200, "OK")
+      //.header(
+      //"Content-Type",
+      //"application/octet-stream")  // Generic MIME type for binary files
+      //.header("Transfer-Encoding",
+      //"chunked")  // Optional: Use chunked transfer encoding
+      //.send();
+
+      //// Define the chunk size (e.g., 64 KB)
+      // constexpr std::streamsize chunkSize = 64 * 1024;  // 64 KB
+      // char buffer[chunkSize];
+
+      //// Read and send the file in chunks
+      // while (file) {
+      // file.read(buffer, chunkSize);  // Read a chunk of the file
+      // std::streamsize bytesRead =
+      // file.gcount();  // Get the number of bytes read
+      // if (bytesRead > 0) {
+      //// Send the chunk to the client
+      // downstream_->sendBody(folly::IOBuf::copyBuffer(buffer, bytesRead));
+      //}
+      //}
+
+      // file.close();
+
+      // Signal the end of the response
+      downstream_->sendEOM();
+
     } else {
       LOG(ERROR) << "Failed to read file: " << file_req.file_hash()
                  << ", repo: " << file_req.repo_uuid();
