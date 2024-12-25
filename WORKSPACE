@@ -236,6 +236,13 @@ new_git_repository(
     remote = "git@github.com:curl/curl.git",
 )
 
+new_git_repository(
+    name = "imagemagick",
+    build_file = "//bazel:imagemagick.BUILD",
+    commit = "b77eb776838b6039834948bb63f8106a7980554b",
+    remote = "git@github.com:ImageMagick/ImageMagick.git",
+)
+
 git_repository(
     name = "com_github_google_benchmark",
     remote = "git@github.com:google/benchmark.git",
