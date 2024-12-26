@@ -62,7 +62,7 @@ class RepoHandler {
         ret = impl::RepoManager::Instance()->ListRepoMediaFiles(req, res);
         break;
       default:
-        ret = Err_Unsupported_op;
+        ret = Err_Fail;
         LOG(ERROR) << "Unsupported operation";
     }
     if (ret) {

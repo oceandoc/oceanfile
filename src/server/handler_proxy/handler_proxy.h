@@ -76,7 +76,7 @@ class HandlerProxy {
             req.user(), req.token(), res->mutable_token());
         break;
       default:
-        ret = Err_Unsupported_op;
+        ret = Err_Fail;
         LOG(ERROR) << "Unsupported operation";
     }
 
@@ -98,7 +98,7 @@ class HandlerProxy {
         ret = impl::ServerManager::Instance()->HandShake(req, res);
         break;
       default:
-        ret = Err_Unsupported_op;
+        ret = Err_Fail;
         LOG(ERROR) << "Unsupported operation";
     }
     if (ret) {

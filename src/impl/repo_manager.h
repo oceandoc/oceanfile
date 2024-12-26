@@ -126,7 +126,7 @@ class RepoManager {
     proto::RepoMeta repo_meta;
     if (!RepoMetaByUUID(repo_uuid, &repo_meta)) {
       LOG(ERROR) << "Cannot find repo meta: " << repo_uuid;
-      return Err_Repo_meta_not_exists;
+      return Err_Fail;
     }
 
     std::string repo_data_file_path = "./data/" + repo_uuid + ".data";
@@ -228,7 +228,7 @@ class RepoManager {
     if (util::Util::Mkdir(path)) {
       return Err_Success;
     }
-    return Err_File_mkdir_error;
+    return Err_Fail;
   }
 
   bool ExistsRepo(const std::string& path, std::string* uuid = nullptr) {
@@ -298,10 +298,10 @@ class RepoManager {
     proto::RepoMeta repo;
     if (ExistsRepo(req.path(), repo.mutable_repo_uuid())) {
       if (RestoreRepo(req.path(), &repo) == Err_Success) {
-        *res->mutable_repo() = repo;
+        res->mutable_repos()->insert({repo.repo_uuid(), repo});
         return Err_Success;
       }
-      return Err_Repo_restore_repo_error;
+      return Err_Fail;
     }
 
     repo.set_repo_uuid(util::Util::UUID());
@@ -319,7 +319,7 @@ class RepoManager {
     std::string content;
     if (!util::Util::MessageToJson(repo, &content)) {
       LOG(ERROR) << "Convert to json error";
-      return Err_Repo_create_repo_error;
+      return Err_Fail;
     }
     auto ret = util::Util::WriteToFile(repo_config_file_path, content, false);
     if (ret) {
@@ -336,10 +336,10 @@ class RepoManager {
         absl::base_internal::SpinLockHolder locker(&lock_);
         repos_.mutable_repos()->erase(repo.repo_uuid());
       }
-      return Err_Repo_flush_repo_config_error;
+      return Err_Fail;
     }
 
-    *res->mutable_repo() = repo;
+    res->mutable_repos()->insert({repo.repo_uuid(), repo});
     return Err_Success;
   }
 
@@ -358,7 +358,7 @@ class RepoManager {
       LOG(INFO) << "Repo deleted: " << req.repo_uuid();
       return Err_Success;
     }
-    return Err_Repo_flush_repo_config_error;
+    return Err_Fail;
   }
 
   bool RepoMetaByUUID(const std::string& uuid, proto::RepoMeta* repo_meta) {
@@ -376,12 +376,12 @@ class RepoManager {
     if (util::Util::LoadSmallFile(path, &content)) {
       if (!util::Util::LZMADecompress(content, &decompressed_content)) {
         LOG(ERROR) << "Decomppress error: " << path;
-        return Err_Decompress_error;
+        return Err_Fail;
       }
 
       if (!repo_data->ParseFromString(decompressed_content)) {
         LOG(ERROR) << "Parse error: " << path;
-        return Err_Deserialize_error;
+        return Err_Fail;
       }
       return Err_Success;
     }
@@ -417,7 +417,7 @@ class RepoManager {
 
   int32_t ListRepoDir(const proto::RepoReq& req, proto::RepoRes* res) {
     if (req.repo_uuid().empty()) {
-      return Err_Repo_uuid_error;
+      return Err_Fail;
     }
 
     auto ret = GetRepoDir(req, res);
@@ -439,62 +439,67 @@ class RepoManager {
 
   int32_t ListRepoMediaFiles(const proto::RepoReq& /*req*/,
                              proto::RepoRes* res) {
-    sqlite3_stmt* stmt = nullptr;
     // std::string query =
     //"SELECT hash, local_id, device_id, create_time, update_time, "
     //"duration, type, width, height, file_name, favorite, owner, "
     //"live_photo_video_hash, deleted, thumb_hash "
     //"FROM files WHERE type IN (1, 2) AND deleted = 0 "
     //"ORDER BY create_time DESC;";
-    std::string query =
+    std::string sql =
         "SELECT hash, local_id, device_id, create_time, update_time, "
         "duration, type, width, height, file_name, favorite, owner, "
         "live_photo_video_hash, deleted, thumb_hash "
         "FROM files;";
 
-    auto ret = util::SqliteManager::Instance()->PrepareStatement(query, &stmt);
-    if (ret != Err_Success) {
+    sqlite3_stmt** stmt = nullptr;
+    int affect_rows = 0;
+    std::string err_msg;
+    std::function<void(sqlite3_stmt * stmt)> bind_callback =
+        [](sqlite3_stmt* /*stmt*/) {};
+    auto ret = util::SqliteManager::Instance()->Execute(
+        sql, &affect_rows, &err_msg, stmt, bind_callback);
+    if (ret) {
       return Err_Fail;
     }
 
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-      auto* file_info = res->add_file_infos();
+    while (sqlite3_step(*stmt) == SQLITE_ROW) {
+      auto* file_metas = res->add_file_metas();
 
       // Get values from result row
-      const char* hash = (const char*)sqlite3_column_text(stmt, 0);
-      const char* local_id = (const char*)sqlite3_column_text(stmt, 1);
-      const char* device_id = (const char*)sqlite3_column_text(stmt, 2);
-      int64_t create_time = sqlite3_column_int64(stmt, 3);
-      int64_t update_time = sqlite3_column_int64(stmt, 4);
-      int64_t duration = sqlite3_column_int64(stmt, 5);
-      int32_t type = sqlite3_column_int(stmt, 6);
-      int32_t width = sqlite3_column_int(stmt, 7);
-      int32_t height = sqlite3_column_int(stmt, 8);
-      const char* file_name = (const char*)sqlite3_column_text(stmt, 9);
-      int32_t favorite = sqlite3_column_int(stmt, 10);
-      const char* owner = (const char*)sqlite3_column_text(stmt, 11);
-      const char* live_photo_hash = (const char*)sqlite3_column_text(stmt, 12);
-      const char* thumb_hash = (const char*)sqlite3_column_text(stmt, 14);
+      const char* hash = (const char*)sqlite3_column_text(*stmt, 0);
+      const char* local_id = (const char*)sqlite3_column_text(*stmt, 1);
+      const char* device_id = (const char*)sqlite3_column_text(*stmt, 2);
+      int64_t create_time = sqlite3_column_int64(*stmt, 3);
+      int64_t update_time = sqlite3_column_int64(*stmt, 4);
+      int64_t duration = sqlite3_column_int64(*stmt, 5);
+      int32_t type = sqlite3_column_int(*stmt, 6);
+      int32_t width = sqlite3_column_int(*stmt, 7);
+      int32_t height = sqlite3_column_int(*stmt, 8);
+      const char* file_name = (const char*)sqlite3_column_text(*stmt, 9);
+      int32_t favorite = sqlite3_column_int(*stmt, 10);
+      const char* owner = (const char*)sqlite3_column_text(*stmt, 11);
+      const char* live_photo_hash = (const char*)sqlite3_column_text(*stmt, 12);
+      const char* thumb_hash = (const char*)sqlite3_column_text(*stmt, 14);
 
       // Set values in protobuf message
-      if (hash) file_info->set_hash(hash);
-      if (local_id) file_info->set_local_id(local_id);
-      if (device_id) file_info->set_device_id(device_id);
-      file_info->set_create_time(create_time);
-      file_info->set_update_time(update_time);
-      file_info->set_duration(duration);
-      file_info->set_type(type);
-      file_info->set_width(width);
-      file_info->set_height(height);
-      if (file_name) file_info->set_file_name(file_name);
-      file_info->set_favorite(favorite);
-      if (owner) file_info->set_owner(owner);
+      if (hash) file_metas->set_file_hash(hash);
+      if (local_id) file_metas->set_local_id(local_id);
+      if (device_id) file_metas->set_device_id(device_id);
+      file_metas->set_local_create_time(create_time);
+      file_metas->set_local_update_time(update_time);
+      file_metas->set_duration(duration);
+      file_metas->set_file_sub_type(proto::FileSubType(type));
+      file_metas->set_width(width);
+      file_metas->set_height(height);
+      if (file_name) file_metas->set_file_name(file_name);
+      file_metas->set_favorite(favorite);
+      if (owner) file_metas->set_owner(owner);
       if (live_photo_hash)
-        file_info->set_live_photo_video_hash(live_photo_hash);
-      if (thumb_hash) file_info->set_thumb_hash(thumb_hash);
+        file_metas->set_live_photo_video_hash(live_photo_hash);
+      if (thumb_hash) file_metas->set_thumb_hash(thumb_hash);
     }
 
-    sqlite3_finalize(stmt);
+    sqlite3_finalize(*stmt);
     return Err_Success;
   }
 
@@ -534,7 +539,7 @@ class RepoManager {
   int32_t ReadFile(const proto::FileReq& req, std::string* content) {
     if (req.repo_uuid().empty()) {
       LOG(ERROR) << "Repo uuid empty";
-      return Err_Repo_uuid_error;
+      return Err_Fail;
     }
     proto::RepoMeta repo_meta;
     if (!RepoMetaByUUID(req.repo_uuid(), &repo_meta)) {
@@ -546,7 +551,7 @@ class RepoManager {
         util::Util::RepoFilePath(repo_path, req.file_hash());
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
-      return Err_Repo_uuid_error;
+      return Err_Fail;
     }
     LOG(INFO) << "Now get file: " << repo_file_path;
     if (util::Util::LoadSmallFile(repo_file_path, content)) {
@@ -559,7 +564,7 @@ class RepoManager {
   int32_t WriteToFile(const proto::FileReq& req) {
     if (req.repo_uuid().empty()) {
       LOG(ERROR) << "Repo uuid empty";
-      return Err_Repo_uuid_error;
+      return Err_Fail;
     }
     proto::RepoMeta repo_meta;
     if (!RepoMetaByUUID(req.repo_uuid(), &repo_meta)) {
@@ -571,7 +576,7 @@ class RepoManager {
         util::Util::RepoFilePath(repo_path, req.file_hash());
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
-      return Err_Repo_uuid_error;
+      return Err_Fail;
     }
 
     util::Util::MkParentDir(repo_file_path);
@@ -590,7 +595,7 @@ class RepoManager {
       LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
                  << ", start: " << start << ", end: " << end
                  << ", content size: " << req.content().size();
-      return Err_File_partition_size_error;
+      return Err_Fail;
     }
 
     static thread_local std::shared_mutex mu;
@@ -618,7 +623,7 @@ class RepoManager {
     proto::RepoMeta repo_meta;
     if (!RepoMetaByUUID(receive_ctx.repo_uuid, &repo_meta)) {
       LOG(ERROR) << "Cannot find repo meta: " << receive_ctx.repo_uuid;
-      return Err_Repo_meta_not_exists;
+      return Err_Fail;
     }
 
     absl::base_internal::SpinLockHolder locker(&lock_);

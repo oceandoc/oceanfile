@@ -177,7 +177,8 @@ class SqliteManager final {
 
     bind_callback(*stmt);
 
-    if (sqlite3_step(*stmt) != SQLITE_DONE) {
+    if (sqlite3_step(*stmt) != SQLITE_DONE ||
+        sqlite3_step(*stmt) != SQLITE_ROW) {
       err_msg->append(sqlite3_errmsg(db));
       sqlite3_finalize(*stmt);
       sqlite3_close(db);

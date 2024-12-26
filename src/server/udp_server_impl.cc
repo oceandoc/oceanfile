@@ -18,7 +18,7 @@ void UdpServer::HandleMessage(std::size_t length) {
             << ": " << json_str;
   proto::ServerReq server_req;
   proto::ServerRes server_res;
-  server_res.set_err_code(proto::ErrCode::Deserialize_error);
+  server_res.set_err_code(proto::ErrCode::Fail);
   if (!util::Util::JsonToMessage(json_str, &server_req)) {
     SendResponse(server_res);
   }

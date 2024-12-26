@@ -16,7 +16,7 @@
 
 #include "src/impl/file_process_manager.h"
 #include "src/impl/repo_manager.h"
-#include "src/impl/scan_manager.h"
+// #include "src/impl/scan_manager.h"
 #include "src/server/grpc_server_impl.h"
 #include "src/server/http_server_impl.h"
 #include "src/server/server_context.h"
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   oceandoc::util::ConfigManager::Instance()->Init(
       home_dir, home_dir + "/conf/server_base_config.json");
   oceandoc::util::ThreadPool::Instance()->Init();
-  oceandoc::impl::ScanManager::Instance()->Init();
+  // oceandoc::impl::ScanManager::Instance()->Init();
   oceandoc::impl::RepoManager::Instance()->Init(home_dir);
   oceandoc::impl::FileProcessManager::Instance()->Init();
   oceandoc::util::SqliteManager::Instance()->Init(home_dir);

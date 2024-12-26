@@ -36,7 +36,7 @@ cc_library(
     local_defines = LOCAL_DEFINES,
     deps = [
         ":file_process_manager",
-        ":scan_manager",
+        #":scan_manager",
         "//src/proto:cc_config",
         "//src/proto:cc_data",
         "//src/util",
@@ -53,40 +53,40 @@ cc_test(
     deps = [":repo_manager"],
 )
 
-cc_library(
-    name = "scan_manager",
-    srcs = ["scan_manager.cc"],
-    hdrs = ["scan_manager.h"],
-    copts = COPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        "//src/common:blocking_queue",
-        "//src/common:defs",
-        "//src/proto:cc_data",
-        "//src/util",
-        "//src/util:thread_pool",
-        "@folly",
-    ],
-)
+#cc_library(
+#name = "scan_manager",
+#srcs = ["scan_manager.cc"],
+#hdrs = ["scan_manager.h"],
+#copts = COPTS,
+#local_defines = LOCAL_DEFINES,
+#deps = [
+#"//src/common:blocking_queue",
+#"//src/common:defs",
+#"//src/proto:cc_data",
+#"//src/util",
+#"//src/util:thread_pool",
+#"@folly",
+#],
+#)
 
-cc_library(
-    name = "sync_manager",
-    srcs = ["sync_manager.cc"],
-    hdrs = ["sync_manager.h"],
-    copts = COPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        ":scan_manager",
-        "//src/client/grpc_client:grpc_clients",
-        "//src/common:defs",
-        "//src/proto:cc_data",
-        "//src/proto:cc_grpc_service",
-        "//src/util",
-        "//src/util:thread_pool",
-        "@com_github_grpc_grpc//:grpc++",
-        "@folly",
-    ],
-)
+#cc_library(
+#name = "sync_manager",
+#srcs = ["sync_manager.cc"],
+#hdrs = ["sync_manager.h"],
+#copts = COPTS,
+#local_defines = LOCAL_DEFINES,
+#deps = [
+#":scan_manager",
+#"//src/client/grpc_client:grpc_clients",
+#"//src/common:defs",
+#"//src/proto:cc_data",
+#"//src/proto:cc_grpc_service",
+#"//src/util",
+#"//src/util:thread_pool",
+#"@com_github_grpc_grpc//:grpc++",
+#"@folly",
+#],
+#)
 
 cc_library(
     name = "server_manager",
@@ -183,23 +183,23 @@ cc_library(
     ],
 )
 
-cc_test(
-    name = "sync_manager_test",
-    srcs = ["sync_manager_test.cc"],
-    copts = COPTS,
-    data = ["//conf:client_base_config.json"],
-    local_defines = LOCAL_DEFINES,
-    deps = [":sync_manager"],
-)
+#cc_test(
+#name = "sync_manager_test",
+#srcs = ["sync_manager_test.cc"],
+#copts = COPTS,
+#data = ["//conf:client_base_config.json"],
+#local_defines = LOCAL_DEFINES,
+#deps = [":sync_manager"],
+#)
 
-cc_test(
-    name = "scan_manager_test",
-    srcs = ["scan_manager_test.cc"],
-    copts = COPTS,
-    data = ["//conf:client_base_config.json"],
-    local_defines = LOCAL_DEFINES,
-    deps = [":scan_manager"],
-)
+#cc_test(
+#name = "scan_manager_test",
+#srcs = ["scan_manager_test.cc"],
+#copts = COPTS,
+#data = ["//conf:client_base_config.json"],
+#local_defines = LOCAL_DEFINES,
+#deps = [":scan_manager"],
+#)
 
 cc_test(
     name = "user_manager_test",

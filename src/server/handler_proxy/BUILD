@@ -70,7 +70,7 @@ cc_library(
         "//src/impl:repo_manager",
         "//src/impl:server_manager",
         "//src/impl:session_manager",
-        "//src/impl:sync_manager",
+        #"//src/impl:sync_manager",
         "//src/impl:user_manager",
         "//src/proto:cc_grpc_service",
         "//src/util",

@@ -55,41 +55,41 @@ LINKOPTS = GLOBAL_LINKOPTS + select({
     "//conditions:default": [],
 })
 
-cc_binary(
-    name = "scan_status_prettier",
-    srcs = ["scan_status_prettier.cc"],
-    copts = COPTS,
-    linkopts = LINKOPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        "//src/impl:scan_manager",
-        "//src/util",
-    ],
-)
+#cc_binary(
+#name = "scan_status_prettier",
+#srcs = ["scan_status_prettier.cc"],
+#copts = COPTS,
+#linkopts = LINKOPTS,
+#local_defines = LOCAL_DEFINES,
+#deps = [
+#"//src/impl:scan_manager",
+#"//src/util",
+#],
+#)
 
-cc_binary(
-    name = "scan_status_validator",
-    srcs = ["scan_status_validator.cc"],
-    copts = COPTS,
-    linkopts = LINKOPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        "//src/impl:scan_manager",
-        "//src/util",
-    ],
-)
+#cc_binary(
+#name = "scan_status_validator",
+#srcs = ["scan_status_validator.cc"],
+#copts = COPTS,
+#linkopts = LINKOPTS,
+#local_defines = LOCAL_DEFINES,
+#deps = [
+#"//src/impl:scan_manager",
+#"//src/util",
+#],
+#)
 
-cc_binary(
-    name = "scan",
-    srcs = ["scan.cc"],
-    copts = COPTS,
-    linkopts = LINKOPTS,
-    local_defines = LOCAL_DEFINES,
-    deps = [
-        "//src/impl:scan_manager",
-        "//src/util",
-    ],
-)
+#cc_binary(
+#name = "scan",
+#srcs = ["scan.cc"],
+#copts = COPTS,
+#linkopts = LINKOPTS,
+#local_defines = LOCAL_DEFINES,
+#deps = [
+#"//src/impl:scan_manager",
+#"//src/util",
+#],
+#)
 
 cc_binary(
     name = "user_op",

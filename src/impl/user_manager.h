@@ -53,27 +53,26 @@ class UserManager final {
       return Err_Fail;
     }
 
-    sqlite3_stmt* stmt = nullptr;
-    auto ret = util::SqliteManager::Instance()->PrepareStatement(
-        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);",
-        &stmt);
+    sqlite3_stmt** stmt = nullptr;
+    int affect_rows = 0;
+    std::string err_msg;
+    std::string sql =
+        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);";
+    std::function<void(sqlite3_stmt * stmt)> bind_callback =
+        [&salt, &hashed_password, &user](sqlite3_stmt* stmt) {
+          sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
+          sqlite3_bind_text(stmt, 2, salt.c_str(), salt.size(), SQLITE_STATIC);
+          sqlite3_bind_text(stmt, 3, hashed_password.c_str(),
+                            hashed_password.size(), SQLITE_STATIC);
+        };
+    auto ret = util::SqliteManager::Instance()->Execute(
+        sql, &affect_rows, &err_msg, stmt, bind_callback);
     if (ret) {
       return Err_Fail;
     }
 
-    sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, salt.c_str(), salt.size(), SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, hashed_password.c_str(), hashed_password.size(),
-                      SQLITE_STATIC);
-
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-      sqlite3_finalize(stmt);
-      return Err_Fail;
-    }
-    sqlite3_finalize(stmt);
-
-    int changes = util::SqliteManager::Instance()->AffectRows();
-    if (changes > 0) {
+    sqlite3_finalize(*stmt);
+    if (affect_rows > 0) {
       *token = SessionManager::Instance()->GenerateToken(user);
       return Err_Success;
     } else {
@@ -96,21 +95,22 @@ class UserManager final {
     }
 
     if (login_user == "admin" || login_user == to_delete_user) {
-      sqlite3_stmt* stmt = nullptr;
-      auto ret = util::SqliteManager::Instance()->PrepareStatement(
-          "DELETE FROM users WHERE user = ?;", &stmt);
+      sqlite3_stmt** stmt = nullptr;
+      int affect_rows = 0;
+      std::string err_msg;
+      std::string sql = "DELETE FROM users WHERE user = ?;";
+      std::function<void(sqlite3_stmt * stmt)> bind_callback =
+          [&to_delete_user](sqlite3_stmt* stmt) {
+            sqlite3_bind_text(stmt, 1, to_delete_user.c_str(),
+                              to_delete_user.size(), SQLITE_STATIC);
+          };
+      auto ret = util::SqliteManager::Instance()->Execute(
+          sql, &affect_rows, &err_msg, stmt, bind_callback);
       if (ret) {
         return Err_Fail;
       }
-      sqlite3_bind_text(stmt, 1, to_delete_user.c_str(), to_delete_user.size(),
-                        SQLITE_STATIC);
-      if (sqlite3_step(stmt) != SQLITE_DONE) {
-        sqlite3_finalize(stmt);
-        return Err_Fail;
-      }
-      sqlite3_finalize(stmt);
-      int changes = util::SqliteManager::Instance()->AffectRows();
-      if (changes > 0) {
+      sqlite3_finalize(*stmt);
+      if (affect_rows > 0) {
         SessionManager::Instance()->KickoutByToken(token);
         return Err_Success;
       } else {
@@ -130,26 +130,31 @@ class UserManager final {
       return Err_User_passwd_error;
     }
 
-    sqlite3_stmt* stmt = nullptr;
-    util::SqliteManager::Instance()->PrepareStatement(
-        "SELECT salt, password FROM users WHERE user = ?;", &stmt);
-    if (!stmt) {
+    sqlite3_stmt** stmt = nullptr;
+    int affect_rows = 0;
+    std::string err_msg;
+    std::string sql = "SELECT salt, password FROM users WHERE user = ?;";
+    std::function<void(sqlite3_stmt * stmt)> bind_callback =
+        [&user](sqlite3_stmt* stmt) {
+          sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
+        };
+    auto ret = util::SqliteManager::Instance()->Execute(
+        sql, &affect_rows, &err_msg, stmt, bind_callback);
+    if (ret) {
       return Err_Fail;
     }
 
-    sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
-
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
+    if (sqlite3_step(*stmt) == SQLITE_ROW) {
       std::string salt;
       salt.reserve(util::Util::kSaltSize);
-      salt.append(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)),
+      salt.append(reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 0)),
                   util::Util::kSaltSize);
       std::string hashed_password;
       hashed_password.reserve(util::Util::kDerivedKeySize);
       hashed_password.append(
-          reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)),
+          reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 1)),
           util::Util::kDerivedKeySize);
-      sqlite3_finalize(stmt);
+      sqlite3_finalize(*stmt);
       if (util::Util::VerifyPassword(password, salt, hashed_password)) {
         return Err_Success;
       } else {
@@ -157,7 +162,6 @@ class UserManager final {
       }
     }
 
-    sqlite3_finalize(stmt);
     return Err_User_not_exists;
   }
 
@@ -210,26 +214,31 @@ class UserManager final {
       return Err_User_name_error;
     }
 
-    sqlite3_stmt* stmt = nullptr;
-    util::SqliteManager::Instance()->PrepareStatement(
-        "SELECT salt, password FROM users WHERE user = ?;", &stmt);
-    if (!stmt) {
+    sqlite3_stmt** stmt = nullptr;
+    int affect_rows = 0;
+    std::string err_msg;
+    std::string sql = "SELECT salt, password FROM users WHERE user = ?;";
+    std::function<void(sqlite3_stmt * stmt)> bind_callback =
+        [&user](sqlite3_stmt* stmt) {
+          sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
+        };
+    auto ret = util::SqliteManager::Instance()->Execute(
+        sql, &affect_rows, &err_msg, stmt, bind_callback);
+    if (ret) {
       return Err_Fail;
     }
+    sqlite3_finalize(*stmt);
 
-    sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
-
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
+    if (sqlite3_step(*stmt) == SQLITE_ROW) {
       std::string hashed_password;
       hashed_password.reserve(util::Util::kDerivedKeySize);
       hashed_password.append(
-          reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)),
+          reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 1)),
           util::Util::kDerivedKeySize);
-      sqlite3_finalize(stmt);
+      sqlite3_finalize(*stmt);
       return Err_User_exists;
     }
 
-    sqlite3_finalize(stmt);
     return Err_User_not_exists;
   }
 
@@ -255,26 +264,25 @@ class UserManager final {
       return Err_User_passwd_error;
     }
 
-    sqlite3_stmt* stmt = nullptr;
-    ret = util::SqliteManager::Instance()->PrepareStatement(
-        "UPDATE users SET salt = ?, password = ? WHERE user = ?;", &stmt);
+    sqlite3_stmt** stmt = nullptr;
+    int affect_rows = 0;
+    std::string err_msg;
+    std::string sql = "UPDATE users SET salt = ?, password = ? WHERE user = ?;";
+    std::function<void(sqlite3_stmt * stmt)> bind_callback =
+        [&user, &salt, &hashed_password](sqlite3_stmt* stmt) {
+          sqlite3_bind_text(stmt, 3, user.c_str(), user.size(), SQLITE_STATIC);
+          sqlite3_bind_text(stmt, 1, salt.c_str(), salt.size(), SQLITE_STATIC);
+          sqlite3_bind_text(stmt, 2, hashed_password.c_str(),
+                            hashed_password.size(), SQLITE_STATIC);
+        };
+    ret = util::SqliteManager::Instance()->Execute(sql, &affect_rows, &err_msg,
+                                                   stmt, bind_callback);
     if (ret) {
       return Err_Fail;
     }
+    sqlite3_finalize(*stmt);
 
-    sqlite3_bind_text(stmt, 3, user.c_str(), user.size(), SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 1, salt.c_str(), salt.size(), SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, hashed_password.c_str(), hashed_password.size(),
-                      SQLITE_STATIC);
-
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-      sqlite3_finalize(stmt);
-      return Err_Fail;
-    }
-    sqlite3_finalize(stmt);
-
-    int changes = util::SqliteManager::Instance()->AffectRows();
-    if (changes > 0) {
+    if (affect_rows > 0) {
       *token = SessionManager::Instance()->GenerateToken(user);
       return Err_Success;
     } else {

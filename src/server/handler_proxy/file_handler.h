@@ -9,7 +9,6 @@
 #include <filesystem>
 
 #include "src/impl/repo_manager.h"
-#include "src/impl/sync_manager.h"
 #include "src/impl/user_manager.h"
 #include "src/proto/service.pb.h"
 #include "src/util/util.h"
@@ -28,10 +27,8 @@ class FileHandler {
     int32_t ret = Err_Success;
     if (req.repo_type() == proto::RepoType::RT_Ocean) {
       ret = impl::RepoManager::Instance()->WriteToFile(req);
-    } else if (req.repo_type() == proto::RepoType::RT_Remote) {
-      ret = impl::SyncManager::Instance()->WriteToFile(req);
     } else {
-      ret = Err_Unsupported_op;
+      ret = Err_Fail;
       LOG(ERROR) << "Unsupported repo type";
     }
     return ret;
@@ -44,7 +41,7 @@ class FileHandler {
     } else {
       LOG(ERROR) << "Unsupported repo type";
     }
-    return Err_Unsupported_op;
+    return Err_Fail;
   }
 
   static int32_t Exists(const proto::FileReq& req, proto::FileRes* res) {
@@ -62,15 +59,15 @@ class FileHandler {
 
     if (req.file_type() == proto::FileType::Regular) {
       if (!std::filesystem::is_regular_file(req.dst())) {
-        ret = Err_File_type_mismatch;
+        ret = Err_Fail;
       }
     } else if (req.file_type() == proto::FileType::Direcotry) {
       if (!std::filesystem::is_directory(req.dst())) {
-        ret = Err_File_type_mismatch;
+        ret = Err_Fail;
       }
     } else if (req.file_type() == proto::FileType::Symlink) {
       if (!std::filesystem::is_symlink(req.dst())) {
-        ret = Err_File_type_mismatch;
+        ret = Err_Fail;
       }
     } else {
       LOG(ERROR) << "Unsupported file type";
