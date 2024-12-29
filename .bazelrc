@@ -227,3 +227,6 @@ build:clang_aarch64_macosx --compiler='clang'
 build:clang_aarch64_macosx --copt='-mmacosx-version-min=10.15'
 build:clang_aarch64_macosx --define cross_compiling=true
 build:clang_aarch64_macosx --build_tag_filters='-ignore'
+
+build --copt=-DMAGICKCORE_HDRI_ENABLE=1
+build --copt=-DMAGICKCORE_QUANTUM_DEPTH=16
