@@ -334,24 +334,17 @@ class SqliteManager final {
     std::string err_msg;
     std::string sql =
         "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [](sqlite3_stmt* stmt) {
-          std::vector<uint8_t> salt_arr{0x45, 0x2c, 0x03, 0x06, 0x73, 0x0b,
-                                        0x0f, 0x3a, 0xc3, 0x08, 0x6d, 0x4f,
-                                        0x62, 0xef, 0xfc, 0x20};
-          std::vector<uint8_t> hashed_password_arr{
-              0x29, 0x9a, 0xe5, 0x3a, 0xb2, 0x2c, 0x08, 0x5a, 0x47, 0x96, 0xb5,
-              0x91, 0x87, 0xd2, 0xb5, 0x4c, 0x21, 0x7e, 0x48, 0x30, 0xb4, 0xab,
-              0xe4, 0xad, 0xe7, 0x9d, 0x7d, 0x8e, 0x6d, 0x90, 0xf5, 0x1a};
-          std::string salt(salt_arr.begin(), salt_arr.end());
-          std::string hashed_password(hashed_password_arr.begin(),
-                                      hashed_password_arr.end());
-          sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC);
-          sqlite3_bind_text(stmt, 2, salt.c_str(), common::kSaltSize,
-                            SQLITE_STATIC);
-          sqlite3_bind_text(stmt, 3, hashed_password.c_str(),
-                            common::kDerivedKeySize, SQLITE_STATIC);
-        };
+    std::function<void(sqlite3_stmt * stmt)> bind_callback = [](sqlite3_stmt*
+                                                                    stmt) {
+      std::string salt = "452c0306730b0f3ac3086d4f62effc20";
+      std::string hashed_password =
+          "299ae53ab22c085a4796b59187d2b54c217e4830b4abe4ade79d7d8e6d90f51a";
+      sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 2, salt.c_str(), common::kSaltSize,
+                        SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 3, hashed_password.c_str(),
+                        common::kDerivedKeySize, SQLITE_STATIC);
+    };
     auto ret = Insert(sql, &affect_rows, &err_msg, bind_callback);
     if (ret) {
       LOG(ERROR) << "Init admin error: " << err_msg;

@@ -36,8 +36,8 @@ TEST(SqliteManager, ExecuteNonQuery) {
   }
 
   if (rows.size() > 0) {
-    LOG(INFO) << util::Util::ToHexStr(rows.front().salt);
-    LOG(INFO) << util::Util::ToHexStr(rows.front().password);
+    LOG(INFO) << rows.front().salt;
+    LOG(INFO) << rows.front().password;
   }
   return;
 }
