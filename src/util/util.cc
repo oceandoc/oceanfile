@@ -1214,7 +1214,7 @@ string Util::GenerateSalt() {
                  common::kSaltSize) != 1) {
     throw std::runtime_error("Failed to generate random salt.");
   }
-  return salt;
+  return ToHexStr(salt);
 }
 
 bool Util::HashPassword(const string &password, const string &salt,
@@ -1227,6 +1227,7 @@ bool Util::HashPassword(const string &password, const string &salt,
                         reinterpret_cast<unsigned char *>(hash->data())) != 1) {
     return false;
   }
+  *hash = ToHexStr(*hash);
   return true;
 }
 

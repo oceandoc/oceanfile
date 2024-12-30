@@ -42,15 +42,23 @@ cc_library(
 )
 
 cc_library(
+    name = "sqlite_row",
+    hdrs = ["sqlite_row.h"],
+    deps = [
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+cc_library(
     name = "sqlite_manager",
     srcs = ["sqlite_manager.cc"],
     hdrs = ["sqlite_manager.h"],
     copts = COPTS,
     local_defines = LOCAL_DEFINES,
     deps = [
+        ":sqlite_row",
         ":util",
         "//src/common:defs",
-        "//src/common:sqlite_row",
         "@com_github_glog_glog//:glog",
         "@folly",
         "@sqlite",

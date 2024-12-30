@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "src/common/sqlite_row.h"
+#include "src/util/sqlite_row.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -27,7 +27,7 @@ TEST(SqliteManager, ExecuteNonQuery) {
       [&user](sqlite3_stmt* stmt) {
         sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
       };
-  std::vector<common::UsersRow> rows;
+  std::vector<UsersRow> rows;
   auto ret = util::SqliteManager::Instance()->Select(sql, &err_msg,
                                                      bind_callback, &rows);
   if (ret) {

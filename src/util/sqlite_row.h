@@ -3,16 +3,17 @@
  * All rights reserved.
  *******************************************************************************/
 
-#ifndef BAZEL_TEMPLATE_COMMON_SQLITE_ROW_H
-#define BAZEL_TEMPLATE_COMMON_SQLITE_ROW_H
+#ifndef BAZEL_TEMPLATE_UTIL_SQLITE_ROW_H
+#define BAZEL_TEMPLATE_UTIL_SQLITE_ROW_H
 
 #include <string>
 
 #include "external/sqlite/sqlite3.h"
+#include "glog/logging.h"
 #include "src/common/defs.h"
 
 namespace oceandoc {
-namespace common {
+namespace util {
 
 struct UsersRow {
   int32_t id;
@@ -21,12 +22,19 @@ struct UsersRow {
   std::string password;
 
   bool Extract(sqlite3_stmt* stmt) {
-    salt.reserve(kSaltSize);
+    salt.reserve(common::kSaltSize * 2);
+    for (int i = 0; i < common::kSaltSize * 2; ++i) {
+      auto c = sqlite3_column_text(stmt, 0)[i];
+      std::bitset<8> binary(c);  // 8 bits for unsigned char
+      LOG(INFO) << binary.to_string();
+      LOG(INFO) << static_cast<unsigned int>(c);
+    }
+
     salt.append(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)),
-                kSaltSize);
-    password.reserve(kDerivedKeySize);
+                common::kSaltSize * 2);
+    password.reserve(common::kDerivedKeySize * 2);
     password.append(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)),
-                    kDerivedKeySize);
+                    common::kDerivedKeySize * 2);
     return true;
   }
 };
@@ -51,7 +59,7 @@ struct FilesRow {
   bool Extract(sqlite3_stmt* /*stmt*/) { return true; }
 };
 
-}  // namespace common
+}  // namespace util
 }  // namespace oceandoc
 
-#endif  // BAZEL_TEMPLATE_COMMON_SQLITE_ROW_H
+#endif  // BAZEL_TEMPLATE_UTIL_SQLITE_ROW_H

@@ -15,7 +15,7 @@
 #include "folly/Singleton.h"
 #include "src/common/blocking_queue.h"
 #include "src/common/error.h"
-#include "src/common/sqlite_row.h"
+#include "src/util/sqlite_row.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -186,7 +186,7 @@ class SqliteManager final {
     while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
       RowType row;
       row.Extract(stmt);
-      rows->emplace_back(row);
+      rows->push_back(row);
     }
 
     if (rc != SQLITE_DONE) {
@@ -338,12 +338,15 @@ class SqliteManager final {
                                                                     stmt) {
       std::string salt = "452c0306730b0f3ac3086d4f62effc20";
       std::string hashed_password =
-          "299ae53ab22c085a4796b59187d2b54c217e4830b4abe4ade79d7d8e6d90f51a";
-      sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 2, salt.c_str(), common::kSaltSize,
-                        SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 3, hashed_password.c_str(),
-                        common::kDerivedKeySize, SQLITE_STATIC);
+          "e64de2fcaef0b98d035c3c241e4f8fda32f3b09067ef0f1b1706869a54f9d3b7";
+      if (SQLITE_OK != sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC)) {
+        LOG(ERROR) << "Bind error";
+      }
+      if (SQLITE_OK !=
+          sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_STATIC)) {
+        LOG(ERROR) << "Bind error";
+      }
+      sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_STATIC);
     };
     auto ret = Insert(sql, &affect_rows, &err_msg, bind_callback);
     if (ret) {
@@ -408,8 +411,8 @@ class SqliteManager final {
     std::string sql = R"(SELECT * FROM meta WHERE id = 1)";
     std::function<void(sqlite3_stmt * stmt)> bind_callback =
         [](sqlite3_stmt* /*stmt*/) {};
-    std::vector<common::MetaRow> rows;
-    auto ret = Select<common::MetaRow>(sql, &err_msg, bind_callback, &rows);
+    std::vector<MetaRow> rows;
+    auto ret = Select<MetaRow>(sql, &err_msg, bind_callback, &rows);
     if (ret) {
       LOG(ERROR) << "Select version error";
       return 0;
