@@ -42,7 +42,8 @@ class SqliteManager final {
   }
 
   bool Init(const std::string& home_dir) {
-    db_path_ = home_dir + "/data/db";
+    db_path_ = home_dir + "/data/fstation.db";
+
     if (Util::Exists(db_path_) && Util::FileSize(db_path_) > 0) {
       if (!UpgradeTables()) {
         LOG(ERROR) << "Upgrade tables error";
@@ -80,7 +81,6 @@ class SqliteManager final {
 
   bool InitTables() {
     std::string error_msg;
-    int affect_rows = 0;
     std::string sql = R"(CREATE TABLE IF NOT EXISTS users (
                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                            user TEXT UNIQUE,
@@ -88,7 +88,7 @@ class SqliteManager final {
                            password TEXT
                          );)";
 
-    if (ExecuteNonQuery(sql, &error_msg, &affect_rows)) {
+    if (ExecuteNonQuery(sql, &error_msg)) {
       LOG(ERROR) << "Init users table error: " << error_msg;
       return false;
     }
@@ -99,30 +99,31 @@ class SqliteManager final {
 
     error_msg.clear();
     sql = R"(CREATE TABLE IF NOT EXISTS meta (
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               version INTEGER
-             );)";
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     version INTEGER
+    );)";
     if (ExecuteNonQuery(sql, &error_msg)) {
       LOG(ERROR) << "Init meta table error: " << error_msg;
       return false;
     }
+
     if (!InitVersion()) {
       return false;
     }
 
     error_msg.clear();
     sql = R"(CREATE TABLE IF NOT EXISTS files (
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               local_id TEXT UNIQUE,
-               device_id TEXT,
-               photo_taken_time INTEGER DEFAULT -1,
-               type INTEGER,
-               file_name TEXT,
-               owner TEXT,
-               file_hash TEXT,
-               live_photo_video_hash TEXT DEFAULT '',
-               thumb_hash TEXT DEFAULT ''
-             );)";
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     local_id TEXT UNIQUE,
+     device_id TEXT,
+     photo_taken_time INTEGER DEFAULT -1,
+     type INTEGER,
+     file_name TEXT,
+     owner TEXT,
+     file_hash TEXT,
+     live_photo_video_hash TEXT DEFAULT '',
+     thumb_hash TEXT DEFAULT ''
+    );)";
 
     if (ExecuteNonQuery(sql, &error_msg)) {
       LOG(ERROR) << "Init files table error: " << error_msg;
@@ -200,8 +201,7 @@ class SqliteManager final {
 
   // 1. sql without parameters
   // 2. only execute once
-  int32_t ExecuteNonQuery(const std::string& sql, std::string* err_msg,
-                          int32_t* affect_rows = nullptr) {
+  int32_t ExecuteNonQuery(const std::string& sql, std::string* err_msg) {
     sqlite3* db = GetConn();
     if (db == nullptr) {
       return Err_Fail;
@@ -215,9 +215,6 @@ class SqliteManager final {
       return Err_Fail;
     }
 
-    if (affect_rows) {
-      *affect_rows = AffectRows(db);
-    }
     conns_.PushBack(db);
     return Err_Success;
   }
@@ -268,12 +265,14 @@ class SqliteManager final {
                  std::string* err_msg,
                  const std::function<void(sqlite3_stmt* stmt)>& bind_callback) {
     sqlite3* db = GetConn();
+
     if (db == nullptr) {
       return Err_Fail;
     }
 
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+      LOG(INFO) << 2;
       err_msg->append(sqlite3_errmsg(db));
       sqlite3_finalize(stmt);
       sqlite3_close(db);
@@ -343,10 +342,10 @@ class SqliteManager final {
         LOG(ERROR) << "Bind error";
       }
       if (SQLITE_OK !=
-          sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_STATIC)) {
+          sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_TRANSIENT)) {
         LOG(ERROR) << "Bind error";
       }
-      sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_TRANSIENT);
     };
     auto ret = Insert(sql, &affect_rows, &err_msg, bind_callback);
     if (ret) {

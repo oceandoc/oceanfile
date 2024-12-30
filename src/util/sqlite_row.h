@@ -9,7 +9,6 @@
 #include <string>
 
 #include "external/sqlite/sqlite3.h"
-#include "glog/logging.h"
 #include "src/common/defs.h"
 
 namespace oceandoc {
@@ -23,13 +22,6 @@ struct UsersRow {
 
   bool Extract(sqlite3_stmt* stmt) {
     salt.reserve(common::kSaltSize * 2);
-    for (int i = 0; i < common::kSaltSize * 2; ++i) {
-      auto c = sqlite3_column_text(stmt, 0)[i];
-      std::bitset<8> binary(c);  // 8 bits for unsigned char
-      LOG(INFO) << binary.to_string();
-      LOG(INFO) << static_cast<unsigned int>(c);
-    }
-
     salt.append(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)),
                 common::kSaltSize * 2);
     password.reserve(common::kDerivedKeySize * 2);
