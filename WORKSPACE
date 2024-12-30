@@ -785,6 +785,21 @@ new_local_repository(
     path = "../ImageMagick",
 )
 
+http_archive(
+    name = "libxml2",
+    build_file = "@//:libxml2.BUILD",
+    sha256 = "PLACEHOLDER",
+    strip_prefix = "libxml2-2.9.10",
+    url = "http://xmlsoft.org/sources/libxml2-2.9.10.tar.gz",
+)
+
+new_git_repository(
+    name = "libxml2",
+    build_file = "//bazel:libxml2.BUILD",
+    commit = "71c37a565d3726440aa96d648db0426deb90157b",
+    remote = "git@github.com:GNOME/libxml2.git",
+)
+
 new_git_repository(
     name = "cc_toolchains",
     commit = "2a194c24161d9488bbfbb2bd9f486967edcc7170",
