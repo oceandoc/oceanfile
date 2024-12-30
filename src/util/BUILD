@@ -50,6 +50,7 @@ cc_library(
     deps = [
         ":util",
         "//src/common:defs",
+        "//src/common:sqlite_row",
         "@com_github_glog_glog//:glog",
         "@folly",
         "@sqlite",

@@ -31,6 +31,11 @@ cc_library(
     hdrs = ["blocking_queue.h"],
 )
 
+cc_library(
+    name = "sqlite_row",
+    hdrs = ["sqlite_row.h"],
+)
+
 cc_proto_plugin(
     name = "error_code",
     src = "//src/proto:error.proto",

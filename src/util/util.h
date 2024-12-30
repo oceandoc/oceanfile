@@ -33,10 +33,6 @@ class Util final {
   ~Util() {}
 
  public:
-  static constexpr int kSaltSize = 16;        // 16 bytes (128 bits)
-  static constexpr int kDerivedKeySize = 32;  // 32 bytes (256 bits)
-  static constexpr int kIterations = 100000;  // PBKDF2 iterations
-
   static int64_t CurrentTimeMillis();
   static int64_t CurrentTimeNanos();
   static int64_t StrToTimeStampUTC(const std::string &time);

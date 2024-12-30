@@ -53,7 +53,7 @@ class UserManager final {
       return Err_Fail;
     }
 
-    sqlite3_stmt** stmt = nullptr;
+    sqlite3_stmt* stmt = nullptr;
     int affect_rows = 0;
     std::string err_msg;
     std::string sql =
@@ -95,7 +95,7 @@ class UserManager final {
     }
 
     if (login_user == "admin" || login_user == to_delete_user) {
-      sqlite3_stmt** stmt = nullptr;
+      sqlite3_stmt* stmt = nullptr;
       int affect_rows = 0;
       std::string err_msg;
       std::string sql = "DELETE FROM users WHERE user = ?;";
@@ -130,7 +130,7 @@ class UserManager final {
       return Err_User_passwd_error;
     }
 
-    sqlite3_stmt** stmt = nullptr;
+    sqlite3_stmt* stmt = nullptr;
     int affect_rows = 0;
     std::string err_msg;
     std::string sql = "SELECT salt, password FROM users WHERE user = ?;";
@@ -214,7 +214,7 @@ class UserManager final {
       return Err_User_name_error;
     }
 
-    sqlite3_stmt** stmt = nullptr;
+    sqlite3_stmt* stmt = nullptr;
     int affect_rows = 0;
     std::string err_msg;
     std::string sql = "SELECT salt, password FROM users WHERE user = ?;";
@@ -227,7 +227,6 @@ class UserManager final {
     if (ret) {
       return Err_Fail;
     }
-    sqlite3_finalize(*stmt);
 
     if (sqlite3_step(*stmt) == SQLITE_ROW) {
       std::string hashed_password;
@@ -238,6 +237,7 @@ class UserManager final {
       sqlite3_finalize(*stmt);
       return Err_User_exists;
     }
+    sqlite3_finalize(*stmt);
 
     return Err_User_not_exists;
   }
@@ -264,7 +264,7 @@ class UserManager final {
       return Err_User_passwd_error;
     }
 
-    sqlite3_stmt** stmt = nullptr;
+    sqlite3_stmt* stmt = nullptr;
     int affect_rows = 0;
     std::string err_msg;
     std::string sql = "UPDATE users SET salt = ?, password = ? WHERE user = ?;";

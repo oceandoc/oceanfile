@@ -132,7 +132,7 @@ class RepoClient {
     }
 
     LOG(INFO) << "Create reop: " << repo_name << " success";
-    repo->Swap(res.mutable_repo());
+    *repo = res.mutable_repos()->begin()->second;
     return true;
   }
 

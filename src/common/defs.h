@@ -27,6 +27,10 @@ constexpr int64_t MAX_GRPC_MSG_SIZE = 2 * 64 * 1024 * 1024 * 8;  // 128MB
 constexpr double TRACING_SAMPLER_PROBALITITY = 0.01;             // 1 Percent
 constexpr int64_t SESSION_INTERVAL = 5 * 60 * 1000;              // 5min
 
+constexpr int kSaltSize = 16;        // 16 bytes (128 bits)
+constexpr int kDerivedKeySize = 32;  // 32 bytes (256 bits)
+constexpr int kIterations = 100000;  // PBKDF2 iterations
+
 enum SendStatus {
   SUCCESS = 0,
   RETRING,
