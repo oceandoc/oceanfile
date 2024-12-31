@@ -157,7 +157,7 @@ cc_test(
         "config_manager_test.cc",
     ],
     copts = COPTS,
-    data = ["//conf:client_base_config.json"],
+    data = ["//conf:server_base_config.json"],
     local_defines = LOCAL_DEFINES,
     deps = [":config_manager"],
 )
@@ -168,7 +168,9 @@ cc_test(
         "sqlite_manager_test.cc",
     ],
     copts = COPTS,
-    data = ["//conf:client_base_config.json"],
+    data = [
+        "//conf:client_base_config.json",
+    ],
     local_defines = LOCAL_DEFINES,
     deps = [":sqlite_manager"],
 )

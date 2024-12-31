@@ -49,6 +49,11 @@ class SqliteManager final {
   bool Init(const std::string& home_dir) {
     db_path_ = home_dir + "/data/fstation.db";
 
+    if (!Util::Exists(home_dir + "/data")) {
+      if (!Util::Mkdir(home_dir + "/data")) {
+        return false;
+      }
+    }
     if (Util::Exists(db_path_) && Util::FileSize(db_path_) > 0) {
       if (!UpgradeTables()) {
         LOG(ERROR) << "Upgrade tables error";
