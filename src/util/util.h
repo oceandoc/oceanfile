@@ -89,6 +89,8 @@ class Util final {
 
   static std::string ParentPath(const std::string &path);
   static std::string CurrentPath();
+  static std::string AbsolutePath(const std::string &path);
+  static std::string RealPath(const std::string &path);
 
   static bool CopyFile(const std::string &src, const std::string &dst,
                        const std::filesystem::copy_options opt =

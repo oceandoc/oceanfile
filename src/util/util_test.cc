@@ -210,19 +210,26 @@ TEST(Util, UpdateTime) {
   EXPECT_EQ(Util::UpdateTime(path), 2727650275042);
 }
 
+// NOTICE: all file is symlink when bazel run and bazel test, even though origin
+// file is a regular file, but bazel test point to bazel execroot directory,
+// while bazel run point to source directory
 TEST(Util, FileSize) {
   // echo "test" > txt will add a \n to file automatic, vim has same behavior
   std::string path = "test_data/util_test/test1/test2/symlink_to_target";
   if (test::Util::IsBazelTest()) {
-    std::string target_path =
-        test::Util::ExecRoot() + "/" + test::Util::Workspace() + "/" + path;
-    EXPECT_EQ(Util::FileSize(path), target_path.size());
+    std::string real_path =
+        Util::RealPath(path);  // point to cache execroot dir
+    EXPECT_EQ(Util::FileSize(path), real_path.size());
+    real_path = Util::RealPath("test_data/util_test/target");
     EXPECT_EQ(Util::FileSize("test_data/util_test/target"), 108);
     EXPECT_EQ(Util::FileSize("test_data"), 4096);
   } else if (test::Util::IsBazelRun()) {
-    std::string target_path = Util::CurrentPath() + "/" + path;
-    EXPECT_EQ(Util::FileSize(path), target_path.size());
-    EXPECT_EQ(Util::FileSize("test_data/util_test/target"), 5);
+    std::string real_path = Util::RealPath(path);
+    EXPECT_EQ(Util::FileSize(path), real_path.size());  // point to source file
+
+    // test_data/util_test/target is a symlink when use bazel run
+    real_path = Util::RealPath("test_data/util_test/target");
+    EXPECT_EQ(Util::FileSize("test_data/util_test/target"), real_path.size());
   } else {
     EXPECT_EQ(Util::FileSize(path), 12);
     EXPECT_EQ(Util::FileSize("test_data/util_test/target"), 5);
@@ -234,10 +241,17 @@ TEST(Util, FileInfo) {
   int64_t update_time = -1, size = -1;
   std::string user, group;
   auto runfile_dir = Util::GetEnv("TEST_SRCDIR");
-  if (runfile_dir.has_value()) {
+  if (test::Util::IsBazelTest()) {
+    std::string real_path = Util::RealPath(path);
     EXPECT_EQ(Util::FileInfo(path, &update_time, &size, &user, &group), true);
     EXPECT_EQ(update_time, 2727650275042);
-    EXPECT_EQ(size, 108);
+    EXPECT_EQ(size, real_path.size());
+  } else if (test::Util::IsBazelRun()) {
+    std::string real_path = Util::RealPath(path);
+    // LOG(INFO) << Util::AbsolutePath(path);
+    EXPECT_EQ(Util::FileInfo(path, &update_time, &size, &user, &group), true);
+    EXPECT_EQ(update_time, 2727650275042);
+    EXPECT_EQ(size, real_path.size());
   } else {
     EXPECT_EQ(Util::FileInfo(path, &update_time, &size, &user, &group), true);
     EXPECT_EQ(update_time, 2727650275042);
@@ -438,14 +452,18 @@ TEST(Util, SyncSymlink) {
 
 TEST(Util, PrepareFile) {
   common::FileAttr attr;
-  Util::PrepareFile("test_data/util_test/target",
-                    common::HashMethod::Hash_BLAKE3,
+  std::string path = "test_data/util_test/target";
+  Util::PrepareFile(path, common::HashMethod::Hash_BLAKE3,
                     common::NET_BUFFER_SIZE_BYTES, &attr);
   EXPECT_EQ(attr.file_hash,
             "dea2b412aa90f1b43a06ca5e8b8feafec45ae1357971322749480f4e1572eaa2");
   EXPECT_EQ(attr.partition_num, 1);
   if (test::Util::IsBazelTest()) {
-    EXPECT_EQ(attr.file_size, 108);
+    std::string real_path = Util::RealPath(path);
+    EXPECT_EQ(attr.file_size, real_path.size());
+  } else if (test::Util::IsBazelRun()) {
+    std::string real_path = Util::RealPath(path);
+    EXPECT_EQ(attr.file_size, real_path.size());
   } else {
     EXPECT_EQ(attr.file_size, 5);
   }

@@ -583,6 +583,27 @@ string Util::CurrentPath() {
   return "";
 }
 
+string Util::AbsolutePath(const string &path) {
+  try {
+    return std::filesystem::absolute(path).string();
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "CurrentPath error: " << e.what();
+  }
+  return "";
+}
+
+string Util::RealPath(const string &path) {
+  try {
+    if (!std::filesystem::is_symlink(path)) {
+      return path;
+    }
+    return std::filesystem::read_symlink(path).string();
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "CurrentPath error: " << e.what();
+  }
+  return "";
+}
+
 bool Util::CopyFile(const string &src, const string &dst,
                     const std::filesystem::copy_options opt) {
   try {
