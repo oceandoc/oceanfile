@@ -21,12 +21,17 @@
 namespace oceandoc {
 namespace util {
 
+using SqliteBinder = std::function<bool(sqlite3_stmt* stmt)>;
+
 class SqliteManager final {
+  FRIEND_TEST(SqliteManager, Update);
+
  private:
   friend class folly::Singleton<SqliteManager>;
   SqliteManager() {}
 
  public:
+  static SqliteBinder DoNothing;
   static std::shared_ptr<SqliteManager> Instance();
 
   ~SqliteManager() {
@@ -65,6 +70,211 @@ class SqliteManager final {
     return true;
   }
 
+  int32_t ExecuteNonQuery(const std::string& sql, std::string* err_msg) {
+    sqlite3* db = GetConn();
+    if (db == nullptr) {
+      return Err_Fail;
+    }
+
+    char* raw_msg = nullptr;
+    int rc = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, &raw_msg);
+    if (rc != SQLITE_OK) {
+      err_msg->append(raw_msg);
+      sqlite3_free(raw_msg);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    conns_.PushBack(db);
+    return Err_Success;
+  }
+
+  template <class RowType>
+  int32_t Select(const std::string& sql, std::string* err_msg,
+                 const SqliteBinder& bind_callback,
+                 std::vector<RowType>* rows) {
+    sqlite3* db = GetConn();
+    if (db == nullptr) {
+      return Err_Fail;
+    }
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    if (!bind_callback(stmt)) {
+      err_msg->append(sqlite3_errmsg(db));
+      return Err_Fail;
+    }
+
+    int rc = SQLITE_OK;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+      RowType row;
+      row.Extract(stmt);
+      rows->push_back(row);
+    }
+
+    if (rc != SQLITE_DONE) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    PutConn(db);
+    return Err_Success;
+  }
+
+  int32_t Insert(const std::string& sql, int32_t* affect_rows,
+                 std::string* err_msg, const SqliteBinder& bind_callback) {
+    sqlite3* db = GetConn();
+    if (db == nullptr) {
+      return Err_Fail;
+    }
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    if (!bind_callback(stmt)) {
+      err_msg->append(sqlite3_errmsg(db));
+      return Err_Fail;
+    }
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    *affect_rows = sqlite3_changes(db);
+    sqlite3_finalize(stmt);
+    PutConn(db);
+    return Err_Success;
+  }
+
+  // need call sqlite3_step and sqlite3_reset in bind_callback
+  int32_t InsertBatch(const std::string& sql, std::string* err_msg,
+                      const SqliteBinder& bind_callback) {
+    sqlite3* db = GetConn();
+    if (db == nullptr) {
+      return Err_Fail;
+    }
+
+    char* raw_msg = nullptr;
+    std::string query = "BEGIN TRANSACTION;";
+    int rc = sqlite3_exec(db, query.c_str(), nullptr, nullptr, &raw_msg);
+    if (rc != SQLITE_OK) {
+      err_msg->append(raw_msg);
+      sqlite3_free(raw_msg);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    if (!bind_callback(stmt)) {
+      err_msg->append(sqlite3_errmsg(db));
+      return Err_Fail;
+    }
+
+    sqlite3_finalize(stmt);
+
+    query = "COMMIT;";
+    rc = sqlite3_exec(db, query.c_str(), nullptr, nullptr, &raw_msg);
+    if (rc != SQLITE_OK) {
+      err_msg->append(raw_msg);
+      sqlite3_free(raw_msg);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    PutConn(db);
+    return Err_Success;
+  }
+
+  int32_t Update(const std::string& sql, int32_t* affect_rows,
+                 std::string* err_msg, const SqliteBinder& bind_callback) {
+    sqlite3* db = GetConn();
+    if (db == nullptr) {
+      return Err_Fail;
+    }
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    if (!bind_callback(stmt)) {
+      err_msg->append(sqlite3_errmsg(db));
+      return Err_Fail;
+    }
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    *affect_rows = sqlite3_changes(db);
+    sqlite3_finalize(stmt);
+    PutConn(db);
+    return Err_Success;
+  }
+
+  int32_t Delete(const std::string& sql, int32_t* affect_rows,
+                 std::string* err_msg, const SqliteBinder& bind_callback) {
+    sqlite3* db = GetConn();
+    if (db == nullptr) {
+      return Err_Fail;
+    }
+
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    if (!bind_callback(stmt)) {
+      err_msg->append(sqlite3_errmsg(db));
+      return Err_Fail;
+    }
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+      err_msg->append(sqlite3_errmsg(db));
+      sqlite3_finalize(stmt);
+      sqlite3_close(db);
+      return Err_Fail;
+    }
+
+    *affect_rows = sqlite3_changes(db);
+    sqlite3_finalize(stmt);
+    PutConn(db);
+    return Err_Success;
+  }
+
+ private:
   bool UpgradeTables() {
     auto version = GetVersion();
     if (version == 0) {
@@ -85,7 +295,9 @@ class SqliteManager final {
                            id INTEGER PRIMARY KEY AUTOINCREMENT,
                            user TEXT UNIQUE,
                            salt TEXT,
-                           password TEXT
+                           password TEXT,
+                           create_time INTEGER,
+                           update_time INTEGER
                          );)";
 
     if (ExecuteNonQuery(sql, &error_msg)) {
@@ -99,9 +311,9 @@ class SqliteManager final {
 
     error_msg.clear();
     sql = R"(CREATE TABLE IF NOT EXISTS meta (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     version INTEGER
-    );)";
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               version INTEGER
+             );)";
     if (ExecuteNonQuery(sql, &error_msg)) {
       LOG(ERROR) << "Init meta table error: " << error_msg;
       return false;
@@ -113,17 +325,18 @@ class SqliteManager final {
 
     error_msg.clear();
     sql = R"(CREATE TABLE IF NOT EXISTS files (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     local_id TEXT UNIQUE,
-     device_id TEXT,
-     photo_taken_time INTEGER DEFAULT -1,
-     type INTEGER,
-     file_name TEXT,
-     owner TEXT,
-     file_hash TEXT,
-     live_photo_video_hash TEXT DEFAULT '',
-     thumb_hash TEXT DEFAULT ''
-    );)";
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               local_id TEXT UNIQUE,
+               device_id TEXT,
+               file_hash TEXT,
+               type INTEGER,
+               file_name TEXT DEFAULT '',
+               owner TEXT DEFAULT '',
+               taken_time INTEGER DEFAULT -1,
+               video_hash TEXT DEFAULT '',
+               cover_hash TEXT DEFAULT '',
+               thumb_hash TEXT DEFAULT ''
+             );)";
 
     if (ExecuteNonQuery(sql, &error_msg)) {
       LOG(ERROR) << "Init files table error: " << error_msg;
@@ -165,199 +378,49 @@ class SqliteManager final {
     }
   }
 
-  template <class RowType>
-  int32_t Select(const std::string& sql, std::string* err_msg,
-                 const std::function<void(sqlite3_stmt* stmt)>& bind_callback,
-                 std::vector<RowType>* rows) {
-    sqlite3_stmt* stmt = nullptr;
-    sqlite3* db = GetConn();
-    if (db == nullptr) {
-      return Err_Fail;
-    }
-
-    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-      err_msg->append(sqlite3_errmsg(db));
-      sqlite3_finalize(stmt);
-      sqlite3_close(db);
-      return Err_Fail;
-    }
-
-    bind_callback(stmt);
-    int rc = SQLITE_OK;
-    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-      RowType row;
-      row.Extract(stmt);
-      rows->push_back(row);
-    }
-
-    if (rc != SQLITE_DONE) {
-      err_msg->append(sqlite3_errmsg(db));
-      return Err_Fail;
-    }
-
-    PutConn(db);
-    return Err_Success;
-  }
-
-  // 1. sql without parameters
-  // 2. only execute once
-  int32_t ExecuteNonQuery(const std::string& sql, std::string* err_msg) {
-    sqlite3* db = GetConn();
-    if (db == nullptr) {
-      return Err_Fail;
-    }
-    char* raw_msg = nullptr;
-    int rc = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, &raw_msg);
-    if (rc != SQLITE_OK) {
-      sqlite3_close(db);
-      err_msg->append(raw_msg);
-      sqlite3_free(raw_msg);
-      return Err_Fail;
-    }
-
-    conns_.PushBack(db);
-    return Err_Success;
-  }
-
-  int32_t InsertBatch(
-      const std::string& sql, std::string* err_msg,
-      const std::function<void(sqlite3_stmt* stmt)>& bind_callback) {
-    sqlite3* db = GetConn();
-    if (db == nullptr) {
-      return Err_Fail;
-    }
-
-    char* raw_msg = nullptr;
-    std::string query = "BEGIN TRANSACTION;";
-    int rc = sqlite3_exec(db, query.c_str(), nullptr, nullptr, &raw_msg);
-    if (rc != SQLITE_OK) {
-      sqlite3_close(db);
-      err_msg->append(raw_msg);
-      sqlite3_free(raw_msg);
-      return Err_Fail;
-    }
-
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-      err_msg->append(sqlite3_errmsg(db));
-      sqlite3_finalize(stmt);
-      sqlite3_close(db);
-      return Err_Fail;
-    }
-
-    bind_callback(stmt);
-    sqlite3_finalize(stmt);
-
-    query = "COMMIT;";
-    rc = sqlite3_exec(db, query.c_str(), nullptr, nullptr, &raw_msg);
-    if (rc != SQLITE_OK) {
-      sqlite3_close(db);
-      err_msg->append(raw_msg);
-      sqlite3_free(raw_msg);
-      return Err_Fail;
-    }
-
-    PutConn(db);
-    return Err_Success;
-  }
-
-  int32_t Insert(const std::string& sql, int32_t* affect_rows,
-                 std::string* err_msg,
-                 const std::function<void(sqlite3_stmt* stmt)>& bind_callback) {
-    sqlite3* db = GetConn();
-
-    if (db == nullptr) {
-      return Err_Fail;
-    }
-
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-      LOG(INFO) << 2;
-      err_msg->append(sqlite3_errmsg(db));
-      sqlite3_finalize(stmt);
-      sqlite3_close(db);
-      return Err_Fail;
-    }
-
-    bind_callback(stmt);
-
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-      err_msg->append(sqlite3_errmsg(db));
-      sqlite3_finalize(stmt);
-      sqlite3_close(db);
-      return Err_Fail;
-    }
-
-    *affect_rows = AffectRows(db);
-    sqlite3_finalize(stmt);
-    PutConn(db);
-    return Err_Success;
-  }
-
-  int32_t Update(const std::string& sql, int32_t* affect_rows,
-                 std::string* err_msg,
-                 const std::function<void(sqlite3_stmt* stmt)>& bind_callback) {
-    sqlite3* db = GetConn();
-    if (db == nullptr) {
-      return Err_Fail;
-    }
-
-    sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
-      err_msg->append(sqlite3_errmsg(db));
-      sqlite3_finalize(stmt);
-      sqlite3_close(db);
-      return Err_Fail;
-    }
-
-    bind_callback(stmt);
-
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-      err_msg->append(sqlite3_errmsg(db));
-      sqlite3_finalize(stmt);
-      sqlite3_close(db);
-      return Err_Fail;
-    }
-
-    *affect_rows = AffectRows(db);
-    sqlite3_finalize(stmt);
-    PutConn(db);
-    return Err_Success;
-  }
-
-  int32_t AffectRows(sqlite3* db) { return sqlite3_changes(db); }
-
- private:
   bool InitAdminUser() {
     int affect_rows = 0;
     std::string err_msg;
     std::string sql =
-        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback = [](sqlite3_stmt*
-                                                                    stmt) {
+        R"(INSERT OR IGNORE INTO users
+             (user, salt, password, create_time, update_time)
+             VALUES (?, ?, ?, ?, ?);)";
+    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
+        [](sqlite3_stmt* stmt) -> bool {
       std::string salt = "452c0306730b0f3ac3086d4f62effc20";
-      std::string hashed_password =
+      std::string password =
           "e64de2fcaef0b98d035c3c241e4f8fda32f3b09067ef0f1b1706869a54f9d3b7";
-      if (SQLITE_OK != sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC)) {
-        LOG(ERROR) << "Bind error";
+      if (sqlite3_bind_text(stmt, 1, "admin", -1, SQLITE_STATIC)) {
+        return false;
       }
-      if (SQLITE_OK !=
-          sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_TRANSIENT)) {
-        LOG(ERROR) << "Bind error";
+      if (sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_TRANSIENT)) {
+        return false;
       }
-      sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1, SQLITE_TRANSIENT);
+      if (sqlite3_bind_text(stmt, 3, password.c_str(), -1, SQLITE_TRANSIENT)) {
+        return false;
+      }
+
+      int64_t now = Util::CurrentTimeMillis();
+      if (sqlite3_bind_int64(stmt, 4, now)) {
+        return false;
+      }
+      if (sqlite3_bind_int64(stmt, 5, now)) {
+        return false;
+      }
+      return true;
     };
-    auto ret = Insert(sql, &affect_rows, &err_msg, bind_callback);
-    if (ret) {
+
+    if (Insert(sql, &affect_rows, &err_msg, bind_callback)) {
       LOG(ERROR) << "Init admin error: " << err_msg;
       return false;
     }
 
     if (affect_rows <= 0) {
-      LOG(ERROR) << "Init admin error: " << err_msg;
+      LOG(ERROR) << "Init admin error, already exists";
       return false;
     }
-    LOG(ERROR) << "Init admin success";
+
+    LOG(INFO) << "Init admin success";
     return true;
   }
 
@@ -365,15 +428,19 @@ class SqliteManager final {
     int affect_rows = 0;
     std::string err_msg;
     std::string sql = R"(INSERT INTO meta (id, version) VALUES (?, ?);)";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [](sqlite3_stmt* stmt) {
-          sqlite3_bind_int(stmt, 1, 1);
-          sqlite3_bind_int(stmt, 2, 1);
-        };
+    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
+        [](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_int(stmt, 1, 1)) {
+        return false;
+      }
+      if (sqlite3_bind_int(stmt, 2, 1)) {
+        return false;
+      }
+      return true;
+    };
 
-    auto ret = Insert(sql, &affect_rows, &err_msg, bind_callback);
-    if (ret) {
-      LOG(ERROR) << "Insert to meta prepare error";
+    if (Insert(sql, &affect_rows, &err_msg, bind_callback)) {
+      LOG(ERROR) << "Insert to meta error: " << err_msg;
       return false;
     }
 
@@ -381,7 +448,7 @@ class SqliteManager final {
       LOG(INFO) << "Init version success";
       return true;
     } else {
-      LOG(INFO) << "Already exists version";
+      LOG(ERROR) << "Already exists version";
     }
     return false;
   }
@@ -390,11 +457,16 @@ class SqliteManager final {
     int affect_rows = 0;
     std::string err_msg;
     std::string sql = R"(UPDATE meta SET version = ? where id = 1;)";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [version](sqlite3_stmt* stmt) { sqlite3_bind_int(stmt, 1, version); };
-    auto ret = Update(sql, &affect_rows, &err_msg, bind_callback);
-    if (ret) {
-      LOG(ERROR) << "Update version error";
+    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
+        [version](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_int(stmt, 1, version)) {
+        return false;
+      }
+      return true;
+    };
+
+    if (Update(sql, &affect_rows, &err_msg, bind_callback)) {
+      LOG(ERROR) << "Update version error: " << err_msg;
       return false;
     }
 
@@ -407,23 +479,21 @@ class SqliteManager final {
 
   int32_t GetVersion() {
     std::string err_msg;
-    std::string sql = R"(SELECT * FROM meta WHERE id = 1)";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [](sqlite3_stmt* /*stmt*/) {};
+    std::string sql = R"(SELECT version FROM meta WHERE id = 1)";
+    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
+        [](sqlite3_stmt* /*stmt*/) -> bool { return true; };
     std::vector<MetaRow> rows;
-    auto ret = Select<MetaRow>(sql, &err_msg, bind_callback, &rows);
-    if (ret) {
-      LOG(ERROR) << "Select version error";
+    if (Select<MetaRow>(sql, &err_msg, bind_callback, &rows)) {
+      LOG(ERROR) << "Select version error: " << err_msg;
       return 0;
     }
 
     if (!rows.empty()) {
       return rows.front().version;
     } else {
-      ret = 0;
       LOG(ERROR) << "Select version empty";
     }
-    return ret;
+    return 0;
   }
 
  private:

@@ -35,22 +35,24 @@ class Util final {
  public:
   static int64_t CurrentTimeMillis();
   static int64_t CurrentTimeNanos();
+  static int64_t StrToTimeStampLocal(const std::string &time);
+  static int64_t StrToTimeStampLocal(const std::string &time,
+                                     const std::string &format);
   static int64_t StrToTimeStampUTC(const std::string &time);
   static int64_t StrToTimeStampUTC(const std::string &time,
                                    const std::string &format);
-  static int64_t StrToTimeStamp(const std::string &time);
-  static int64_t StrToTimeStamp(const std::string &time,
-                                const std::string &format);
   static int64_t StrToTimeStamp(const std::string &time,
                                 const std::string &format,
                                 const std::string &tz_str);
 
+  static std::string ToTimeStrLocal();
+  static std::string ToTimeStrLocal(const int64_t ts);
+  static std::string ToTimeStrLocal(const int64_t ts,
+                                    const std::string &format);
   static std::string ToTimeStrUTC();
+  static std::string ToTimeStrUTC(const int64_t ts);
   static std::string ToTimeStrUTC(const int64_t ts, const std::string &format);
   // CST chines standard time
-  static std::string ToTimeStr();
-  static std::string ToTimeStr(const int64_t ts);
-  static std::string ToTimeStr(const int64_t ts, const std::string &format);
   static std::string ToTimeStr(const int64_t ts, const std::string &format,
                                const std::string &tz_str);
   static struct timespec ToTimeSpec(const int64_t ts);
@@ -86,6 +88,7 @@ class Util final {
                        std::string *out);
 
   static std::string ParentPath(const std::string &path);
+  static std::string CurrentPath();
 
   static bool CopyFile(const std::string &src, const std::string &dst,
                        const std::filesystem::copy_options opt =
@@ -160,6 +163,7 @@ class Util final {
   static bool StartWith(const std::string &str, const std::string &prefix);
 
   static bool EndWith(const std::string &str, const std::string &postfix);
+  static bool Contain(const std::string &str, const std::string &p);
 
   static void ReplaceAll(std::string *s, const std::string &from,
                          const std::string &to) {
@@ -278,6 +282,8 @@ class Util final {
       return std::nullopt;
     }
   }
+
+  static void PrintAllEnv();
 
   static int64_t FDCount();
   static int64_t MemUsage();

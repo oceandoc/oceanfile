@@ -6,6 +6,7 @@
 #include "src/util/util.h"
 
 #include <algorithm>
+#include <boost/algorithm/string/predicate.hpp>
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
@@ -72,6 +73,11 @@ using google::protobuf::json::ParseOptions;
 using google::protobuf::json::PrintOptions;
 using std::string;
 
+#if defined(__linux__) || defined(__APPLE__)
+extern char **environ;
+#elif defined(_WIN32)
+#endif
+
 namespace oceandoc {
 namespace util {
 
@@ -82,33 +88,19 @@ int64_t Util::CurrentTimeMillis() {
 int64_t Util::CurrentTimeNanos() { return absl::GetCurrentTimeNanos(); }
 
 int64_t Util::StrToTimeStampUTC(const string &time) {
-  return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez");
+  return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez", "UTC");
 }
 
 int64_t Util::StrToTimeStampUTC(const string &time, const string &format) {
-  absl::TimeZone tz = absl::UTCTimeZone();
-  absl::Time t;
-  string err;
-  if (!absl::ParseTime(format, time, tz, &t, &err)) {
-    LOG(ERROR) << err << " " << time << ", format: " << format;
-    return -1;
-  }
-  return absl::ToUnixMillis(t);
+  return Util::StrToTimeStamp(time, format, "UTC");
 }
 
-int64_t Util::StrToTimeStamp(const string &time) {
-  return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez");
+int64_t Util::StrToTimeStampLocal(const string &time) {
+  return Util::StrToTimeStamp(time, "%Y-%m-%d%ET%H:%M:%E3S%Ez", "localtime");
 }
 
-int64_t Util::StrToTimeStamp(const string &time, const string &format) {
-  absl::TimeZone tz = absl::LocalTimeZone();
-  absl::Time t;
-  string err;
-  if (!absl::ParseTime(format, time, tz, &t, &err)) {
-    LOG(ERROR) << err << " " << time << ", format: " << format;
-    return -1;
-  }
-  return absl::ToUnixMillis(t);
+int64_t Util::StrToTimeStampLocal(const string &time, const string &format) {
+  return Util::StrToTimeStamp(time, format, "localtime");
 }
 
 int64_t Util::StrToTimeStamp(const string &time, const string &format,
@@ -120,35 +112,36 @@ int64_t Util::StrToTimeStamp(const string &time, const string &format,
   absl::Time t;
   string err;
   if (!absl::ParseTime(format, time, tz, &t, &err)) {
-    LOG(ERROR) << err << " " << time << ", format: " << format;
     return -1;
   }
 
   return absl::ToUnixMillis(t);
 }
 
-string Util::ToTimeStrUTC() {
-  return Util::ToTimeStrUTC(Util::CurrentTimeMillis(),
-                            "%Y-%m-%d%ET%H:%M:%E3S%Ez");
-}
-
-string Util::ToTimeStrUTC(const int64_t ts, const string &format) {
-  absl::TimeZone tz = absl::UTCTimeZone();
-  return absl::FormatTime(format, absl::FromUnixMillis(ts), tz);
-}
-
-string Util::ToTimeStr() {
+string Util::ToTimeStrLocal() {
   return Util::ToTimeStr(Util::CurrentTimeMillis(), "%Y-%m-%d%ET%H:%M:%E3S%Ez",
                          "localtime");
 }
 
-string Util::ToTimeStr(const int64_t ts) {
+string Util::ToTimeStrLocal(const int64_t ts) {
   return Util::ToTimeStr(ts, "%Y-%m-%d%ET%H:%M:%E3S%Ez", "localtime");
 }
 
-string Util::ToTimeStr(const int64_t ts, const string &format) {
-  absl::TimeZone tz = absl::LocalTimeZone();
-  return absl::FormatTime(format, absl::FromUnixMillis(ts), tz);
+string Util::ToTimeStrLocal(const int64_t ts, const string &format) {
+  return Util::ToTimeStr(ts, format, "localtime");
+}
+
+string Util::ToTimeStrUTC() {
+  return Util::ToTimeStr(Util::CurrentTimeMillis(), "%Y-%m-%d%ET%H:%M:%E3S%Ez",
+                         "UTC");
+}
+
+string Util::ToTimeStrUTC(const int64_t ts) {
+  return Util::ToTimeStr(ts, "%Y-%m-%d%ET%H:%M:%E3S%Ez", "UTC");
+}
+
+string Util::ToTimeStrUTC(const int64_t ts, const string &format) {
+  return Util::ToTimeStr(ts, format, "UTC");
 }
 
 string Util::ToTimeStr(const int64_t ts, const string &format,
@@ -581,6 +574,15 @@ string Util::ParentPath(const string &path) {
   return "";
 }
 
+string Util::CurrentPath() {
+  try {
+    return std::filesystem::current_path().string();
+  } catch (const std::filesystem::filesystem_error &e) {
+    LOG(ERROR) << "CurrentPath error: " << e.what();
+  }
+  return "";
+}
+
 bool Util::CopyFile(const string &src, const string &dst,
                     const std::filesystem::copy_options opt) {
   try {
@@ -904,6 +906,10 @@ bool Util::StartWith(const string &str, const string &prefix) {
 
 bool Util::EndWith(const string &str, const string &postfix) {
   return boost::ends_with(str, postfix);
+}
+
+bool Util::Contain(const string &str, const string &p) {
+  return boost::contains(str, p);
 }
 
 void Util::Split(const string &str, const string &delim,
@@ -1582,6 +1588,22 @@ string Util::HomeDir() {
     return workspace.parent_path().parent_path().string();
   }
   return current_path;
+}
+
+void Util::PrintAllEnv() {
+#if defined(__linux__) || defined(__APPLE__)
+  char **env = environ;
+  while (*env) {
+    LOG(INFO) << *env;
+    ++env;
+  }
+#elif defined(_WIN32)
+  char **env = _environ;
+  while (*env) {
+    LOG(INFO) << *env;
+    ++env;
+  }
+#endif
 }
 
 }  // namespace util

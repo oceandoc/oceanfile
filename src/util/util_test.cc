@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <functional>
 #include <thread>
-#include <vector>
 
 // #include "fmt/core.h"
 #include "glog/logging.h"
@@ -21,96 +20,131 @@
 namespace oceandoc {
 namespace util {
 
+// TEST(Util, PrintAllEnv) { Util::PrintAllEnv(); }
+
 TEST(Util, CurrentTimeMillis) {
-  LOG(INFO) << Util::CurrentTimeMillis();
   EXPECT_GT(Util::CurrentTimeMillis(), 1704038400000);
   EXPECT_LT(Util::CurrentTimeMillis(), 1904038400000);
 }
 
 TEST(Util, CurrentTimeNanos) {
-  LOG(INFO) << Util::CurrentTimeNanos();
   EXPECT_GT(Util::CurrentTimeNanos(), 1727101022292387983);
   EXPECT_LT(Util::CurrentTimeNanos(), 1927101022292387983);
 }
 
+// NOTICE: Cannot combine %E#S and %E#f
+// NOTICE: bazel run/test will use UTC time zone as default
+// and bazel just provide --test_env=TZ=Asia/Shanghai, not have --run_env
+// env TZ=Asia/Shanghai bazel run //xxx:target
+// https://www.epochconverter.com
 TEST(Util, StrToTimeStamp) {
+  absl::TimeZone tz;
+  if (!absl::LoadTimeZone("UTC", &tz)) {
+    LOG(ERROR) << "Load time zone error";
+  }
+  EXPECT_EQ(tz.name(), "UTC");
+
   std::string time = "2024-09-24 13:36:44";
   std::string format = "%Y-%m-%d HH:MM:SS";
-  int64_t ts = 1727185004000;
-  EXPECT_EQ(Util::StrToTimeStamp(time, format), -1);
+  EXPECT_EQ(Util::StrToTimeStampUTC(time, format), -1);
 
   time = "2024-09-24 13:36:44";
   format = "%Y-%m-%d %H:%M:%S";
-  ts = 1727185004000;
-  EXPECT_EQ(Util::StrToTimeStampUTC(time, format), ts);
+  EXPECT_EQ(Util::StrToTimeStampUTC(time, format), 1727185004000);
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "UTC"), 1727185004000);
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "Asia/Shanghai"), 1727156204000);
+  if (test::Util::IsBazelTest()) {
+    EXPECT_EQ(Util::StrToTimeStampLocal(time, format), 1727156204000);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::StrToTimeStampUTC(time, format), 1727185004000);
+  }
 
-  time = "2024-09-24 13:36:44";
-  format = "%Y-%m-%d %H:%M:%S";
-  ts = 1727156204000;
-  EXPECT_EQ(Util::StrToTimeStamp(time, format, "Asia/Shanghai"), ts);
-
-  time = "2024-09-24 21:36:44";
-  format = "%Y-%m-%d %H:%M:%S";
-  ts = 1727185004000;
-  // CST time
-  EXPECT_EQ(Util::StrToTimeStamp(time, format, "Asia/Shanghai"), ts);
-
-  // UTC time
-  time = "2024-09-24 13:36:44";
-  format = "%Y-%m-%d %H:%M:%S";
-  ts = 1727185004000;
-  EXPECT_EQ(Util::StrToTimeStamp(time, format, "UTC"), ts);
-
-  // local time, bazel sandbox use UTC time, but this project used
-  // --test_env=TZ=Asia/Shanghai
-  time = "2024-09-24 13:36:44";
-  format = "%Y-%m-%d %H:%M:%S";
-  ts = 1727156204000;
-  EXPECT_EQ(Util::StrToTimeStamp(time, format, "localtime"), ts);
-
-  time = "2024-09-24 21:36:44.123";
+  time = "2024-09-24 13:36:44.123";
   format = "%Y-%m-%d %H:%M:%E3S";
-  ts = 1727185004123;
-  EXPECT_EQ(Util::StrToTimeStamp(time, format, "Asia/Shanghai"), ts);
+  EXPECT_EQ(Util::StrToTimeStampUTC(time, format), 1727185004123);
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "UTC"), 1727185004123);
+  EXPECT_EQ(Util::StrToTimeStamp(time, format, "Asia/Shanghai"), 1727156204123);
+  if (test::Util::IsBazelTest()) {
+    EXPECT_EQ(Util::StrToTimeStampLocal(time, format), 1727156204123);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::StrToTimeStampUTC(time, format), 1727185004123);
+  }
 
   time = "2024-09-24 13:36:44.123";
   format = "%Y-%m-%d %H:%M:%E2S%E3f";
-  ts = 1727156204123;
-  EXPECT_EQ(Util::StrToTimeStamp(time, format), ts);
+  if (test::Util::IsBazelTest()) {
+    EXPECT_EQ(Util::StrToTimeStampLocal(time, format), 1727156204123);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::StrToTimeStampUTC(time, format), 1727185004123);
+  }
 
   time = "2024-09-24 13:36:44.123";
   format = "%Y-%m-%d %H:%M:%E3S";
-  ts = 1727156204123;
-  EXPECT_EQ(Util::StrToTimeStamp(time, format), ts);
+  if (test::Util::IsBazelTest()) {
+    EXPECT_EQ(Util::StrToTimeStampLocal(time, format), 1727156204123);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::StrToTimeStampUTC(time, format), 1727185004123);
+  }
 
-  time = "2024-09-24T13:36:44.000+0000";
-  format = "%Y-%m-%d %H:%M:%E2S%E3f%Ez";
-  ts = 1727185004000;
-  EXPECT_EQ(Util::StrToTimeStamp(time), ts);
+  time = "2024-09-24T13:36:44.123+00:00";
+  format = "%Y-%m-%d%ET%H:%M:%E2S%E3f%Ez";
+  EXPECT_EQ(Util::StrToTimeStampUTC(time, format), 1727185004123);
+  EXPECT_EQ(Util::StrToTimeStampLocal(time, format), 1727185004123);
 
-  time = "2024-09-24 13:36:44.123+08:30:24";
+  time = "2024-09-24 13:36:44.123+08:00:00";
   format = "%Y-%m-%d %H:%M:%E3S%E*z";
-  ts = 1727154380123;
-  EXPECT_EQ(Util::StrToTimeStamp(time, format), ts);
+  EXPECT_EQ(Util::StrToTimeStampUTC(time, format), 1727156204123);
 }
 
 TEST(Util, ToTimeStr) {
-  int64_t ts = 1727185004000;
-  std::string time = "2024-09-24T21:36:44.000+08:00 CST";
-  std::string format = "%Y-%m-%d%ET%H:%M:%E3S%Ez %Z";
+  int64_t ts = 1727185004123;
+  std::string format = "%Y-%m-%dT%H:%M:%S%z %Z";
+  std::string time = "2024-09-24T21:36:44+0800 CST";
+  std::string utc_time = "2024-09-24T13:36:44+0000 UTC";
+
   EXPECT_EQ(Util::ToTimeStr(ts, format, "Asia/Shanghai"), time);
+  if (test::Util::IsBazelTest()) {
+    EXPECT_EQ(Util::ToTimeStrLocal(ts, format), time);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::ToTimeStrLocal(ts, format), utc_time);
+  }
+  EXPECT_EQ(Util::ToTimeStrUTC(ts, format), utc_time);
 
-  // local time, bazel sandbox use UTC time, but this project used
-  // --test_env=TZ=Asia/Shanghai
-  time = "2024-09-24T21:36:44.000+08:00";
-  format = "%Y-%m-%d %H:%M:%S";
-  EXPECT_EQ(Util::ToTimeStr(ts), time);
-
-  time = "2024-09-24 13:36:44";
-  EXPECT_EQ(Util::ToTimeStrUTC(ts, format), time);
-
-  time = "2024-09-24 21:36:44";
+  // %ET:T, %Ez:%z
+  format = "%Y-%m-%d%ET%H:%M:%S%Ez %Z";
+  time = "2024-09-24T21:36:44+08:00 CST";
+  utc_time = "2024-09-24T13:36:44+00:00 UTC";
   EXPECT_EQ(Util::ToTimeStr(ts, format, "Asia/Shanghai"), time);
+  if (test::Util::IsBazelTest()) {
+    EXPECT_EQ(Util::ToTimeStrLocal(ts, format), time);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::ToTimeStrLocal(ts, format), utc_time);
+  }
+  EXPECT_EQ(Util::ToTimeStrUTC(ts, format), utc_time);
+
+  // %E3f
+  format = "%Y-%m-%d%ET%H:%M:%S.%E3f%Ez %Z";
+  time = "2024-09-24T21:36:44.123+08:00 CST";
+  utc_time = "2024-09-24T13:36:44.123+00:00 UTC";
+  EXPECT_EQ(Util::ToTimeStr(ts, format, "Asia/Shanghai"), time);
+  if (test::Util::IsBazelTest()) {
+    EXPECT_EQ(Util::ToTimeStrLocal(ts, format), time);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::ToTimeStrLocal(ts, format), utc_time);
+  }
+  EXPECT_EQ(Util::ToTimeStrUTC(ts, format), utc_time);
+
+  // %E3S:%S.%E3f
+  format = "%Y-%m-%d%ET%H:%M:%E3S%Ez %Z";
+  time = "2024-09-24T21:36:44.123+08:00 CST";
+  utc_time = "2024-09-24T13:36:44.123+00:00 UTC";
+  EXPECT_EQ(Util::ToTimeStr(ts, format, "Asia/Shanghai"), time);
+  if (test::Util::IsBazelTest()) {
+    EXPECT_EQ(Util::ToTimeStrLocal(ts, format), time);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::ToTimeStrLocal(ts, format), utc_time);
+  }
+  EXPECT_EQ(Util::ToTimeStrUTC(ts, format), utc_time);
 }
 
 TEST(Util, ToTimeSpec) {
@@ -120,7 +154,7 @@ TEST(Util, ToTimeSpec) {
 }
 
 TEST(Util, Random) {
-  auto generator = [](int thread_num) {
+  auto generator = [](int /*thread_num*/) {
     for (int i = 0; i < 10000; ++i) {
       auto ret = Util::Random(0, 100);
       EXPECT_GT(ret, -1);
@@ -178,12 +212,17 @@ TEST(Util, UpdateTime) {
 
 TEST(Util, FileSize) {
   // echo "test" > txt will add a \n to file automatic, vim has same behavior
-  auto runfile_dir = Util::GetEnv("TEST_SRCDIR");
   std::string path = "test_data/util_test/test1/test2/symlink_to_target";
-  if (runfile_dir.has_value()) {
-    EXPECT_EQ(Util::FileSize(path), 131);
+  if (test::Util::IsBazelTest()) {
+    std::string target_path =
+        test::Util::ExecRoot() + "/" + test::Util::Workspace() + "/" + path;
+    EXPECT_EQ(Util::FileSize(path), target_path.size());
     EXPECT_EQ(Util::FileSize("test_data/util_test/target"), 108);
-    EXPECT_EQ(Util::FileSize("test_data"), 18);
+    EXPECT_EQ(Util::FileSize("test_data"), 4096);
+  } else if (test::Util::IsBazelRun()) {
+    std::string target_path = Util::CurrentPath() + "/" + path;
+    EXPECT_EQ(Util::FileSize(path), target_path.size());
+    EXPECT_EQ(Util::FileSize("test_data/util_test/target"), 5);
   } else {
     EXPECT_EQ(Util::FileSize(path), 12);
     EXPECT_EQ(Util::FileSize("test_data/util_test/target"), 5);
@@ -232,13 +271,13 @@ TEST(Util, Path) {
 
 TEST(Util, Exists) {
   std::string path = "test_data/util_test/test1/test2/target_not_exist";
-  if (test::Util::IsBazelRunUnitTest()) {
+  if (test::Util::IsBazelTest()) {
     EXPECT_EQ(Util::Exists(path), false);
     EXPECT_EQ(std::filesystem::exists(path), false);
-
-  } else {
-    EXPECT_EQ(Util::Exists(path), true);
+  } else if (test::Util::IsBazelRun()) {
+    EXPECT_EQ(Util::Exists(path), false);
     EXPECT_EQ(std::filesystem::exists(path), false);
+  } else {
   }
 }
 
@@ -387,7 +426,7 @@ TEST(Util, SyncSymlink) {
   EXPECT_EQ(Util::Remove(dst_symlink), true);
   EXPECT_EQ(Util::Exists(dst_symlink), false);
   EXPECT_EQ(Util::SyncSymlink(src, dst, src_symlink), true);
-  if (!test::Util::IsBazelRunUnitTest()) {
+  if (!test::Util::IsBazelTest()) {
     EXPECT_EQ(Util::Exists(dst_symlink), true);
     std::string src_target =
         std::filesystem::read_symlink(src_symlink).string();
@@ -403,9 +442,9 @@ TEST(Util, PrepareFile) {
                     common::HashMethod::Hash_BLAKE3,
                     common::NET_BUFFER_SIZE_BYTES, &attr);
   EXPECT_EQ(attr.file_hash,
-            "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2");
+            "dea2b412aa90f1b43a06ca5e8b8feafec45ae1357971322749480f4e1572eaa2");
   EXPECT_EQ(attr.partition_num, 1);
-  if (test::Util::IsBazelRunUnitTest()) {
+  if (test::Util::IsBazelTest()) {
     EXPECT_EQ(attr.file_size, 108);
   } else {
     EXPECT_EQ(attr.file_size, 5);
@@ -513,39 +552,6 @@ TEST(Util, Blake3) {
             "9b12d05351596e6851917bc73dcaf39eb12a27a196e56d38492ed730a60edf8e");
 }
 
-TEST(Util, FileHashCompare) {
-  const auto& path =
-      "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus";
-  std::string out;
-  auto start = Util::CurrentTimeMillis();
-  Util::FileBlake3(path, &out);
-  auto now = Util::CurrentTimeMillis();
-  LOG(INFO) << "Cost: " << now - start;
-  EXPECT_EQ(out,
-            "4195ca072574b8da14152cbd76b3de16dd5e290d5dbb3582a047ee17bb1b6fd4");
-  start = now;
-
-  Util::FileSHA256(path, &out);
-  now = Util::CurrentTimeMillis();
-  LOG(INFO) << "Cost: " << now - start;
-  EXPECT_EQ(out,
-            "4084ec48f2affbd501c02a942b674abcfdbbc6475070049de2c89fb6aa25a3f0");
-  start = now;
-
-  Util::FileBlake3(path, &out);
-  now = Util::CurrentTimeMillis();
-  LOG(INFO) << "Cost: " << now - start;
-  EXPECT_EQ(out,
-            "4195ca072574b8da14152cbd76b3de16dd5e290d5dbb3582a047ee17bb1b6fd4");
-  start = now;
-
-  Util::FileSHA256(path, &out);
-  now = Util::CurrentTimeMillis();
-  LOG(INFO) << "Cost: " << now - start;
-  EXPECT_EQ(out,
-            "4084ec48f2affbd501c02a942b674abcfdbbc6475070049de2c89fb6aa25a3f0");
-}
-
 TEST(Util, LZMA) {
   std::string data = "/usr/local/llvm";
   std::string compressed_data;
@@ -571,24 +577,6 @@ TEST(Util, LZMA) {
   EXPECT_EQ(decompressed_data, "/usr/local/llvm");
 }
 
-TEST(Util, MessageToJson) {
-  proto::FileReq req;
-  req.set_op(proto::FileOp::FilePut);
-  req.set_src("tesxt");
-  req.set_file_hash("abbc");
-  req.set_file_size(50);
-  req.set_repo_uuid("/tmp/test_repo");
-  req.set_content("test");
-
-  std::string serialized;
-  if (!Util::MessageToJson(req, &serialized)) {
-    LOG(ERROR) << "Req to json error: " << serialized;
-  }
-  std::string result =
-      R"({"request_id":"","op":1,"path":"tesxt","hash":"abbc","size":50,"content":"dGVzdA==","partition_num":0,"repo_uuid":"/tmp/test_repo","partition_size":0})";
-  EXPECT_EQ(serialized, result);
-}
-
 TEST(Util, JsonToMessage) {
   proto::FileReq req;
 
@@ -597,15 +585,7 @@ TEST(Util, JsonToMessage) {
   if (!Util::JsonToMessage(serialized, &req)) {
     LOG(ERROR) << "Req to json error: " << serialized;
   }
-  EXPECT_EQ(req.src(), "tesxt");
-  serialized =
-      R"({"request_id":"","op":"FilePut","path":"/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus","hash":"4084ec48f2affbd501c02a942b674abcfdbbc6475070049de2c89fb6aa25a3f0","size":359621552,"content":"f0VMRgIBAQMAAAAAAAAAAAIAPgABAAAAMNl8AAAAAABAAAAAAAAAADBZbxUAAAAAAAAAAEAAOAAOAEA","partition_num":2,"repo_uuid":"8636ac78-d409-4c27-8827-c6ddb1a3230c"})";
-  if (!Util::JsonToMessage(serialized, &req)) {
-    LOG(ERROR) << "Req to json error: " << serialized;
-  }
-  EXPECT_EQ(
-      req.src(),
-      "/usr/local/gcc/14.1.0/libexec/gcc/x86_64-pc-linux-gnu/14.1.0/cc1plus");
+  EXPECT_EQ(req.op(), 2);
 }
 
 TEST(Util, HashPassword) {

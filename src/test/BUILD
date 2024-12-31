@@ -63,3 +63,16 @@ cc_library(
         "@folly",
     ],
 )
+
+cc_test(
+    name = "test_util_test",
+    srcs = ["test_util_test.cc"],
+    copts = COPTS,
+    local_defines = LOCAL_DEFINES,
+    deps = [
+        ":test_util",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_github_glog_glog//:glog",
+        "@com_google_googletest//:gtest",
+    ],
+)
