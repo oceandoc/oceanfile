@@ -56,7 +56,24 @@ struct FilesRow {
   std::string file_hash;
   std::string live_photo_video_hash;
   std::string thumb_hash;
-  bool Extract(sqlite3_stmt* /*stmt*/) { return true; }
+  bool Extract(sqlite3_stmt* stmt) {
+    const char* hash = (const char*)sqlite3_column_text(stmt, 0);
+    const char* local_id = (const char*)sqlite3_column_text(stmt, 1);
+    const char* device_id = (const char*)sqlite3_column_text(stmt, 2);
+    int64_t create_time = sqlite3_column_int64(stmt, 3);
+    int64_t update_time = sqlite3_column_int64(stmt, 4);
+    int64_t duration = sqlite3_column_int64(stmt, 5);
+    int32_t type = sqlite3_column_int(stmt, 6);
+    int32_t width = sqlite3_column_int(stmt, 7);
+    int32_t height = sqlite3_column_int(stmt, 8);
+    const char* file_name = (const char*)sqlite3_column_text(stmt, 9);
+    int32_t favorite = sqlite3_column_int(stmt, 10);
+    const char* owner = (const char*)sqlite3_column_text(stmt, 11);
+    const char* live_photo_hash = (const char*)sqlite3_column_text(stmt, 12);
+    const char* thumb_hash = (const char*)sqlite3_column_text(stmt, 14);
+
+    return true;
+  }
 };
 
 }  // namespace util

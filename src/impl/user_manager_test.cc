@@ -12,11 +12,22 @@ namespace oceandoc {
 namespace impl {
 
 TEST(UserManager, UserExists) {
+  std::string home_dir = oceandoc::util::Util::HomeDir();
+  LOG(INFO) << "Home dir: " << home_dir;
+  auto db_path = home_dir + "/data/fstation.db";
+  if (util::Util::Exists(db_path)) {
+    if (!util::Util::Remove(db_path)) {
+      LOG(ERROR) << "Remove " << db_path << " error";
+    }
+  }
+
+  EXPECT_EQ(util::SqliteManager::Instance()->Init(home_dir), true);
   EXPECT_EQ(UserManager::Instance()->Init(), true);
+
   std::string user = "admin";
   std::string plain_passwd = "admin";
   std::string token;
-  EXPECT_EQ(UserManager::Instance()->UserExists(user), Err_User_exists);
+  EXPECT_EQ(UserManager::Instance()->UserExists(user), Err_Success);
 
   EXPECT_EQ(UserManager::Instance()->UserLogin(
                 user, util::Util::SHA256(plain_passwd), &token),
@@ -25,9 +36,10 @@ TEST(UserManager, UserExists) {
 
   plain_passwd = "admin1";
   EXPECT_EQ(UserManager::Instance()->ChangePassword(
-                "admin", "admin", util::Util::SHA256(plain_passwd), &token),
+                "admin", util::Util::SHA256("admin"),
+                util::Util::SHA256(plain_passwd), &token),
             Err_Success);
-  EXPECT_EQ(UserManager::Instance()->UserExists(user), Err_User_exists);
+  EXPECT_EQ(UserManager::Instance()->UserExists(user), Err_Success);
 
   plain_passwd = "admin";
   EXPECT_EQ(UserManager::Instance()->UserLogin(
@@ -46,7 +58,7 @@ TEST(UserManager, UserExists) {
   EXPECT_EQ(UserManager::Instance()->UserRegister(
                 user, util::Util::SHA256(plain_passwd), &token),
             Err_Success);
-  EXPECT_EQ(UserManager::Instance()->UserExists(user), Err_User_exists);
+  EXPECT_EQ(UserManager::Instance()->UserExists(user), Err_Success);
   EXPECT_EQ(UserManager::Instance()->UserDelete(user, user, token),
             Err_Success);
   EXPECT_EQ(UserManager::Instance()->UserExists(user), Err_User_not_exists);

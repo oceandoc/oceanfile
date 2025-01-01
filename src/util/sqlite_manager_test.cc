@@ -21,8 +21,7 @@ int32_t SelectUser() {
       R"(SELECT user, salt, password, create_time, update_time
          FROM users
          WHERE user = ?;)";
-  std::function<bool(sqlite3_stmt * stmt)> bind_callback =
-      [&user](sqlite3_stmt* stmt) -> bool {
+  SqliteBinder bind_callback = [&user](sqlite3_stmt* stmt) -> bool {
     if (sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC)) {
       return false;
     }
@@ -69,8 +68,7 @@ TEST(SqliteManager, Delete) {
   std::string user = "admin";
   std::string err_msg;
   std::string sql = R"(DELETE FROM users WHERE user = ?;)";
-  std::function<bool(sqlite3_stmt * stmt)> bind_callback =
-      [&user](sqlite3_stmt* stmt) -> bool {
+  SqliteBinder bind_callback = [&user](sqlite3_stmt* stmt) -> bool {
     if (sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC)) {
       return false;
     }

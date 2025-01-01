@@ -6,15 +6,14 @@
 #ifndef BAZEL_TEMPLATE_IMPL_USER_MANAGER_H
 #define BAZEL_TEMPLATE_IMPL_USER_MANAGER_H
 
-#include <condition_variable>
 #include <memory>
-#include <mutex>
 #include <string>
+#include <vector>
 
-#include "absl/base/internal/spinlock.h"
 #include "folly/Singleton.h"
 #include "src/impl/session_manager.h"
 #include "src/util/sqlite_manager.h"
+#include "src/util/sqlite_row.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -32,11 +31,6 @@ class UserManager final {
 
   bool Init() { return true; }
 
-  void Stop() {
-    stop_.store(true);
-    cv_.notify_all();
-  }
-
   int32_t UserRegister(const std::string& user, const std::string& password,
                        std::string* token) {
     if (user.size() > 64 || user.empty()) {
@@ -53,30 +47,44 @@ class UserManager final {
       return Err_Fail;
     }
 
-    sqlite3_stmt* stmt = nullptr;
     int affect_rows = 0;
     std::string err_msg;
     std::string sql =
-        "INSERT OR IGNORE INTO users (user, salt, password) VALUES (?, ?, ?);";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [&salt, &hashed_password, &user](sqlite3_stmt* stmt) {
-          sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
-          sqlite3_bind_text(stmt, 2, salt.c_str(), salt.size(), SQLITE_STATIC);
-          sqlite3_bind_text(stmt, 3, hashed_password.c_str(),
-                            hashed_password.size(), SQLITE_STATIC);
-        };
-    auto ret = util::SqliteManager::Instance()->Execute(
-        sql, &affect_rows, &err_msg, stmt, bind_callback);
+        R"(INSERT OR IGNORE INTO users
+             (user, salt, password, create_time, update_time)
+             VALUES (?, ?, ?, ?, ?);)";
+    SqliteBinder bind_callback = [&salt, &hashed_password,
+                                  &user](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_STATIC)) {
+        return false;
+      }
+      if (sqlite3_bind_text(stmt, 2, salt.c_str(), -1, SQLITE_STATIC)) {
+        return false;
+      }
+      if (sqlite3_bind_text(stmt, 3, hashed_password.c_str(), -1,
+                            SQLITE_STATIC)) {
+        return false;
+      }
+      int64_t now = util::Util::CurrentTimeMillis();
+      if (sqlite3_bind_int64(stmt, 4, now)) {
+        return false;
+      }
+      if (sqlite3_bind_int64(stmt, 5, now)) {
+        return false;
+      }
+      return true;
+    };
+    auto ret = util::SqliteManager::Instance()->Insert(sql, &affect_rows,
+                                                       &err_msg, bind_callback);
     if (ret) {
       return Err_Fail;
     }
 
-    sqlite3_finalize(*stmt);
     if (affect_rows > 0) {
       *token = SessionManager::Instance()->GenerateToken(user);
       return Err_Success;
     } else {
-      LOG(ERROR) << "No records were updated. user '" << user
+      LOG(ERROR) << "No records were updated. user: " << user
                  << " may exist already";
     }
     return Err_User_exists;
@@ -95,30 +103,52 @@ class UserManager final {
     }
 
     if (login_user == "admin" || login_user == to_delete_user) {
-      sqlite3_stmt* stmt = nullptr;
       int affect_rows = 0;
       std::string err_msg;
       std::string sql = "DELETE FROM users WHERE user = ?;";
-      std::function<void(sqlite3_stmt * stmt)> bind_callback =
-          [&to_delete_user](sqlite3_stmt* stmt) {
-            sqlite3_bind_text(stmt, 1, to_delete_user.c_str(),
-                              to_delete_user.size(), SQLITE_STATIC);
-          };
-      auto ret = util::SqliteManager::Instance()->Execute(
-          sql, &affect_rows, &err_msg, stmt, bind_callback);
+      SqliteBinder bind_callback =
+          [&to_delete_user](sqlite3_stmt* stmt) -> bool {
+        if (sqlite3_bind_text(stmt, 1, to_delete_user.c_str(), -1,
+                              SQLITE_STATIC)) {
+          return false;
+        }
+        return true;
+      };
+      auto ret = util::SqliteManager::Instance()->Delete(
+          sql, &affect_rows, &err_msg, bind_callback);
       if (ret) {
         return Err_Fail;
       }
-      sqlite3_finalize(*stmt);
       if (affect_rows > 0) {
         SessionManager::Instance()->KickoutByToken(token);
         return Err_Success;
       } else {
-        LOG(ERROR) << "No records were deleted. user '" << to_delete_user
+        LOG(ERROR) << "No records were deleted. user: " << to_delete_user
                    << " may not exist";
       }
     }
     return Err_User_not_exists;
+  }
+
+  int32_t SelectUser(const std::string& user, std::vector<util::UsersRow>* rows,
+                     std::string* err_msg) {
+    std::string sql =
+        R"(SELECT user, salt, password, create_time, update_time
+         FROM users
+         WHERE user = ?;)";
+    SqliteBinder bind_callback = [&user](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_text(stmt, 1, user.c_str(), user.size(),
+                            SQLITE_STATIC)) {
+        return false;
+      }
+      return true;
+    };
+    auto ret = util::SqliteManager::Instance()->Select<util::UsersRow>(
+        sql, err_msg, bind_callback, rows);
+    if (ret) {
+      return Err_Fail;
+    }
+    return Err_Success;
   }
 
   int32_t VerifyPassword(const std::string& user, const std::string& password) {
@@ -130,32 +160,16 @@ class UserManager final {
       return Err_User_passwd_error;
     }
 
-    sqlite3_stmt* stmt = nullptr;
-    int affect_rows = 0;
     std::string err_msg;
-    std::string sql = "SELECT salt, password FROM users WHERE user = ?;";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [&user](sqlite3_stmt* stmt) {
-          sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
-        };
-    auto ret = util::SqliteManager::Instance()->Execute(
-        sql, &affect_rows, &err_msg, stmt, bind_callback);
+    std::vector<util::UsersRow> rows;
+    auto ret = SelectUser(user, &rows, &err_msg);
     if (ret) {
-      return Err_Fail;
+      return ret;
     }
 
-    if (sqlite3_step(*stmt) == SQLITE_ROW) {
-      std::string salt;
-      salt.reserve(util::Util::kSaltSize);
-      salt.append(reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 0)),
-                  util::Util::kSaltSize);
-      std::string hashed_password;
-      hashed_password.reserve(util::Util::kDerivedKeySize);
-      hashed_password.append(
-          reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 1)),
-          util::Util::kDerivedKeySize);
-      sqlite3_finalize(*stmt);
-      if (util::Util::VerifyPassword(password, salt, hashed_password)) {
+    if (!rows.empty()) {
+      const auto& user = rows.front();
+      if (util::Util::VerifyPassword(password, user.salt, user.password)) {
         return Err_Success;
       } else {
         return Err_User_passwd_error;
@@ -177,8 +191,11 @@ class UserManager final {
 
   int32_t UserValidateSession(const std::string& user,
                               const std::string& token) {
-    if (user.empty() || token.empty()) {
-      LOG(ERROR) << "user name or token empty";
+    if (user.size() > 64 || user.empty()) {
+      return Err_User_name_error;
+    }
+
+    if (token.empty()) {
       return Err_User_session_error;
     }
 
@@ -214,42 +231,28 @@ class UserManager final {
       return Err_User_name_error;
     }
 
-    sqlite3_stmt* stmt = nullptr;
-    int affect_rows = 0;
     std::string err_msg;
-    std::string sql = "SELECT salt, password FROM users WHERE user = ?;";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [&user](sqlite3_stmt* stmt) {
-          sqlite3_bind_text(stmt, 1, user.c_str(), user.size(), SQLITE_STATIC);
-        };
-    auto ret = util::SqliteManager::Instance()->Execute(
-        sql, &affect_rows, &err_msg, stmt, bind_callback);
+    std::vector<util::UsersRow> rows;
+    auto ret = SelectUser(user, &rows, &err_msg);
     if (ret) {
-      return Err_Fail;
+      return ret;
     }
 
-    if (sqlite3_step(*stmt) == SQLITE_ROW) {
-      std::string hashed_password;
-      hashed_password.reserve(util::Util::kDerivedKeySize);
-      hashed_password.append(
-          reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 1)),
-          util::Util::kDerivedKeySize);
-      sqlite3_finalize(*stmt);
-      return Err_User_exists;
+    if (!rows.empty()) {
+      return Err_Success;
     }
-    sqlite3_finalize(*stmt);
 
     return Err_User_not_exists;
   }
 
   int32_t ChangePassword(const std::string& user,
                          const std::string& old_password,
-                         const std::string& password, std::string* token) {
+                         const std::string& new_password, std::string* token) {
     if (user.size() > 64 || user.empty()) {
       return Err_User_name_error;
     }
 
-    if (password.size() > 64 || password.size() < 8) {
+    if (new_password.size() > 64 || new_password.size() < 8) {
       return Err_User_passwd_error;
     }
 
@@ -260,27 +263,34 @@ class UserManager final {
 
     std::string salt = util::Util::GenerateSalt();
     std::string hashed_password;
-    if (!util::Util::HashPassword(password, salt, &hashed_password)) {
+    if (!util::Util::HashPassword(new_password, salt, &hashed_password)) {
       return Err_User_passwd_error;
     }
 
-    sqlite3_stmt* stmt = nullptr;
     int affect_rows = 0;
     std::string err_msg;
     std::string sql = "UPDATE users SET salt = ?, password = ? WHERE user = ?;";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [&user, &salt, &hashed_password](sqlite3_stmt* stmt) {
-          sqlite3_bind_text(stmt, 3, user.c_str(), user.size(), SQLITE_STATIC);
-          sqlite3_bind_text(stmt, 1, salt.c_str(), salt.size(), SQLITE_STATIC);
-          sqlite3_bind_text(stmt, 2, hashed_password.c_str(),
-                            hashed_password.size(), SQLITE_STATIC);
-        };
-    ret = util::SqliteManager::Instance()->Execute(sql, &affect_rows, &err_msg,
-                                                   stmt, bind_callback);
+    SqliteBinder bind_callback =
+        [&user, &salt, &hashed_password](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_text(stmt, 3, user.c_str(), user.size(),
+                            SQLITE_STATIC)) {
+        return false;
+      }
+      if (sqlite3_bind_text(stmt, 1, salt.c_str(), salt.size(),
+                            SQLITE_STATIC)) {
+        return false;
+      }
+      if (sqlite3_bind_text(stmt, 2, hashed_password.c_str(),
+                            hashed_password.size(), SQLITE_STATIC)) {
+        return false;
+      }
+      return true;
+    };
+    ret = util::SqliteManager::Instance()->Update(sql, &affect_rows, &err_msg,
+                                                  bind_callback);
     if (ret) {
       return Err_Fail;
     }
-    sqlite3_finalize(*stmt);
 
     if (affect_rows > 0) {
       *token = SessionManager::Instance()->GenerateToken(user);
@@ -304,12 +314,6 @@ class UserManager final {
 
     return Err_Fail;
   }
-
- private:
-  mutable absl::base_internal::SpinLock lock_;
-  std::atomic<bool> stop_ = false;
-  std::mutex mu_;
-  std::condition_variable cv_;
 };
 
 }  // namespace impl

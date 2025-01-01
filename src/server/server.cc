@@ -116,7 +116,6 @@ int main(int argc, char **argv) {
     shutdown_thread.join();
   }
 #endif
-  oceandoc::impl::UserManager::Instance()->Stop();
   oceandoc::impl::FileProcessManager::Instance()->Stop();
   oceandoc::impl::RepoManager::Instance()->Stop();
   oceandoc::util::ThreadPool::Instance()->Stop();

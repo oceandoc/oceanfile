@@ -18,10 +18,10 @@
 #include "src/util/sqlite_row.h"
 #include "src/util/util.h"
 
+using SqliteBinder = std::function<bool(sqlite3_stmt* stmt)>;
+
 namespace oceandoc {
 namespace util {
-
-using SqliteBinder = std::function<bool(sqlite3_stmt* stmt)>;
 
 class SqliteManager final {
   FRIEND_TEST(SqliteManager, Update);

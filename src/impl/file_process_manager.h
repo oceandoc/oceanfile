@@ -75,30 +75,33 @@ class FileProcessManager final {
   }
 
   bool InsertToDb(const common::ReceiveContext& ctx) {
-    sqlite3_stmt** stmt = nullptr;
     int affect_rows = 0;
     std::string err_msg;
     std::string sql =
         "INSERT OR IGNORE INTO files (hash, file_name) VALUES (?, ?);";
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [&ctx](sqlite3_stmt* stmt) {
-          sqlite3_bind_text(stmt, 1, ctx.file_hash.c_str(),
-                            ctx.file_hash.size(), SQLITE_STATIC);
-          sqlite3_bind_text(stmt, 2, ctx.file_name.c_str(),
-                            ctx.file_name.size(), SQLITE_STATIC);
-        };
-    auto ret = util::SqliteManager::Instance()->Execute(
-        sql, &affect_rows, &err_msg, stmt, bind_callback);
+    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
+        [&ctx](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_text(stmt, 1, ctx.file_hash.c_str(),
+                            ctx.file_hash.size(), SQLITE_STATIC)) {
+        return false;
+      }
+      if (sqlite3_bind_text(stmt, 2, ctx.file_name.c_str(),
+                            ctx.file_name.size(), SQLITE_STATIC)) {
+        return false;
+      }
+      return true;
+    };
+
+    auto ret = util::SqliteManager::Instance()->Insert(sql, &affect_rows,
+                                                       &err_msg, bind_callback);
     if (ret) {
       return Err_Fail;
     }
 
-    sqlite3_finalize(*stmt);
-
     if (affect_rows > 0) {
-      LOG(ERROR) << "insert success. file: " << ctx.file_hash;
+      LOG(ERROR) << "Insert success. file: " << ctx.file_hash;
     } else {
-      LOG(ERROR) << "No records were updated. file: " << ctx.file_hash
+      LOG(ERROR) << "No records updated. file: " << ctx.file_hash
                  << " may exist already";
     }
     return true;

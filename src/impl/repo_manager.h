@@ -12,6 +12,7 @@
 #include <shared_mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "folly/Singleton.h"
 #include "glog/logging.h"
@@ -20,6 +21,7 @@
 #include "src/impl/file_process_manager.h"
 #include "src/proto/data.pb.h"
 #include "src/proto/service.pb.h"
+#include "src/util/sqlite_row.h"
 #include "src/util/util.h"
 
 namespace oceandoc {
@@ -309,7 +311,7 @@ class RepoManager {
                                         "/" + repo.repo_uuid() + ".repo";
 
     repo.set_create_time(
-        util::Util::ToTimeStr(util::Util::CurrentTimeMillis()));
+        util::Util::ToTimeStrUTC(util::Util::CurrentTimeMillis()));
     repo.set_update_time(repo.create_time());
     repo.set_repo_path(req.path());
     repo.set_repo_name(req.repo_name());
@@ -438,7 +440,7 @@ class RepoManager {
   }
 
   int32_t ListRepoMediaFiles(const proto::RepoReq& /*req*/,
-                             proto::RepoRes* res) {
+                             proto::RepoRes* /*res*/) {
     // std::string query =
     //"SELECT hash, local_id, device_id, create_time, update_time, "
     //"duration, type, width, height, file_name, favorite, owner, "
@@ -451,55 +453,16 @@ class RepoManager {
         "live_photo_video_hash, deleted, thumb_hash "
         "FROM files;";
 
-    sqlite3_stmt** stmt = nullptr;
-    int affect_rows = 0;
     std::string err_msg;
-    std::function<void(sqlite3_stmt * stmt)> bind_callback =
-        [](sqlite3_stmt* /*stmt*/) {};
-    auto ret = util::SqliteManager::Instance()->Execute(
-        sql, &affect_rows, &err_msg, stmt, bind_callback);
+    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
+        [](sqlite3_stmt* /*stmt*/) -> bool { return true; };
+    std::vector<util::FilesRow> rows;
+    auto ret = util::SqliteManager::Instance()->Select<util::FilesRow>(
+        sql, &err_msg, bind_callback, &rows);
     if (ret) {
       return Err_Fail;
     }
 
-    while (sqlite3_step(*stmt) == SQLITE_ROW) {
-      auto* file_metas = res->add_file_metas();
-
-      // Get values from result row
-      const char* hash = (const char*)sqlite3_column_text(*stmt, 0);
-      const char* local_id = (const char*)sqlite3_column_text(*stmt, 1);
-      const char* device_id = (const char*)sqlite3_column_text(*stmt, 2);
-      int64_t create_time = sqlite3_column_int64(*stmt, 3);
-      int64_t update_time = sqlite3_column_int64(*stmt, 4);
-      int64_t duration = sqlite3_column_int64(*stmt, 5);
-      int32_t type = sqlite3_column_int(*stmt, 6);
-      int32_t width = sqlite3_column_int(*stmt, 7);
-      int32_t height = sqlite3_column_int(*stmt, 8);
-      const char* file_name = (const char*)sqlite3_column_text(*stmt, 9);
-      int32_t favorite = sqlite3_column_int(*stmt, 10);
-      const char* owner = (const char*)sqlite3_column_text(*stmt, 11);
-      const char* live_photo_hash = (const char*)sqlite3_column_text(*stmt, 12);
-      const char* thumb_hash = (const char*)sqlite3_column_text(*stmt, 14);
-
-      // Set values in protobuf message
-      if (hash) file_metas->set_file_hash(hash);
-      if (local_id) file_metas->set_local_id(local_id);
-      if (device_id) file_metas->set_device_id(device_id);
-      file_metas->set_local_create_time(create_time);
-      file_metas->set_local_update_time(update_time);
-      file_metas->set_duration(duration);
-      file_metas->set_file_sub_type(proto::FileSubType(type));
-      file_metas->set_width(width);
-      file_metas->set_height(height);
-      if (file_name) file_metas->set_file_name(file_name);
-      file_metas->set_favorite(favorite);
-      if (owner) file_metas->set_owner(owner);
-      if (live_photo_hash)
-        file_metas->set_live_photo_video_hash(live_photo_hash);
-      if (thumb_hash) file_metas->set_thumb_hash(thumb_hash);
-    }
-
-    sqlite3_finalize(*stmt);
     return Err_Success;
   }
 
