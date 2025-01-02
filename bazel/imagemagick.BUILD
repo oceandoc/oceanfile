@@ -67,7 +67,13 @@ cc_library(
     ],
     local_defines = LOCAL_DEFINES,
     visibility = ["//visibility:public"],
-    deps = [],
+    deps = [
+        "@libpng",
+        "@libwebp",
+        "@libxml2",
+        "@libyuv",
+        "@zlib",
+    ],
 )
 
 write_file(

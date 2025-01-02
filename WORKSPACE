@@ -785,19 +785,39 @@ new_local_repository(
     path = "../ImageMagick",
 )
 
-http_archive(
-    name = "libxml2",
-    build_file = "@//:libxml2.BUILD",
-    sha256 = "PLACEHOLDER",
-    strip_prefix = "libxml2-2.9.10",
-    url = "http://xmlsoft.org/sources/libxml2-2.9.10.tar.gz",
-)
-
 new_git_repository(
     name = "libxml2",
     build_file = "//bazel:libxml2.BUILD",
     commit = "71c37a565d3726440aa96d648db0426deb90157b",
     remote = "git@github.com:GNOME/libxml2.git",
+)
+
+new_git_repository(
+    name = "libwebp",
+    build_file = "//bazel:libwebp.BUILD",
+    commit = "2af6c034ac871c967e04c8c9f8bf2dbc2e271b18",
+    remote = "git@github.com:webmproject/libwebp.git",
+)
+
+new_git_repository(
+    name = "libpng",
+    build_file = "//bazel:libpng.BUILD",
+    commit = "c1cc0f3f4c3d4abd11ca68c59446a29ff6f95003",
+    remote = "git@github.com:pnggroup/libpng.git",
+)
+
+new_git_repository(
+    name = "libyuv",
+    build_file = "//bazel:libyuv.BUILD",
+    commit = "b5a18f9d937492c0e2d3dc88d6a2ed39c6cfda24",
+    remote = "git@github.com:lemenkov/libyuv.git",
+)
+
+new_git_repository(
+    name = "freetype2",
+    build_file = "//bazel:freetype2.BUILD",
+    commit = "10b3b14da2a60151dd9242364ad7a375d0d7590a",
+    remote = "git@github.com:freetype/freetype.git",
 )
 
 new_git_repository(
