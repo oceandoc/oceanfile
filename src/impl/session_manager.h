@@ -6,9 +6,7 @@
 #ifndef BAZEL_TEMPLATE_IMPL_SESSION_MANAGER_H
 #define BAZEL_TEMPLATE_IMPL_SESSION_MANAGER_H
 
-#include <condition_variable>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -146,16 +144,8 @@ class SessionManager final {
     token_sessions_.erase(token_it);
   }
 
-  void Stop() {
-    stop_.store(true);
-    cv_.notify_all();
-  }
-
  private:
   mutable absl::base_internal::SpinLock lock_;
-  std::atomic<bool> stop_ = false;
-  std::mutex mu_;
-  std::condition_variable cv_;
   std::unordered_map<std::string, Session> token_sessions_;
   std::unordered_map<std::string, Session> user_sessions_;
 };
