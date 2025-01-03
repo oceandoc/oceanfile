@@ -821,6 +821,27 @@ new_git_repository(
 )
 
 new_git_repository(
+    name = "openexr",
+    build_file = "//bazel:openexr.BUILD",
+    commit = "8bc3faebc66b92805f7309fa7a2f46a66e5cc5c9",
+    remote = "git@github.com:AcademySoftwareFoundation/openexr.git",
+)
+
+new_git_repository(
+    name = "imath",
+    build_file = "//bazel:imath.BUILD",
+    commit = "aa28eb56e2be4547e220f2dc7bbf9961e2d8c9c4",
+    remote = "git@github.com:AcademySoftwareFoundation/Imath.git",
+)
+
+new_git_repository(
+    name = "libdeflate",
+    build_file = "//bazel:libdeflate.BUILD",
+    commit = "78051988f96dc8d8916310d8b24021f01bd9e102",
+    remote = "git@github.com:ebiggers/libdeflate.git",
+)
+
+new_git_repository(
     name = "cc_toolchains",
     commit = "2a194c24161d9488bbfbb2bd9f486967edcc7170",
     remote = "git@github.com:xiedeacc/cc_toolchains.git",
