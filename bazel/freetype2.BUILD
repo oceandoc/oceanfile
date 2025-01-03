@@ -49,7 +49,6 @@ write_file(
     name = "ftoption_h_in",
     out = "ftoption.h.in",
     content = [
-        "/****************************************************************************",
         "#ifndef FTOPTION_H_",
         "#define FTOPTION_H_",
         "#include <ft2build.h>",

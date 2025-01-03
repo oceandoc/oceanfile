@@ -7,6 +7,13 @@ filegroup(
     srcs = glob(["**"]),
 )
 
+exports_files(
+    [
+        "make_data_cpp.py",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 py_binary(
     name = "gen_local_config_git",
     srcs = ["gen_local_config_git.py"],

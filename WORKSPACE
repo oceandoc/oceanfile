@@ -842,6 +842,20 @@ new_git_repository(
 )
 
 new_git_repository(
+    name = "icu",
+    build_file = "//bazel:icu.BUILD",
+    commit = "d9d09db2a7167eea2b5749836ef32cdd45303fdd",
+    remote = "git@github.com:unicode-org/icu.git",
+)
+
+new_git_repository(
+    name = "libjpeg_turbo",
+    build_file = "//bazel:libjpeg_turbo.BUILD",
+    commit = "e0e18dea5433e600ea92d60814f13efa40a0d7dd",
+    remote = "git@github.com:libjpeg-turbo/libjpeg-turbo.git",
+)
+
+new_git_repository(
     name = "cc_toolchains",
     commit = "2a194c24161d9488bbfbb2bd9f486967edcc7170",
     remote = "git@github.com:xiedeacc/cc_toolchains.git",
