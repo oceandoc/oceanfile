@@ -230,3 +230,4 @@ build:clang_aarch64_macosx --build_tag_filters='-ignore'
 
 build --copt=-DMAGICKCORE_HDRI_ENABLE=1
 build --copt=-DMAGICKCORE_QUANTUM_DEPTH=16
+build --copt=-DUSE_JPIP

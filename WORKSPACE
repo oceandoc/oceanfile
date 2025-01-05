@@ -861,6 +861,13 @@ new_git_repository(
     remote = "git@github.com:xiedeacc/cc_toolchains.git",
 )
 
+new_git_repository(
+    name = "openjpeg",
+    build_file = "//bazel:openjpeg.BUILD",
+    commit = "eb25a5ec777ff6699f4bb1187740467dcfa64dd6",
+    remote = "git@github.com:uclouvain/openjpeg.git",
+)
+
 load("//bazel:toolchains.bzl", "cc_toolchains_register")
 
 cc_toolchains_register()

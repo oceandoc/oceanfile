@@ -68,6 +68,7 @@ cc_library(
     copts = COPTS + [
         "-Iexternal/imagemagick",
         "-Iexternal/imagemagick/Magick++/lib",
+        "-Iexternal/imagemagick/MagickCore",
     ],
     local_defines = LOCAL_DEFINES,
     visibility = ["//visibility:public"],
@@ -77,6 +78,7 @@ cc_library(
         "@libwebp",
         "@libxml2",
         "@libyuv",
+        "@openjpeg",
         "@zlib",
     ],
 )
