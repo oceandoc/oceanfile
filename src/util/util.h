@@ -272,9 +272,6 @@ class Util final {
                                   std::string *json);
   static bool JsonToMessage(const std::string &json,
                             google::protobuf::Message *msg);
-  static void PrintFileReq(const proto::FileReq &req);
-  static bool FileReqToJson(const proto::FileReq &req, std::string *json);
-  static bool JsonToFileReq(const std::string &json, proto::FileReq *req);
 
   static std::optional<std::string> GetEnv(const char *var_name) {
     const char *value = std::getenv(var_name);

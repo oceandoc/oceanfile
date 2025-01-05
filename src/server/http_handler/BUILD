@@ -51,7 +51,6 @@ cc_library(
     name = "http_handler",
     hdrs = [
         "file_get_handler.h",
-        "file_json_handler.h",
         "file_put_handler.h",
         "http_handler_factory.h",
         "repo_handler.h",

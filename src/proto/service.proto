@@ -79,21 +79,21 @@ enum RepoOp {
 
 message RepoReq {
   string request_id = 1;
-  RepoOp op = 2;
-  RepoType type = 3;
-  string path = 4;
-  string repo_uuid = 5;
-  string repo_name = 6;
-  string token = 7;
-  string user = 8;
+  string token = 2;
+  string user = 3;
+  RepoOp op = 4;
+  RepoType type = 5;
+  string repo_uuid = 6;
+  string repo_name = 7;
+  string repo_path = 8;
+  int32 file_offset = 9;
+  int32 file_limit = 10;
 }
 
 message RepoRes {
   ErrCode err_code = 1;
   map<string, RepoMeta> repos = 2;
-  RepoDir repo_dir = 3;
-  Dir dir = 4;
-  repeated FileMeta file_metas = 5;
+  repeated File files = 3;
 }
 
 enum FileOp {
@@ -107,31 +107,22 @@ enum FileOp {
 
 message FileReq {
   string request_id = 1;
-  RepoType repo_type = 2;
-  FileOp op = 3;
-  string src = 4;
-  string dst = 5;
-  FileType file_type = 6;
-  string file_hash = 7;
-  int64 file_size = 8;
-  bytes content = 9;
-  int64 update_time = 10;
-  int32 partition_num = 11;
-  string repo_uuid = 12;
-  int64 partition_size = 13;
-  string user = 14;
-  string group = 15;
-  string token = 16;
-  FileMeta file_meta = 17;
+  string user = 2;
+  string token = 3;
+  FileOp op = 4;
+  RepoType repo_type = 5;
+  string repo_uuid = 6;
+  string repo_dir = 7;
+  int32 cur_part = 8;
+  int64 size_per_part = 9;
+  File file = 10;
+  bytes content = 11;
 }
 
 message FileRes {
   ErrCode err_code = 1;
-  string src = 2;
-  string dst = 3;
-  FileType file_type = 4;
   string file_hash = 5;
-  int32 partition_num = 6;
+  int32 cur_part = 6;
   string request_id = 7;
   FileOp op = 8;
   bool can_skip_upload = 9;

@@ -16,34 +16,25 @@ enum FileSubType {
 }
 
 message File {
-  string file_name = 1;
-  uint64 file_size = 2;
-  FileType file_type = 3;
-  uint64 update_time = 4;  // local update time
-  string user = 5;
-  string group = 6;
-  string file_hash = 7;
-  repeated string visible_users = 8;
-}
-
-message FileMeta {
-  string file_name = 1;
-  uint64 file_size = 2;
+  string file_hash = 1;
+  FileType file_type = 2;
   FileSubType file_sub_type = 3;
-  uint64 local_create_time = 4;
-  uint64 local_update_time = 5;
-  uint64 photo_taken_time = 6;
-  string local_id = 7;
-  string device_id = 8;
-  string owner = 9;
-  string file_hash = 10;
-  string live_photo_video_hash = 11;
-  string thumb_hash = 12;
-  string cover_hash = 13;
-  int64 duration = 14;
-  int32 width = 15;
-  int32 height = 16;
-  int32 favorite = 17;
+  string file_name = 4;
+  string video_hash = 5;
+  string cover_hash = 6;
+  string thumb_hash = 7;
+  uint64 file_size = 8;
+  uint64 create_time = 9;
+  uint64 update_time = 10;
+  int64 duration = 11;
+  int32 width = 12;
+  int32 height = 13;
+  uint64 taken_time = 14;
+  string local_id = 15;
+  string device_id = 16;
+  bool favorite = 17;
+  string user = 18;
+  repeated string visible_users = 19;
 }
 
 message Dir {
@@ -73,26 +64,14 @@ enum RepoType {
   RT_Ocean = 3;
 }
 
-message RepoFile {
-  string file_name = 1;
-  string file_hash = 2;
-  repeated string visible_users = 3;
-}
-
-message RepoDir {
-  string path = 1;                  // relateive to ScanStatus'path
-  map<string, RepoFile> files = 2;  // key is filename relative to path
-  repeated string visible_users = 3;
-}
-
-message RepoData {
+message RepoDirs {
   string repo_name = 1;
   string repo_path = 2;
   string repo_uuid = 3;
   string repo_location_uuid = 4;
   uint64 file_num = 5;
   uint64 symlink_num = 6;
-  map<string, RepoDir> dirs = 7;
+  map<string, Dir> dirs = 7;
 }
 
 message RepoMeta {
