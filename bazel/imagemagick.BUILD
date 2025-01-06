@@ -37,10 +37,10 @@ cc_library(
         ],
         exclude = [
             "MagickWand/tests/**/*.c",
-            "MagickCore/annotate.c",
-            "MagickCore/profile.c",
+            #"MagickCore/annotate.c",
+            #"MagickCore/profile.c",
             "coders/djvu.c",
-            "MagickCore/property.c",
+            #"MagickCore/property.c",
             "coders/jbig.c",
         ],
     ) + select({
@@ -74,6 +74,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@freetype2//:freetype",
+        "@lcms",
         "@libpng",
         "@libwebp",
         "@libxml2",

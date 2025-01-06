@@ -868,6 +868,13 @@ new_git_repository(
     remote = "git@github.com:uclouvain/openjpeg.git",
 )
 
+new_git_repository(
+    name = "lcms",
+    build_file = "//bazel:lcms.BUILD",
+    commit = "f6473758511db915ff1762c4aa0115f5de414b3c",
+    remote = "git@github.com:LuaDist/lcms.git",
+)
+
 load("//bazel:toolchains.bzl", "cc_toolchains_register")
 
 cc_toolchains_register()
