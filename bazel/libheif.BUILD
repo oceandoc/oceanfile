@@ -9,7 +9,6 @@ COPTS = GLOBAL_COPTS + select({
     "@platforms//os:osx": [],
     "@platforms//os:windows": [],
     "//conditions:default": [
-        "-std=c11",
         "-O3",
         "-fPIC",
     ],
@@ -24,9 +23,24 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
 
 cc_library(
     name = "libheif",
-    srcs = glob(["libheif/**/*.c"]),
-    hdrs = glob(["libheif/**/*.h"]),
-    includes = [],
+    srcs = glob(
+        ["libheif/**/*.cc"],
+        exclude = [
+            "libheif/plugins/*.cc",
+            "libheif/plugins/*.h",
+            "libheif/plugins_windows.h",
+            "libheif/plugins_windows.cc",
+        ],
+    ),
+    hdrs = glob([
+        "libheif/**/*.h",
+        "libheif/*.h",
+    ]),
+    copts = ["-std=c++20"],
+    includes = [
+        "libheif",
+        "libheif/api",
+    ],
     visibility = ["//visibility:public"],
-    deps = [],
+    deps = ["@openjpeg"],
 )
