@@ -12,6 +12,7 @@
 #include <set>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "folly/Singleton.h"
 #include "src/util/sqlite_manager.h"
@@ -29,135 +30,170 @@ class FileProcessManager final {
   static std::shared_ptr<FileProcessManager> Instance();
 
   ~FileProcessManager() {
-    if (process_task_.joinable()) {
-      process_task_.join();
+    for (auto& task : process_tasks_) {
+      if (task.joinable()) {
+        task.join();
+      }
     }
   }
 
   bool Init() {
-    queue_.reserve(10000);
-    process_task_ = std::thread(std::bind(&FileProcessManager::Process, this));
+    for (int i = 0; i < kTaskNum; ++i) {
+      std::unordered_map<std::string, common::ReceiveContext> q;
+      q.reserve(1000);
+      queues_.emplace_back(q);
+      auto task = std::thread(std::bind(&FileProcessManager::Process, this, i));
+      process_tasks_.emplace_back(task);
+    }
     return true;
   }
 
   void Stop() {
     stop_.store(true);
-    cv_.notify_all();
-    while (!process_task_exits) {
+    for (auto& cv : cvs_) {
+      cv.notify_all();
+    }
+    while (!Stopped()) {
       util::Util::Sleep(500);
     }
   }
 
-  void Put(const proto::FileReq& req) {
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = queue_.find(req.request_id());
-    if (it != queue_.end()) {
-      it->second.partitions.insert(req.partition_num());
-    } else {
-      common::ReceiveContext ctx;
-      if (req.repo_type() == proto::RepoType::RT_Ocean) {
-        ctx.repo_uuid = req.repo_uuid();
-        ctx.file_name = req.src();
-      } else {
-        LOG(ERROR) << "Unsupport repo type: " << req.repo_type();
-      }
-
-      ctx.repo_type = req.repo_type();
-      ctx.dst = req.dst();  // repo dir
-      ctx.file_hash = req.file_hash();
-      ctx.partitions.insert(req.partition_num());
-      ctx.part_num =
-          util::Util::FilePartitionNum(req.file_size(), req.partition_size());
-      LOG(INFO) << "Queue size: " << queue_.size();
-      queue_.emplace(req.request_id(), ctx);
-    }
-    cv_.notify_all();
-  }
-
-  bool InsertToDb(const common::ReceiveContext& ctx) {
-    int affect_rows = 0;
-    std::string err_msg;
-    std::string sql =
-        "INSERT OR IGNORE INTO files (hash, file_name) VALUES (?, ?);";
-    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
-        [&ctx](sqlite3_stmt* stmt) -> bool {
-      if (sqlite3_bind_text(stmt, 1, ctx.file_hash.c_str(),
-                            ctx.file_hash.size(), SQLITE_STATIC)) {
+  bool Stopped() {
+    for (auto stopped : process_task_exits) {
+      if (!stopped) {
         return false;
       }
-      if (sqlite3_bind_text(stmt, 2, ctx.file_name.c_str(),
-                            ctx.file_name.size(), SQLITE_STATIC)) {
-        return false;
-      }
-      return true;
-    };
-
-    auto ret = util::SqliteManager::Instance()->Insert(sql, &affect_rows,
-                                                       &err_msg, bind_callback);
-    if (ret) {
-      return Err_Fail;
-    }
-
-    if (affect_rows > 0) {
-      LOG(ERROR) << "Insert success. file: " << ctx.file_hash;
-    } else {
-      LOG(ERROR) << "No records updated. file: " << ctx.file_hash
-                 << " may exist already";
     }
     return true;
   }
 
+  void Put(const proto::FileReq& req) {
+    const uint32_t thread_no =
+        std::abs(util::Util::XXHash(req.request_id())) % kTaskNum;
+    auto& q = queues_[thread_no];
+    {
+      absl::base_internal::SpinLockHolder locker(&locks_[thread_no]);
+      auto it = q.find(req.request_id());
+      if (it != q.end()) {
+        it->second.partitions.insert(req.cur_part());
+      } else {
+        common::ReceiveContext ctx;
+        ctx.repo_type = req.repo_type();
+        ctx.repo_uuid = req.repo_uuid();
+        ctx.repo_dir = req.repo_dir();
+        ctx.total_part_num = util::Util::FilePartitionNum(
+            req.file().file_size(), req.size_per_part());
+        ctx.partitions.insert(req.cur_part());
+        ctx.file = std::move(req.file());
+        q.emplace(req.request_id(), ctx);
+      }
+      cvs_[thread_no].notify_all();
+    }
+    LOG(INFO) << "Queue size: " << q.size();
+  }
+
+  bool WriteFileMeta(const common::ReceiveContext& /*ctx*/) { return true; }
+
+  bool WriteDB(const common::ReceiveContext& /*ctx*/) { return true; }
+
+  bool GenThumbnail(const common::ReceiveContext& ctx) {
+    auto repo_file_path =
+        util::Util::RepoFilePath(ctx.repo_location, ctx.file.file_hash());
+    std::string content;
+    if (!util::Util::ResizeImg(repo_file_path, &content)) {
+      return false;
+    }
+    std::string blake3_hash;
+    if (!util::Util::Blake3(content, &blake3_hash)) {
+      return false;
+    }
+
+    repo_file_path = util::Util::RepoFilePath(ctx.repo_location, blake3_hash);
+    if (util::Util::WriteToFile(repo_file_path, content)) {
+      return false;
+    }
+    *const_cast<common::ReceiveContext&>(ctx).file.mutable_thumb_hash() =
+        blake3_hash;
+
+    return true;
+  }
+
+  bool WriteMeta(const common::ReceiveContext& ctx) {
+    if (ctx.file.file_type() == proto::FileType::Regular &&
+        ctx.file.file_sub_type() == proto::FileSubType::FST_Photo) {
+      if (!GenThumbnail(ctx)) {
+        return false;
+      }
+    }
+
+    std::string json;
+    if (util::Util::MessageToConciseJson(ctx.file, &json)) {
+      return false;
+    }
+    auto meta_file_path =
+        util::Util::RepoFilePath(ctx.repo_location, ctx.file.file_hash()) +
+        ".json";
+    if (util::Util::WriteToFile(meta_file_path, json)) {
+      return false;
+    }
+
+    return true;
+  }
+
   bool DoProcess(const common::ReceiveContext& ctx) {
-    if (ctx.part_num == ctx.partitions.size()) {
-      if (InsertToDb(ctx)) {
+    if (ctx.total_part_num == ctx.partitions.size()) {
+      if (WriteMeta(ctx)) {
         return true;
       }
     }
     return false;
   }
 
-  void Process() {
+  void DoProcess(const int thread_no) {
+    auto& q = queues_[thread_no];
+    absl::base_internal::SpinLockHolder locker(&locks_[thread_no]);
+    for (auto it = q.begin(); it != q.end();) {
+      if (DoProcess(it->second)) {
+        it = q.erase(it);
+        continue;
+      }
+      ++it;
+    }
+  }
+
+  void Process(const int thread_no) {
     LOG(INFO) << "Process task running";
+
+    auto& q = queues_[thread_no];
     while (true) {
       if (stop_.load()) {
         break;
       }
 
-      if (queue_.empty()) {
-        std::unique_lock<std::mutex> lock(mu_);
-        cv_.wait_for(lock, std::chrono::seconds(60));
+      if (q.empty()) {
+        std::unique_lock<std::mutex> lock(mus_[thread_no]);
+        cvs_[thread_no].wait_for(lock, std::chrono::seconds(60));
       }
 
-      absl::base_internal::SpinLockHolder locker(&lock_);
-      for (auto it = queue_.begin(); it != queue_.end();) {
-        if (DoProcess(it->second)) {
-          it = queue_.erase(it);
-          continue;
-        }
-        ++it;
-      }
+      DoProcess(thread_no);
     }
 
-    for (auto it = queue_.begin(); it != queue_.end();) {
-      if (DoProcess(it->second)) {
-        it = queue_.erase(it);
-        continue;
-      }
-      ++it;
-    }
+    DoProcess(thread_no);
 
-    process_task_exits = true;
+    process_task_exits[thread_no] = true;
     LOG(INFO) << "Process task exists";
   }
 
  private:
-  mutable absl::base_internal::SpinLock lock_;
-  std::unordered_map<std::string, common::ReceiveContext> queue_;
+  static const int32_t kTaskNum = 4;
+
   std::atomic<bool> stop_ = false;
-  std::mutex mu_;
-  std::condition_variable cv_;
-  bool process_task_exits = false;
-  std::thread process_task_;
+  bool process_task_exits[kTaskNum] = {false};
+  std::vector<absl::base_internal::SpinLock> locks_;
+  std::vector<std::mutex> mus_;
+  std::vector<std::condition_variable> cvs_;
+  std::vector<std::thread> process_tasks_;
+  std::vector<std::unordered_map<std::string, common::ReceiveContext>> queues_;
 };
 
 }  // namespace impl

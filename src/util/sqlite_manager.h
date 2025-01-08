@@ -279,6 +279,24 @@ class SqliteManager final {
     return Err_Success;
   }
 
+  int32_t SelectMediaFiles(const int32_t offset, const int32_t limit,
+                           std::vector<util::FilesRow>* rows,
+                           std::string* err_msg) {
+    std::string sql =
+        "SELECT hash, local_id, device_id, create_time, update_time, "
+        "duration, type, width, height, file_name, favorite, owner, "
+        "live_photo_video_hash, deleted, thumb_hash "
+        "FROM files where ;";
+
+    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
+        [](sqlite3_stmt* /*stmt*/) -> bool { return true; };
+    auto ret = Select<util::FilesRow>(sql, err_msg, bind_callback, rows);
+    if (ret) {
+      return Err_Fail;
+    }
+    return Err_Success;
+  }
+
  private:
   bool UpgradeTables() {
     auto version = GetVersion();

@@ -46,17 +46,6 @@ message Dir {
   repeated string visible_users = 6;
 }
 
-message ScanStatus {
-  string path = 1;
-  map<string, Dir> scanned_dirs = 2;  // relative path
-  int64 complete_time = 4;
-  map<string, bool> ignored_dirs = 5;  // relative to path
-  string uuid = 6;
-  int64 file_num = 7;  // not include symlink file
-  int64 symlink_num = 8;
-  int32 hash_method = 9;  // see common/defs.h
-}
-
 enum RepoType {
   RT_Unused = 0;
   RT_Local = 1;
@@ -64,19 +53,9 @@ enum RepoType {
   RT_Ocean = 3;
 }
 
-message RepoDirs {
-  string repo_name = 1;
-  string repo_path = 2;
-  string repo_uuid = 3;
-  string repo_location_uuid = 4;
-  uint64 file_num = 5;
-  uint64 symlink_num = 6;
-  map<string, Dir> dirs = 7;
-}
-
 message RepoMeta {
   string repo_name = 1;
-  string repo_path = 2;
+  string repo_location = 2;
   string repo_uuid = 3;
   string repo_location_uuid = 4;
   string create_time = 5;

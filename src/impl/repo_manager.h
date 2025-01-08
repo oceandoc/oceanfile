@@ -12,6 +12,7 @@
 #include <shared_mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "folly/Singleton.h"
@@ -36,8 +37,8 @@ class RepoManager {
   static std::shared_ptr<RepoManager> Instance();
 
   ~RepoManager() {
-    if (dump_task_.joinable()) {
-      dump_task_.join();
+    if (flush_task_.joinable()) {
+      flush_task_.join();
     }
   }
 
@@ -54,7 +55,7 @@ class RepoManager {
         return false;
       }
     }
-    dump_task_ = std::thread(&RepoManager::FlushRepoDataTask, this);
+    flush_task_ = std::thread(&RepoManager::FlushRepoMetaTask, this);
     LOG(INFO) << "Loaded repo num: " << repos_.repos().size();
     return true;
   }
@@ -100,8 +101,15 @@ class RepoManager {
     return false;
   }
 
-  void FlushRepoDataTask() {
-    LOG(INFO) << "FlushRepoDataTask running";
+  bool ShouldFlushRepoMeta() {
+    if (repo_meta_change_num.load()) {
+      return true;
+    }
+    return false;
+  }
+
+  void FlushRepoMetaTask() {
+    LOG(INFO) << "FlushRepoMetaTask running";
     while (!stop_) {
       if (stop_) {
         break;
@@ -113,67 +121,12 @@ class RepoManager {
       }
 
       absl::base_internal::SpinLockHolder locker(&lock_);
-      for (const auto& p : repo_datas_) {
-        if (ShouldFlushRepoData(p.first)) {
-          FlushRepoData(p.second.repo_uuid());
-        }
+      if (ShouldFlushRepoMeta()) {
+        FlushRepoMeta();
+        repo_meta_change_num.store(0);
       }
     }
-    LOG(INFO) << "FlushRepoDataTask exists";
-  }
-
-  bool ShouldFlushRepoData(const std::string /* repo_uuid */) { return true; }
-
-  bool FlushRepoData(const std::string& repo_uuid) {
-    proto::RepoMeta repo_meta;
-    if (!RepoMetaByUUID(repo_uuid, &repo_meta)) {
-      LOG(ERROR) << "Cannot find repo meta: " << repo_uuid;
-      return Err_Fail;
-    }
-
-    std::string repo_data_file_path = "./data/" + repo_uuid + ".data";
-    bool copy_tmp = false;
-    if (util::Util::Exists(repo_data_file_path)) {
-      auto ret = util::Util::CopyFile(repo_data_file_path,
-                                      repo_data_file_path + ".tmp");
-      if (!ret) {
-        return false;
-      }
-      copy_tmp = true;
-    }
-
-    std::string content;
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = repo_datas_.find(repo_uuid);
-    if (it != repo_datas_.end()) {
-      if (!util::Util::MessageToJson(it->second, &content)) {
-        LOG(ERROR) << "Repos data convert to json error";
-        return false;
-      }
-      if (util::Util::WriteToFile(repo_data_file_path, content, false) ==
-              Err_Success ||
-          util::Util::WriteToFile(repo_data_file_path, content, false) ==
-              Err_Success ||
-          util::Util::WriteToFile(repo_data_file_path, content, false) ==
-              Err_Success) {
-        LOG(INFO) << "Flush repos data success, num: " << repo_uuid;
-        return true;
-      }
-    } else {
-      LOG(ERROR) << "Cannot find repo data: " << repo_uuid;
-      return false;
-    }
-
-    if (util::Util::Exists(repo_data_file_path + ".tmp") && copy_tmp) {
-      auto ret = util::Util::CopyFile(repo_data_file_path + ".tmp",
-                                      repo_data_file_path);
-      if (!ret) {
-        return false;
-      }
-      copy_tmp = true;
-    }
-
-    return false;
+    LOG(INFO) << "FlushRepoMetaTask exists";
   }
 
   int32_t ListUserRepo(const proto::RepoReq& req, proto::RepoRes* res) {
@@ -191,12 +144,11 @@ class RepoManager {
   }
 
   int32_t ListServerDir(const proto::RepoReq& req, proto::RepoRes* res) {
-    std::string path = req.path();
+    std::string path = req.dir();
     if (path.empty()) {
       path = "/";
     }
 
-    res->mutable_dir()->set_path(path);
     try {
       for (const auto& entry : std::filesystem::directory_iterator(path)) {
         const auto& file_name = entry.path().filename().string();
@@ -212,7 +164,8 @@ class RepoManager {
         } else {
           LOG(ERROR) << "Unknow file type: " << entry.path();
         }
-        res->mutable_dir()->mutable_files()->emplace(file_name, file);
+        res->mutable_files()->Add(std::forward<proto::File>(file));
+        // res->mutable_files()->Add(std::move(file));
       }
     } catch (const std::filesystem::filesystem_error& e) {
       return Err_Fail;
@@ -220,86 +173,22 @@ class RepoManager {
     return Err_Success;
   }
 
-  int32_t CreateServerDir(const proto::RepoReq& req, proto::RepoRes* res) {
-    std::string path = req.path();
+  int32_t CreateServerDir(const proto::RepoReq& req, proto::RepoRes* /*res*/) {
+    std::string path = req.dir();
     if (path.empty()) {
       path = "/";
     }
 
-    res->mutable_dir()->set_path(path);
     if (util::Util::Mkdir(path)) {
       return Err_Success;
     }
     return Err_Fail;
   }
 
-  bool ExistsRepo(const std::string& path, std::string* uuid = nullptr) {
-    std::string repo_config_dir = path + "/" + common::CONFIG_DIR;
-    if (!util::Util::Exists(repo_config_dir) ||
-        std::filesystem::is_symlink(repo_config_dir) ||
-        !std::filesystem::is_directory(repo_config_dir)) {
-      return false;
-    }
-
-    for (const auto& entry :
-         std::filesystem::directory_iterator(repo_config_dir)) {
-      if (entry.is_symlink() || entry.is_directory()) {
-        continue;
-      }
-      if (entry.path().extension().string() == ".repo") {
-        if (uuid) {
-          *uuid = entry.path().stem().string();
-        }
-        return true;
-      }
-    }
-    return false;
-  }
-
-  bool RestoreRepo(const std::string& path) {
-    proto::RepoMeta repo;
-    if (ExistsRepo(path, repo.mutable_repo_uuid())) {
-      return RestoreRepo(path, &repo);
-    }
-    return false;
-  }
-
-  bool RestoreRepo(const std::string& path, proto::RepoMeta* repo) {
-    std::string content;
-    std::string repo_config_file_path =
-        path + "/" + common::CONFIG_DIR + "/" + repo->repo_uuid() + ".repo";
-    LOG(INFO) << "Now restore repo from path: " << repo_config_file_path;
-
-    if (!util::Util::LoadSmallFile(repo_config_file_path, &content)) {
-      return false;
-    }
-
-    if (!util::Util::JsonToMessage(content, repo)) {
-      LOG(ERROR) << "Parse repo config error, content: " << content;
-      return false;
-    }
-
-    if (path != repo->repo_path()) {
-      LOG(WARNING) << "Repo moved, origin path: " << repo->repo_path();
-      repo->set_repo_path(path);
-    }
-    LOG(INFO) << "Restored success" << repo->repo_uuid();
-
-    {
-      absl::base_internal::SpinLockHolder locker(&lock_);
-      if (repos_.repos().find(repo->repo_uuid()) != repos_.repos().end()) {
-        LOG(INFO) << "Repo already exists: " << repo->repo_uuid();
-        return Err_Success;
-      }
-      (*repos_.mutable_repos())[repo->repo_uuid()] = *repo;
-    }
-    return FlushRepoMeta();
-  }
-
   int32_t CreateRepo(const proto::RepoReq& req, proto::RepoRes* res) {
     proto::RepoMeta repo;
-    if (ExistsRepo(req.path(), repo.mutable_repo_uuid())) {
-      if (RestoreRepo(req.path(), &repo) == Err_Success) {
+    if (ExistsRepo(req.dir(), repo.mutable_repo_uuid())) {
+      if (RestoreRepo(req.dir(), &repo) == Err_Success) {
         res->mutable_repos()->insert({repo.repo_uuid(), repo});
         return Err_Success;
       }
@@ -307,23 +196,24 @@ class RepoManager {
     }
 
     repo.set_repo_uuid(util::Util::UUID());
-    std::string repo_config_file_path = req.path() + "/" + common::CONFIG_DIR +
-                                        "/" + repo.repo_uuid() + ".repo";
+    std::string repo_meta_file_path =
+        req.dir() + "/" + common::CONFIG_DIR + "/" + repo.repo_uuid() + ".repo";
 
     repo.set_create_time(
         util::Util::ToTimeStrUTC(util::Util::CurrentTimeMillis()));
     repo.set_update_time(repo.create_time());
-    repo.set_repo_path(req.path());
+    repo.set_repo_location(req.dir());
     repo.set_repo_name(req.repo_name());
     repo.set_repo_location_uuid(util::Util::UUID());
     repo.set_owner(req.user());
 
     std::string content;
     if (!util::Util::MessageToJson(repo, &content)) {
-      LOG(ERROR) << "Convert to json error";
+      LOG(ERROR) << "Convert repo meto to json error";
       return Err_Fail;
     }
-    auto ret = util::Util::WriteToFile(repo_config_file_path, content, false);
+
+    auto ret = util::Util::WriteToFile(repo_meta_file_path, content, false);
     if (ret) {
       return ret;
     }
@@ -373,68 +263,13 @@ class RepoManager {
     return false;
   }
 
-  int32_t LoadRepoData(const std::string& path, proto::RepoData* repo_data) {
-    std::string content, decompressed_content;
-    if (util::Util::LoadSmallFile(path, &content)) {
-      if (!util::Util::LZMADecompress(content, &decompressed_content)) {
-        LOG(ERROR) << "Decomppress error: " << path;
-        return Err_Fail;
-      }
-
-      if (!repo_data->ParseFromString(decompressed_content)) {
-        LOG(ERROR) << "Parse error: " << path;
-        return Err_Fail;
-      }
-      return Err_Success;
-    }
-    LOG(ERROR) << "Load cache repo data error: " << path;
-    return Err_File_not_exists;
-  }
-
-  int32_t LoadRepoData(const std::string& repo_uuid) {
-    std::string repo_data_file_path = "./data/" + repo_uuid + ".data";
-    proto::RepoData repo_data;
-    if (util::Util::Exists(repo_data_file_path)) {
-      auto ret = LoadRepoData(repo_data_file_path, &repo_data);
-      if (ret) {
-        return ret;
-      }
-    } else {
-      proto::RepoMeta repo_meta;
-      if (!RepoMetaByUUID(repo_uuid, &repo_meta)) {
-        LOG(ERROR) << "Invalid repo path";
-        return Err_Repo_not_exists;
-      }
-      const auto& repo_path = repo_meta.repo_path();
-      repo_data_file_path = repo_path + "/" + repo_uuid + ".data";
-      auto ret = LoadRepoData(repo_data_file_path, &repo_data);
-      if (ret) {
-        return ret;
-      }
-    }
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    repo_datas_.emplace(repo_uuid, repo_data);
-    return Err_Success;
-  }
-
   int32_t ListRepoDir(const proto::RepoReq& req, proto::RepoRes* res) {
     if (req.repo_uuid().empty()) {
       return Err_Fail;
     }
 
-    auto ret = GetRepoDir(req, res);
-    if (ret == Err_Success) {
-      return Err_Success;
-    }
-
-    ret = LoadRepoData(req.repo_uuid());
-    if (ret) {
-      return ret;
-    }
-
-    ret = GetRepoDir(req, res);
-    if (ret) {
-      return ret;
+    if (GetRepoDir(req, res)) {
+      return Err_Fail;
     }
     return Err_Success;
   }
@@ -466,20 +301,8 @@ class RepoManager {
     return Err_Success;
   }
 
-  int32_t GetRepoDir(const proto::RepoReq& req, proto::RepoRes* res) {
+  int32_t GetRepoDir(const proto::RepoReq& /*req*/, proto::RepoRes* /*res*/) {
     absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = repo_datas_.find(req.repo_uuid());
-    if (it != repo_datas_.end()) {
-      auto dir_it = it->second.dirs().find(req.path());
-      if (dir_it == it->second.dirs().end()) {
-        LOG(ERROR) << "Cannot find dir " << req.path()
-                   << " in repo: " << it->first
-                   << ", path: " << it->second.repo_path();
-        return Err_File_not_exists;
-      }
-      *res->mutable_repo_dir() = dir_it->second;
-      return Err_Success;
-    }
     return Err_File_not_exists;
   }
 
@@ -511,7 +334,7 @@ class RepoManager {
     }
     const auto& repo_path = repo_meta.repo_path();
     const auto& repo_file_path =
-        util::Util::RepoFilePath(repo_path, req.file_hash());
+        util::Util::RepoFilePath(repo_path, req.file().file_hash());
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
       return Err_Fail;
@@ -615,16 +438,85 @@ class RepoManager {
   }
 
  private:
+  bool ExistsRepo(const std::string& path, std::string* uuid = nullptr) {
+    std::string repo_config_dir = path + "/" + common::CONFIG_DIR;
+    if (!util::Util::Exists(repo_config_dir) ||
+        std::filesystem::is_symlink(repo_config_dir) ||
+        !std::filesystem::is_directory(repo_config_dir)) {
+      return false;
+    }
+
+    for (const auto& entry :
+         std::filesystem::directory_iterator(repo_config_dir)) {
+      if (entry.is_symlink() || entry.is_directory()) {
+        continue;
+      }
+      if (entry.path().extension().string() == ".repo") {
+        if (uuid) {
+          *uuid = entry.path().stem().string();
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool RestoreRepo(const std::string& path) {
+    proto::RepoMeta repo;
+    if (ExistsRepo(path, repo.mutable_repo_uuid())) {
+      return RestoreRepo(path, &repo);
+    }
+    return false;
+  }
+
+  bool RestoreRepo(const std::string& path, proto::RepoMeta* repo) {
+    std::string content;
+    std::string repo_meta_file_path =
+        path + "/" + common::CONFIG_DIR + "/" + repo->repo_uuid() + ".repo";
+    LOG(INFO) << "Now restore repo from path: " << repo_meta_file_path;
+
+    if (!util::Util::LoadSmallFile(repo_meta_file_path, &content)) {
+      return false;
+    }
+
+    if (!util::Util::JsonToMessage(content, repo)) {
+      LOG(ERROR) << "Parse repo meta error, content: " << content;
+      return false;
+    }
+
+    if (path != repo->repo_location()) {
+      LOG(WARNING) << "Repo moved, origin path: " << repo->repo_location();
+      repo->set_repo_location(path);
+    }
+
+    {
+      absl::base_internal::SpinLockHolder locker(&lock_);
+      if (repos_.repos().find(repo->repo_uuid()) != repos_.repos().end()) {
+        LOG(INFO) << "Repo already exists: " << repo->repo_uuid();
+        return true;
+      }
+      (*repos_.mutable_repos())[repo->repo_uuid()] = *repo;
+    }
+
+    if (FlushRepoMeta()) {
+      LOG(INFO) << "Restored success" << repo->repo_uuid();
+      return true;
+    }
+    return false;
+  }
+
+ private:
+  std::atomic<bool> stop_ = false;
+  std::mutex mu_;
+  std::condition_variable cv_;
+  std::thread flush_task_;
+  std::atomic<uint64_t> repo_meta_change_num = 0;
+
   std::string repos_config_path_;
   std::string tmp_repos_config_path_;
   proto::Repos repos_;
-  std::map<std::string, proto::RepoData> repo_datas_;
+
   mutable absl::base_internal::SpinLock lock_;
-  std::atomic<bool> stop_ = false;
-  std::shared_mutex mutex_;
-  std::mutex mu_;
-  std::condition_variable cv_;
-  std::thread dump_task_;
 };
 
 }  // namespace impl

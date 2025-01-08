@@ -458,13 +458,6 @@ new_git_repository(
     tag = "v2024.07.08.00",
 )
 
-new_git_repository(
-    name = "xxhash",
-    build_file = "//bazel:xxhash.BUILD",
-    commit = "d5fe4f54c47bc8b8e76c6da9146c32d5c720cd79",
-    remote = "git@github.com:Cyan4973/xxHash.git",
-)
-
 git_repository(
     name = "yaml-cpp",
     commit = "1d8ca1f35eb3a9c9142462b28282a848e5d29a91",
@@ -504,6 +497,13 @@ new_git_repository(
     build_file = "//bazel:smhasher.BUILD",
     commit = "61a0530f28277f2e850bfc39600ce61d02b518de",
     remote = "git@github.com:aappleby/smhasher.git",
+)
+
+new_git_repository(
+    name = "xxhash",
+    build_file = "//bazel:xxhash.BUILD",
+    commit = "d5fe4f54c47bc8b8e76c6da9146c32d5c720cd79",
+    remote = "git@github.com:Cyan4973/xxHash.git",
 )
 
 git_repository(

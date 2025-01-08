@@ -85,7 +85,7 @@ message RepoReq {
   RepoType type = 5;
   string repo_uuid = 6;
   string repo_name = 7;
-  string repo_path = 8;
+  string dir = 8;
   int32 file_offset = 9;
   int32 file_limit = 10;
 }

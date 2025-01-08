@@ -259,6 +259,7 @@ class Util final {
                               const bool use_upper_case = false);
 
   static int64_t MurmurHash64A(const std::string &str);
+  static int64_t XXHash(const std::string &str);
 
   static bool LZMACompress(const std::string &data, std::string *out);
   static bool LZMADecompress(const std::string &data, std::string *out);
@@ -267,6 +268,8 @@ class Util final {
 
   static bool MessageToJson(const google::protobuf::Message &msg,
                             std::string *json);
+  static bool MessageToConciseJson(const google::protobuf::Message &msg,
+                                   std::string *json);
   static std::string MessageToJson(const google::protobuf::Message &msg);
   static bool MessageToPrettyJson(const google::protobuf::Message &msg,
                                   std::string *json);
@@ -290,6 +293,7 @@ class Util final {
   static void ListAllIPAddresses(std::vector<folly::IPAddress> *ip_addrs);
   static std::string ExecutablePath();
   static std::string HomeDir();
+  static bool ResizeImg(const std::string &path, std::string *out);
 };
 
 }  // namespace util

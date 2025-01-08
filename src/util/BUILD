@@ -114,6 +114,7 @@ cc_library(
         "@openssl",
         "@rapidjson",
         "@smhasher",
+        "@xxhash",
         "@xz//:lzma",
     ] + select({
         "@oceandoc//bazel:jemalloc": ["@jemalloc"],

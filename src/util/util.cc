@@ -29,15 +29,13 @@
 #include "boost/uuid/uuid_io.hpp"
 #include "c/blake3.h"
 #include "crc32c/crc32c.h"
+#include "external/xxhash/xxhash.h"
 #include "fmt/core.h"
 #include "glog/logging.h"
 #include "google/protobuf/json/json.h"
 #include "lzma.h"  // NOLINT
 #include "openssl/evp.h"
 #include "openssl/rand.h"
-#include "rapidjson/document.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/writer.h"
 #include "sodium/crypto_hash_sha256.h"
 #include "src/MurmurHash2.h"
 #include "src/common/defs.h"
@@ -1069,6 +1067,10 @@ int64_t Util::MurmurHash64A(const string &str) {
   return ::MurmurHash64A(str.data(), str.size(), 42L);
 }
 
+int64_t Util::XXHash(const string &str) {
+  return ::XXH3_64bits(str.data(), str.size());
+}
+
 EVP_MD_CTX *Util::HashInit(const EVP_MD *type) {
   EVP_MD_CTX *context = EVP_MD_CTX_new();
   if (!context) {
@@ -1351,6 +1353,15 @@ bool Util::MessageToJson(const google::protobuf::Message &msg, string *json) {
   return true;
 }
 
+bool Util::MessageToConciseJson(const google::protobuf::Message &msg,
+                                string *json) {
+  static PrintOptions option = {false, false, true, true, true};
+  if (!MessageToJsonString(msg, json, option).ok()) {
+    return false;
+  }
+  return true;
+}
+
 string Util::MessageToJson(const google::protobuf::Message &msg) {
   static PrintOptions option = {false, false, false, true, true};
   string json;
@@ -1506,6 +1517,8 @@ void Util::PrintAllEnv() {
   }
 #endif
 }
+
+bool Util::ResizeImg(const string &path, string *out) {}
 
 }  // namespace util
 }  // namespace oceandoc

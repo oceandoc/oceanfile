@@ -100,51 +100,6 @@ struct FileAttr final {
   }
 };
 
-class ScanContext final {
- public:
-  ScanContext(const int32_t max_threads = 4)
-      : status(nullptr),
-        hash_method(HashMethod::Hash_NONE),
-        sync_method(SyncMethod::Sync_SYNC),
-        disable_scan_cache(false),
-        skip_scan(false),
-        max_threads(max_threads) {}
-
-  void Reset() {
-    scanned_dir_num = 0;
-    skip_dir_num = 0;
-    stop_dump_task = false;
-    removed_files.clear();
-    added_files.clear();
-    err_code = Err_Success;
-    running_mark = 0;
-    dir_queue.Clear();
-  }
-
-  std::string src;
-  std::string dst;
-  proto::ScanStatus* status;
-  HashMethod hash_method;
-  SyncMethod sync_method;
-  bool disable_scan_cache = false;
-  bool skip_scan = false;
-  std::unordered_set<std::string> ignored_dirs;  // relative to src
-
-  mutable absl::base_internal::SpinLock lock;
-  std::mutex mu;
-  std::condition_variable cond_var;
-  const int32_t max_threads;
-
-  std::atomic<int32_t> scanned_dir_num = 0;
-  std::atomic<int32_t> skip_dir_num = 0;
-  bool stop_dump_task = false;
-  std::set<std::string> removed_files;  // full path
-  std::set<std::string> added_files;    // full path
-  int32_t err_code = Err_Success;
-  std::atomic<uint64_t> running_mark = 0;
-  BlockingQueue<std::string> dir_queue;
-};
-
 class SendContext final {
  public:
   std::string src;
@@ -198,7 +153,6 @@ class SyncContext final {
 
   std::vector<std::string> sync_failed_files;  // full path
   int32_t err_code = Err_Success;
-  ScanContext* scan_ctx = nullptr;
   BlockingQueue<std::string> dir_queue;
   std::atomic<uint64_t> running_mark = 0;
 
@@ -214,7 +168,6 @@ class SyncContext final {
     syncd_file_skipped_cnt = 0;
     sync_failed_files.clear();
     err_code = Err_Success;
-    scan_ctx = nullptr;
     dir_queue.Clear();
     running_mark = 0;
   }
@@ -237,15 +190,12 @@ class GCEntry final {
 
 class ReceiveContext final {
  public:
-  std::string dst;
-  int64_t update_time = 0;
-  std::set<int32_t> partitions;
-  int32_t part_num = 0;
-  int64_t file_update_time = 0;
   proto::RepoType repo_type = proto::RepoType::RT_Unused;
   std::string repo_uuid;
-  std::string file_name;
-  std::string file_hash;
+  std::string repo_location;
+  int32_t total_part_num = 0;
+  std::set<int32_t> partitions;
+  proto::File file;
 };
 
 }  // namespace common
