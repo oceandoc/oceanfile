@@ -75,6 +75,7 @@ cc_library(
     deps = [
         "@freetype2//:freetype",
         "@lcms",
+        "@libheif",
         "@libpng",
         "@libwebp",
         "@libxml2",

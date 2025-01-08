@@ -875,6 +875,13 @@ new_git_repository(
     remote = "git@github.com:LuaDist/lcms.git",
 )
 
+new_git_repository(
+    name = "libheif",
+    build_file = "//bazel:libheif.BUILD",
+    commit = "1630460fdb747f2d3c803e9ce38c22469eeadc83",
+    remote = "git@github.com:strukturag/libheif.git",
+)
+
 load("//bazel:toolchains.bzl", "cc_toolchains_register")
 
 cc_toolchains_register()
