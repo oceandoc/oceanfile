@@ -37,8 +37,14 @@ cc_library(
     hdrs = glob([
         "libheif/**/*.h",
         "libheif/*.h",
+        "libheif/api/libheif/*.h",
     ]),
-    copts = ["-std=c++20"],
+    copts = [
+        "-std=c++20",
+        "-Iexternal/libheif",
+        "-Iexternal/libheif/libheif",
+        "-Iexternal/libheif/libheif/api/libheif",
+    ],
     includes = [
         "libheif",
         "libheif/api",
@@ -95,7 +101,7 @@ write_file(
 template_rule(
     name = "heif_version_h",
     src = ":heif_version_h_in",
-    out = "build/libheif/heif_version.h",
+    out = "libheif/api/libheif/heif_version.h",
     substitutions = select({
         "@platforms//os:linux": {
         },
