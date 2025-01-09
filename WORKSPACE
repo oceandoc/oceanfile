@@ -848,11 +848,17 @@ new_git_repository(
     remote = "git@github.com:unicode-org/icu.git",
 )
 
-new_git_repository(
+#new_git_repository(
+#name = "libjpeg_turbo",
+#build_file = "//bazel:libjpeg_turbo.BUILD",
+#commit = "e0e18dea5433e600ea92d60814f13efa40a0d7dd",
+#remote = "git@github.com:libjpeg-turbo/libjpeg-turbo.git",
+#)
+
+new_local_repository(
     name = "libjpeg_turbo",
     build_file = "//bazel:libjpeg_turbo.BUILD",
-    commit = "e0e18dea5433e600ea92d60814f13efa40a0d7dd",
-    remote = "git@github.com:libjpeg-turbo/libjpeg-turbo.git",
+    path = "../libjpeg-turbo",
 )
 
 new_git_repository(
@@ -869,10 +875,10 @@ new_git_repository(
 )
 
 new_git_repository(
-    name = "lcms",
-    build_file = "//bazel:lcms.BUILD",
-    commit = "f6473758511db915ff1762c4aa0115f5de414b3c",
-    remote = "git@github.com:LuaDist/lcms.git",
+    name = "lcms2",
+    build_file = "//bazel:lcms2.BUILD",
+    commit = "4001dd2d8d7466c7ebbaf377ae9814038431632d",
+    remote = "git@github.com:mm2/Little-CMS.git",
 )
 
 new_git_repository(

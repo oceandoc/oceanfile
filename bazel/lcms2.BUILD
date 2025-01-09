@@ -23,22 +23,20 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
 })
 
 cc_library(
-    name = "lcms",
+    name = "lcms2",
     srcs = glob(
         [
             "src/**/*.c",
+            "src/**/*.h",
         ],
         exclude = [
         ],
     ) + [
     ],
     hdrs = glob([
-        "src/**/*.h",
         "include/**/*.h",
     ]),
-    copts = COPTS + [
-        "-Iexternal/lcms",
-    ],
+    copts = COPTS,
     includes = [
         "include",
     ],
