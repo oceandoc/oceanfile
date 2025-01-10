@@ -112,11 +112,12 @@ message FileReq {
   FileOp op = 4;
   RepoType repo_type = 5;
   string repo_uuid = 6;
-  string repo_dir = 7;
-  int32 cur_part = 8;
-  int64 size_per_part = 9;
-  File file = 10;
-  bytes content = 11;
+  string repo_location = 7;
+  string repo_dir = 8;
+  int32 cur_part = 9;
+  int64 size_per_part = 10;
+  File file = 11;
+  bytes content = 12;
 }
 
 message FileRes {

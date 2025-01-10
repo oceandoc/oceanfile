@@ -196,6 +196,7 @@ class ReceiveContext final {
   int32_t total_part_num = 0;
   std::set<int32_t> partitions;
   proto::File file;
+  std::string user;
 };
 
 }  // namespace common

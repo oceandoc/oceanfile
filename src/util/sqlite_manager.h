@@ -279,18 +279,120 @@ class SqliteManager final {
     return Err_Success;
   }
 
+  int32_t SelectFile(const std::string& file_hash,
+                     std::vector<util::FilesRow>* rows, std::string* err_msg) {
+    std::string sql = "SELECT * FROM files WHERE file_hash = ?;";
+    SqliteBinder bind_callback = [&file_hash](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_text(stmt, 1, file_hash.c_str(), -1, SQLITE_STATIC)) {
+        return false;
+      }
+
+      return true;
+    };
+    auto ret = Select<util::FilesRow>(sql, err_msg, bind_callback, rows);
+    if (ret) {
+      return Err_Fail;
+    }
+    return Err_Success;
+  }
+
+  int32_t SelectFiles(const std::string& repo_dir,
+                      std::vector<util::FilesRow>* rows, std::string* err_msg) {
+    std::string sql = "SELECT * FROM files WHERE repo_dir = ?;";
+    SqliteBinder bind_callback = [&repo_dir](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_text(stmt, 1, repo_dir.c_str(), -1, SQLITE_STATIC)) {
+        return false;
+      }
+
+      return true;
+    };
+    auto ret = Select<util::FilesRow>(sql, err_msg, bind_callback, rows);
+    if (ret) {
+      return Err_Fail;
+    }
+    return Err_Success;
+  }
+
   int32_t SelectMediaFiles(const int32_t offset, const int32_t limit,
                            std::vector<util::FilesRow>* rows,
                            std::string* err_msg) {
     std::string sql =
-        "SELECT hash, local_id, device_id, create_time, update_time, "
-        "duration, type, width, height, file_name, favorite, owner, "
-        "live_photo_video_hash, deleted, thumb_hash "
-        "FROM files where ;";
+        "SELECT * FROM files WHERE repo_dir = /media LIMIT ? OFFSET ?;";
+    SqliteBinder bind_callback = [&offset, &limit](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_int(stmt, 1, limit)) {
+        return false;
+      }
+      if (sqlite3_bind_int(stmt, 2, offset)) {
+        return false;
+      }
 
-    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
-        [](sqlite3_stmt* /*stmt*/) -> bool { return true; };
+      return true;
+    };
     auto ret = Select<util::FilesRow>(sql, err_msg, bind_callback, rows);
+    if (ret) {
+      return Err_Fail;
+    }
+    return Err_Success;
+  }
+
+  int32_t InsertFile(const util::FilesRow& row, std::string* err_msg) {
+    std::string sql =
+        "INSERT OR IGNORE INTO files (local_id, device_id, repo_dir, "
+        "file_hash, type, file_name, owner, taken_time, video_hash, "
+        "cover_hash, thumb_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    SqliteBinder bind_callback = [&row](sqlite3_stmt* stmt) -> bool {
+      if (sqlite3_bind_text(stmt, 1, row.local_id.c_str(), -1, SQLITE_STATIC)) {
+        return false;
+      }
+      if (sqlite3_bind_text(stmt, 1, row.device_id.c_str(), -1,
+                            SQLITE_STATIC)) {
+        return false;
+      }
+      if (sqlite3_bind_text(stmt, 1, row.repo_dir.c_str(), -1, SQLITE_STATIC)) {
+        return false;
+      }
+
+      if (sqlite3_bind_text(stmt, 1, row.file_hash.c_str(), -1,
+                            SQLITE_STATIC)) {
+        return false;
+      }
+
+      if (sqlite3_bind_int(stmt, 2, row.type)) {
+        return false;
+      }
+
+      if (sqlite3_bind_text(stmt, 1, row.file_name.c_str(), -1,
+                            SQLITE_STATIC)) {
+        return false;
+      }
+
+      if (sqlite3_bind_text(stmt, 1, row.owner.c_str(), -1, SQLITE_STATIC)) {
+        return false;
+      }
+
+      if (sqlite3_bind_int(stmt, 2, row.taken_time)) {
+        return false;
+      }
+
+      if (sqlite3_bind_text(stmt, 1, row.video_hash.c_str(), -1,
+                            SQLITE_STATIC)) {
+        return false;
+      }
+
+      if (sqlite3_bind_text(stmt, 1, row.cover_hash.c_str(), -1,
+                            SQLITE_STATIC)) {
+        return false;
+      }
+
+      if (sqlite3_bind_text(stmt, 1, row.thumb_hash.c_str(), -1,
+                            SQLITE_STATIC)) {
+        return false;
+      }
+
+      return true;
+    };
+    int32_t affect_rows = 0;
+    auto ret = Insert(sql, &affect_rows, err_msg, bind_callback);
     if (ret) {
       return Err_Fail;
     }
@@ -351,6 +453,7 @@ class SqliteManager final {
                id INTEGER PRIMARY KEY AUTOINCREMENT,
                local_id TEXT UNIQUE,
                device_id TEXT,
+               repo_dir TEXT,
                file_hash TEXT,
                type INTEGER,
                file_name TEXT DEFAULT '',
@@ -408,8 +511,7 @@ class SqliteManager final {
         R"(INSERT OR IGNORE INTO users
              (user, salt, password, create_time, update_time)
              VALUES (?, ?, ?, ?, ?);)";
-    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
-        [](sqlite3_stmt* stmt) -> bool {
+    SqliteBinder bind_callback = [](sqlite3_stmt* stmt) -> bool {
       std::string salt = "452c0306730b0f3ac3086d4f62effc20";
       std::string password =
           "e64de2fcaef0b98d035c3c241e4f8fda32f3b09067ef0f1b1706869a54f9d3b7";
@@ -451,8 +553,7 @@ class SqliteManager final {
     int affect_rows = 0;
     std::string err_msg;
     std::string sql = R"(INSERT INTO meta (id, version) VALUES (?, ?);)";
-    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
-        [](sqlite3_stmt* stmt) -> bool {
+    SqliteBinder bind_callback = [](sqlite3_stmt* stmt) -> bool {
       if (sqlite3_bind_int(stmt, 1, 1)) {
         return false;
       }
@@ -480,8 +581,7 @@ class SqliteManager final {
     int affect_rows = 0;
     std::string err_msg;
     std::string sql = R"(UPDATE meta SET version = ? where id = 1;)";
-    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
-        [version](sqlite3_stmt* stmt) -> bool {
+    SqliteBinder bind_callback = [version](sqlite3_stmt* stmt) -> bool {
       if (sqlite3_bind_int(stmt, 1, version)) {
         return false;
       }
@@ -503,8 +603,9 @@ class SqliteManager final {
   int32_t GetVersion() {
     std::string err_msg;
     std::string sql = R"(SELECT version FROM meta WHERE id = 1)";
-    std::function<bool(sqlite3_stmt * stmt)> bind_callback =
-        [](sqlite3_stmt* /*stmt*/) -> bool { return true; };
+    SqliteBinder bind_callback = [](sqlite3_stmt* /*stmt*/) -> bool {
+      return true;
+    };
     std::vector<MetaRow> rows;
     if (Select<MetaRow>(sql, &err_msg, bind_callback, &rows)) {
       LOG(ERROR) << "Select version error: " << err_msg;

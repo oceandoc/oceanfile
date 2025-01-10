@@ -43,7 +43,7 @@ class FileProcessManager final {
       q.reserve(1000);
       queues_.emplace_back(q);
       auto task = std::thread(std::bind(&FileProcessManager::Process, this, i));
-      process_tasks_.emplace_back(task);
+      process_tasks_.emplace_back(std::move(task));
     }
     return true;
   }
@@ -80,7 +80,7 @@ class FileProcessManager final {
         common::ReceiveContext ctx;
         ctx.repo_type = req.repo_type();
         ctx.repo_uuid = req.repo_uuid();
-        ctx.repo_dir = req.repo_dir();
+        ctx.repo_location = req.repo_location();
         ctx.total_part_num = util::Util::FilePartitionNum(
             req.file().file_size(), req.size_per_part());
         ctx.partitions.insert(req.cur_part());
@@ -92,13 +92,52 @@ class FileProcessManager final {
     LOG(INFO) << "Queue size: " << q.size();
   }
 
-  bool WriteFileMeta(const common::ReceiveContext& /*ctx*/) { return true; }
-
-  bool WriteDB(const common::ReceiveContext& /*ctx*/) { return true; }
-
-  bool GenThumbnail(const common::ReceiveContext& ctx) {
+  bool WriteFileMeta(const common::ReceiveContext& ctx) {
     auto repo_file_path =
-        util::Util::RepoFilePath(ctx.repo_location, ctx.file.file_hash());
+        util::Util::RepoFilePath(ctx.repo_location, ctx.file.file_hash()) +
+        ".meta.json";
+    std::string content;
+
+    if (!util::Util::MessageToConciseJson(ctx.file, &content)) {
+      return false;
+    }
+
+    if (util::Util::WriteToFile(repo_file_path, content)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  void RecvCtxToSqlRow(const common::ReceiveContext& ctx, util::FilesRow* row) {
+    row->local_id = ctx.file.local_id();
+    row->device_id = ctx.file.device_id();
+    row->repo_dir = "/media";
+    row->file_hash = ctx.file.file_hash();
+    row->type = ctx.file.file_sub_type();
+    row->file_name = ctx.file.file_name();
+    row->owner = ctx.user;
+    row->taken_time = ctx.file.taken_time();
+    row->video_hash = ctx.file.video_hash();
+    row->cover_hash = ctx.file.cover_hash();
+    row->thumb_hash = ctx.file.thumb_hash();
+  }
+
+  bool WriteDB(const common::ReceiveContext& ctx) {
+    std::string err_msg;
+    util::FilesRow row;
+    RecvCtxToSqlRow(ctx, &row);
+    if (util::SqliteManager::Instance()->InsertFile(row, &err_msg)) {
+      LOG(ERROR) << "Insert file: " << ctx.file.file_name()
+                 << " error: " << err_msg;
+      return false;
+    }
+    return true;
+  }
+
+  bool GenThumbnail(common::ReceiveContext* ctx) {
+    auto repo_file_path =
+        util::Util::RepoFilePath(ctx->repo_location, ctx->file.file_hash());
     std::string content;
     if (!util::Util::ResizeImg(repo_file_path, &content)) {
       return false;
@@ -108,30 +147,29 @@ class FileProcessManager final {
       return false;
     }
 
-    repo_file_path = util::Util::RepoFilePath(ctx.repo_location, blake3_hash);
+    repo_file_path = util::Util::RepoFilePath(ctx->repo_location, blake3_hash);
     if (util::Util::WriteToFile(repo_file_path, content)) {
       return false;
     }
-    *const_cast<common::ReceiveContext&>(ctx).file.mutable_thumb_hash() =
-        blake3_hash;
+    (ctx->file).set_thumb_hash(blake3_hash);
 
     return true;
   }
 
-  bool WriteMeta(const common::ReceiveContext& ctx) {
-    if (ctx.file.file_type() == proto::FileType::Regular &&
-        ctx.file.file_sub_type() == proto::FileSubType::FST_Photo) {
+  bool WriteMeta(common::ReceiveContext* ctx) {
+    if (ctx->file.file_type() == proto::FileType::Regular &&
+        ctx->file.file_sub_type() == proto::FileSubType::FST_Photo) {
       if (!GenThumbnail(ctx)) {
         return false;
       }
     }
 
     std::string json;
-    if (util::Util::MessageToConciseJson(ctx.file, &json)) {
+    if (util::Util::MessageToConciseJson(ctx->file, &json)) {
       return false;
     }
     auto meta_file_path =
-        util::Util::RepoFilePath(ctx.repo_location, ctx.file.file_hash()) +
+        util::Util::RepoFilePath(ctx->repo_location, ctx->file.file_hash()) +
         ".json";
     if (util::Util::WriteToFile(meta_file_path, json)) {
       return false;
@@ -140,8 +178,8 @@ class FileProcessManager final {
     return true;
   }
 
-  bool DoProcess(const common::ReceiveContext& ctx) {
-    if (ctx.total_part_num == ctx.partitions.size()) {
+  bool DoProcess(common::ReceiveContext* ctx) {
+    if (ctx->total_part_num == ctx->partitions.size()) {
       if (WriteMeta(ctx)) {
         return true;
       }
@@ -153,7 +191,7 @@ class FileProcessManager final {
     auto& q = queues_[thread_no];
     absl::base_internal::SpinLockHolder locker(&locks_[thread_no]);
     for (auto it = q.begin(); it != q.end();) {
-      if (DoProcess(it->second)) {
+      if (DoProcess(&it->second)) {
         it = q.erase(it);
         continue;
       }

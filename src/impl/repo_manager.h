@@ -306,19 +306,8 @@ class RepoManager {
     return Err_File_not_exists;
   }
 
-  int32_t RepoFileExists(const proto::RepoReq& req, proto::RepoRes* /*res*/) {
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = repo_datas_.find(req.repo_uuid());
-    if (it != repo_datas_.end()) {
-      auto dir_it = it->second.dirs().find(req.path());
-      if (dir_it == it->second.dirs().end()) {
-        LOG(ERROR) << "Cannot find dir " << req.path()
-                   << " in repo: " << it->first
-                   << ", path: " << it->second.repo_path();
-        return Err_File_not_exists;
-      }
-      return Err_Success;
-    }
+  int32_t RepoFileExists(const proto::RepoReq& /*req*/,
+                         proto::RepoRes* /*res*/) {
     return Err_File_not_exists;
   }
 
@@ -332,9 +321,9 @@ class RepoManager {
       LOG(ERROR) << "Invalid repo path";
       return Err_Repo_not_exists;
     }
-    const auto& repo_path = repo_meta.repo_path();
+    const auto& repo_location = repo_meta.repo_location();
     const auto& repo_file_path =
-        util::Util::RepoFilePath(repo_path, req.file().file_hash());
+        util::Util::RepoFilePath(repo_location, req.file().file_hash());
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
       return Err_Fail;
@@ -357,9 +346,9 @@ class RepoManager {
       LOG(ERROR) << "Invalid repo path";
       return Err_Repo_not_exists;
     }
-    const auto& repo_path = repo_meta.repo_path();
+    const auto& repo_location = repo_meta.repo_location();
     const auto& repo_file_path =
-        util::Util::RepoFilePath(repo_path, req.file_hash());
+        util::Util::RepoFilePath(repo_location, req.file().file_hash());
     if (repo_file_path.empty()) {
       LOG(ERROR) << "Invalid repo file path";
       return Err_Fail;
@@ -368,17 +357,18 @@ class RepoManager {
     util::Util::MkParentDir(repo_file_path);
 
     auto err_code = Err_Success;
-    err_code = util::Util::CreateFileWithSize(repo_file_path, req.file_size());
+    err_code =
+        util::Util::CreateFileWithSize(repo_file_path, req.file().file_size());
     if (err_code != Err_Success) {
       LOG(ERROR) << "Create file error: " << repo_file_path;
       return err_code;
     }
 
     int64_t start = 0, end = 0;
-    util::Util::CalcPartitionStart(req.file_size(), req.partition_num(),
-                                   req.partition_size(), &start, &end);
+    util::Util::CalcPartitionStart(req.file().file_size(), req.cur_part(),
+                                   req.size_per_part(), &start, &end);
     if (end - start + 1 != static_cast<int64_t>(req.content().size())) {
-      LOG(ERROR) << "Calc size error, partition_num: " << req.partition_num()
+      LOG(ERROR) << "Calc size error, partition_num: " << req.cur_part()
                  << ", start: " << start << ", end: " << end
                  << ", content size: " << req.content().size();
       return Err_Fail;
@@ -389,51 +379,25 @@ class RepoManager {
     auto ret = util::Util::WriteToFile(repo_file_path, req.content(), start);
     if (ret) {
       LOG(ERROR) << "Store part error, "
-                 << "file: " << req.file_hash()
-                 << ", part: " << req.partition_num();
+                 << "file: " << req.file().file_hash()
+                 << ", part: " << req.cur_part();
     } else {
       LOG(INFO) << "Store part success, "
-                << "file: " << req.file_hash()
-                << ", part: " << req.partition_num()
-                << ", size: " << req.file_size();
+                << "file: " << req.file().file_hash()
+                << ", part: " << req.cur_part()
+                << ", size: " << req.file().file_size();
       impl::FileProcessManager::Instance()->Put(req);
     }
     return ret;
   }
 
   int32_t CreateRepoFile(const common::ReceiveContext& receive_ctx) {
-    proto::RepoFile file;
-    file.set_file_name(receive_ctx.file_name);
-    file.set_file_hash(receive_ctx.file_hash);
-
     proto::RepoMeta repo_meta;
     if (!RepoMetaByUUID(receive_ctx.repo_uuid, &repo_meta)) {
       LOG(ERROR) << "Cannot find repo meta: " << receive_ctx.repo_uuid;
       return Err_Fail;
     }
 
-    absl::base_internal::SpinLockHolder locker(&lock_);
-    auto it = repo_datas_.find(receive_ctx.repo_uuid);
-    if (it != repo_datas_.end()) {
-      auto dir_it = it->second.mutable_dirs()->find(repo_meta.repo_path());
-      if (dir_it == it->second.dirs().end()) {
-        proto::RepoDir dir;
-        dir.set_path(receive_ctx.dst);
-        dir.mutable_files()->emplace(receive_ctx.file_name, file);
-      } else {
-        dir_it->second.mutable_files()->emplace(receive_ctx.file_name, file);
-      }
-    } else {
-      proto::RepoData repo_data;
-      repo_data.set_repo_name(repo_meta.repo_name());
-      repo_data.set_repo_path(repo_meta.repo_path());
-      repo_data.set_repo_uuid(repo_meta.repo_uuid());
-      repo_data.set_repo_location_uuid(repo_meta.repo_location_uuid());
-      proto::RepoDir dir;
-      dir.set_path(receive_ctx.dst);
-      dir.mutable_files()->emplace(receive_ctx.file_name, file);
-      repo_data.mutable_dirs()->emplace(receive_ctx.dst, dir);
-    }
     return Err_Success;
   }
 
