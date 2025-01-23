@@ -58,10 +58,13 @@ cc_library(
         "pngconf.h",
         "pnglibconf.h",
     ],
-    copts = [
-        "-Wno-unused-but-set-variable",
-        "-Wno-macro-redefined",
-    ],
+	copts = select({
+		"@platforms//os:windows": [],
+		"//conditions:default": [
+			"-Wno-unused-but-set-variable",
+			"-Wno-macro-redefined",
+		],
+	}),
     includes = [
         ".",
     ],

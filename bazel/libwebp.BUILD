@@ -180,12 +180,11 @@ WEBP_SRCS = [
     "//conditions:default": [],
 })
 
-WEBP_COPTS = [
-    "-Wno-unused-but-set-variable",
-] + select({
-    "@platforms//cpu:x86_64": ["-msse4.1"],
-    ":cpu_wasm": [],  # not sure why wasm doesn't use default
-    "//conditions:default": [],
+WEBP_COPTS = select({
+    "@platforms//os:windows": [],
+    "//conditions:default": [
+        "-Wno-unused-but-set-variable",
+    ],
 })
 
 WEBP_DEFINES = [

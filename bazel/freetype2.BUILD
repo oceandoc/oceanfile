@@ -436,7 +436,7 @@ cc_library(
         "src/type1/type1.c",
     ],
     hdrs = [
-        "include/freetype/config/ftconfig.h",
+        #"include/freetype/config/ftconfig.h",
         "include/freetype/config/ftheader.h",
         # Ensure custom modules and options by removing the generic ones.
         #"include/freetype/config/ftmodule.h",
@@ -498,9 +498,12 @@ cc_library(
         "builds/skia/no-type1/freetype/config/ftmodule.h",
         "builds/skia/no-type1/freetype/config/ftoption.h",
     ],
-    copts = [
-        "-Wno-unused-function",
-    ],
+	copts =  select({
+		"@platforms//os:windows": [],
+		"//conditions:default": [
+			"-Wno-unused-function",
+		],
+    }),
     defines = FREETYPE_PUBLIC_DEFINES,
     includes = [
         "builds",
