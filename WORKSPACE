@@ -848,18 +848,18 @@ new_git_repository(
     remote = "git@github.com:unicode-org/icu.git",
 )
 
-#new_git_repository(
-#name = "libjpeg_turbo",
-#build_file = "//bazel:libjpeg_turbo.BUILD",
-#commit = "e0e18dea5433e600ea92d60814f13efa40a0d7dd",
-#remote = "git@github.com:libjpeg-turbo/libjpeg-turbo.git",
-#)
-
-new_local_repository(
+new_git_repository(
     name = "libjpeg_turbo",
     build_file = "//bazel:libjpeg_turbo.BUILD",
-    path = "../libjpeg-turbo",
+    commit = "e0e18dea5433e600ea92d60814f13efa40a0d7dd",
+    remote = "git@github.com:libjpeg-turbo/libjpeg-turbo.git",
 )
+
+#new_local_repository(
+#    name = "libjpeg_turbo",
+#    build_file = "//bazel:libjpeg_turbo.BUILD",
+#    path = "../libjpeg-turbo",
+#)
 
 new_git_repository(
     name = "cc_toolchains",
