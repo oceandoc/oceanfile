@@ -21,6 +21,12 @@ LOCAL_DEFINES = GLOBAL_LOCAL_DEFINES + select({
     "//conditions:default": [],
 })
 
+common_includes = [
+    "-Iexternal/libheif",
+    "-Iexternal/libheif/libheif",
+    "-Iexternal/libheif/libheif/api/libheif",
+]
+
 cc_library(
     name = "libheif",
     srcs = glob(
@@ -30,6 +36,8 @@ cc_library(
             "libheif/plugins/*.h",
             "libheif/plugins_windows.h",
             "libheif/plugins_windows.cc",
+            "libheif/plugins_unix.cc",
+            "libheif/plugins_unix.h",
         ],
     ) + [
         ":heif_version_h",
@@ -39,12 +47,19 @@ cc_library(
         "libheif/*.h",
         "libheif/api/libheif/*.h",
     ]),
-    copts = [
-        "-std=c++20",
-        "-Iexternal/libheif",
-        "-Iexternal/libheif/libheif",
-        "-Iexternal/libheif/libheif/api/libheif",
-    ],
+    copts = select({
+        "@platforms//os:linux": [
+            "-std=c++20",  # Linux 使用 GCC/Clang C++20
+        ],
+        "@platforms//os:osx": [],  # macOS 环境下没有特殊选项
+        "@platforms//os:windows": [
+            "/std:c++20",  # Windows 使用 MSVC C++20
+        ],
+        "//conditions:default": [
+			"-std=c++20",
+		],
+    }) + common_includes,
+	
     includes = [
         "libheif",
         "libheif/api",
